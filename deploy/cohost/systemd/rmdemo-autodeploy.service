@@ -1,0 +1,13 @@
+[Unit]
+Description=Auto-deploy rmdemo (Resume Matcher demo) from GitHub
+After=network-online.target docker.service
+Wants=network-online.target
+# Never let this interfere with the trading stack — it only ever touches the rmdemo project.
+
+[Service]
+Type=oneshot
+# HOME so git/ssh find /root/.ssh/config (the github-resume deploy-key alias) + known_hosts.
+Environment=HOME=/root
+ExecStart=/usr/local/bin/rmdemo-autodeploy.sh
+# Don't hammer the box if a deploy wedges.
+TimeoutStartSec=600

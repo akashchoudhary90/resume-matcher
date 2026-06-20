@@ -60,9 +60,20 @@ Open `https://schulich.edufund.ca:8443` → log in (`admin` / your password). Th
   serves it with `tls /cert.pem /key.pem`. Heavier but very mature. Ask and I'll wire it.
 
 ## Update
+
+**Manual** (after a `git push` from your laptop):
 ```bash
-docker compose -f deploy/cohost/docker-compose.cohost.yml -p rmdemo up -d --build
+cd ~/resume-matcher && git pull && docker compose -f deploy/cohost/docker-compose.cohost.yml -p rmdemo up -d --build
 ```
+
+**Hands-off (recommended)** — install the auto-deploy timer once; then every `git push` goes live on
+its own within ~3 minutes:
+```bash
+sudo bash deploy/cohost/install-autodeploy.sh
+```
+It pulls with the read-only deploy key and rebuilds **only** the `rmdemo` project — never the trading
+stack. Watch it: `tail -f /var/log/rmdemo-autodeploy.log` · status: `systemctl list-timers rmdemo-autodeploy.timer`.
+Requires `deploy/cohost/.env` (see `.env.example`).
 
 ## Delete it completely (zero residue)
 ```bash

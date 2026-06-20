@@ -1,0 +1,11 @@
+[Unit]
+Description=Run the rmdemo auto-deploy check every 3 minutes
+
+[Timer]
+OnBootSec=2min
+OnUnitActiveSec=3min
+AccuracySec=30s
+Unit=rmdemo-autodeploy.service
+
+[Install]
+WantedBy=timers.target
