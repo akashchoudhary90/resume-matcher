@@ -18,6 +18,10 @@ services:
     build:
       context: ../..
       dockerfile: Dockerfile
+      args:
+        # Install the Claude Code CLI into the image so the Claude backend is available. The image
+        # still runs on the deterministic mock engine until CLAUDE_CODE_OAUTH_TOKEN is set below.
+        WITH_CLAUDE: "${WITH_CLAUDE:-1}"
     image: rmdemo-app:latest
     container_name: rmdemo-app
     environment:
@@ -25,6 +29,12 @@ services:
       RM_ADMIN_PASSWORD: "${RM_ADMIN_PASSWORD:?set RM_ADMIN_PASSWORD before deploying}"
       RM_INFERENCE_BACKEND: "mock"
       RM_AUTOLOAD: "1"
+      # Demo matching engine: "claude_cli" uses your Claude subscription via the local CLI (no API
+      # key). Falls back to the deterministic engine automatically if the token below is unset.
+      RM_DEMO_BACKEND: "${RM_DEMO_BACKEND:-claude_cli}"
+      RM_CLAUDE_CLI_MODEL: "${RM_CLAUDE_CLI_MODEL:-sonnet}"
+      # Subscription token from `claude setup-token` (NOT an API key). Set it in deploy/cohost/.env.
+      CLAUDE_CODE_OAUTH_TOKEN: "${CLAUDE_CODE_OAUTH_TOKEN:-}"
     expose:
       - "8000"                 # reachable only inside this stack's private network
     networks:

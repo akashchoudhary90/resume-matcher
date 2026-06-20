@@ -35,11 +35,18 @@ def test_invisible_chars_stripped_at_ingestion():
 
 
 def test_auto_redact_name_false_keeps_name_but_still_redacts_contact():
-    # The consented client demo keeps names (identifiable results) but still strips contact info.
+    # auto_redact_name=False keeps the name but still strips contact info.
     data = b"Jane Doe\njane@example.com (416) 555-1212\nPython and SQL developer."
     cand = parse_resume_bytes("R01", "jane.txt", data, auto_redact_name=False)
     assert "Jane" in cand.text and "Doe" in cand.text  # name kept
     assert "jane@example.com" not in cand.text and "555" not in cand.text  # contact still redacted
+
+
+def test_redact_false_keeps_all_pii():
+    # The consented demo path uses redact=False — nothing is redacted (the matcher sees the raw text).
+    data = b"Jane Doe\njane@example.com (416) 555-1212\nPython and SQL developer."
+    cand = parse_resume_bytes("R01", "jane.txt", data, redact=False)
+    assert "jane@example.com" in cand.text and "Jane" in cand.text and "555" in cand.text
 
 
 def test_unknown_extension_decoded_as_text():

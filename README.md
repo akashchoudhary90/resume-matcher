@@ -87,7 +87,20 @@ Endpoints: `POST /api/demo/parse-job`, `POST /api/demo/run` (multipart upload),
 | `RM_DEMO_MAX_RESUMES` | `10` | Max resumes per upload. |
 | `RM_DEMO_MAX_FILE_MB` | `4` | Max size per uploaded file. |
 | `RM_DEMO_MAX_SESSIONS` | `100` | In-memory session cap (oldest evicted past this). |
-| `RM_DEMO_BACKEND` | `mock` | Matching engine for the demo (deterministic + fully local by default). |
+| `RM_DEMO_BACKEND` | `mock` | Matching engine: `mock` (deterministic) or `claude_cli` (Claude on your subscription). |
+| `RM_CLAUDE_CLI_MODEL` | `sonnet` | Model for the Claude backend (`sonnet` quality / `haiku` speed). |
+| `RM_DEMO_CONCURRENCY` | `4` | Parallel resume extractions per upload (Claude backend). |
+
+**Claude matching on your subscription (no API key).** Set `RM_DEMO_BACKEND=claude_cli` to score with
+Claude via the local **Claude Code CLI** authenticated by your subscription — same approach as the
+Kotak project, no per-token API bill. Claude does the skill *extraction* (which skills are evidenced,
+with verbatim quotes); the deterministic ranker still makes the score decision and discards any quote
+that isn't a real substring of the resume, so a hallucinated skill can't inflate the score. Setup:
+(1) build the image with `--build-arg WITH_CLAUDE=1` (the cohost compose does this by default), (2) run
+`claude setup-token` on a logged-in machine and put the token in `CLAUDE_CODE_OAUTH_TOKEN`. Until the
+token is present it falls back to `mock` automatically. Note: with the Claude engine, resume text is
+sent to Anthropic via your subscription session (the deterministic `mock` engine keeps everything
+on-box).
 
 ### Deploying behind a domain (Docker + automatic HTTPS)
 

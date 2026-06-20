@@ -93,13 +93,18 @@ def parse_resume_text(
     years_experience: float | None = None,
     has_resume: bool = True,
     auto_redact_name: bool = True,
+    redact: bool = True,
 ) -> CandidateProfile:
+    # Invisible/zero-width characters are stripped regardless (anti-injection hygiene, not PII).
     raw_text = strip_invisible(raw_text)
-    # Contact identifiers (email/phone/url/address) are always redacted (cheap, and keeps the
-    # non-local-adapter tripwire satisfied). The applicant's NAME is only auto-redacted when the
-    # caller asks for it: the consented client demo keeps names so results stay identifiable.
-    redact_name = name or (guess_name(raw_text) if auto_redact_name else None)
-    redacted = redact_text(raw_text, name=redact_name)
+    if not redact:
+        # Caller explicitly wants the raw text (e.g. the consented client demo): no PII redaction.
+        redacted = raw_text
+    else:
+        # Contact identifiers (email/phone/url/address) are redacted; the applicant's NAME is only
+        # auto-redacted when the caller asks for it.
+        redact_name = name or (guess_name(raw_text) if auto_redact_name else None)
+        redacted = redact_text(raw_text, name=redact_name)
     return CandidateProfile(
         candidate_id=candidate_id,
         skills=normalize_skills(redacted),

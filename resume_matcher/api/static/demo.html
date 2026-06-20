@@ -250,7 +250,7 @@ $('#runBtn').onclick = async () => {
   fd.append('preferred_skills', SKILLS.filter(s=>s.bucket==='preferred').map(s=>s.id).join(';'));
   fd.append('min_education', $('#minEdu').value);
   FILES.forEach(f=> fd.append('resumes', f, f.name));
-  $('#runBtn').disabled=true; $('#runStatus').textContent='Scoring… (your files are processed in memory and discarded after)';
+  $('#runBtn').disabled=true; $('#runStatus').textContent='Scoring… (processed in memory, discarded after; AI matching can take a bit for several resumes)';
   try{
     const r = await fetch('/api/demo/run', {method:'POST', body:fd});
     const d = await r.json();
@@ -351,8 +351,11 @@ function renderResults(d){
   const job = d.job||{};
   const reqList = (job.required_skills||[]).map(s=>esc(s.name)).join(', ')||'—';
   const prefList = (job.preferred_skills||[]).map(s=>esc(s.name)).join(', ')||'—';
+  const engine = d.engine==='claude_cli'
+    ? `<span class="pill" style="color:var(--green)">engine: Claude</span>`
+    : `<span class="pill">engine: deterministic</span>`;
   const head = `<div class="card">
-      <h2>${esc(job.title||'Role')} <span class="muted" style="font-weight:400">@ ${esc(job.employer||'')}</span></h2>
+      <h2>${esc(job.title||'Role')} <span class="muted" style="font-weight:400">@ ${esc(job.employer||'')}</span> ${engine}</h2>
       <div class="muted">Required: ${reqList} &nbsp;·&nbsp; Preferred: ${prefList}${job.min_education?` &nbsp;·&nbsp; min education: ${esc(job.min_education)}`:''}</div>
       <div class="muted" style="margin-top:6px">${d.n_resumes} resume(s) scored. ${esc((d.privacy&&d.privacy.note)||'')}</div>
     </div>`;

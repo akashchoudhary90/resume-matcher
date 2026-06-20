@@ -80,6 +80,10 @@ def get_adapter(backend: str | None = None) -> InferenceAdapter:
         from .adapters.claude_code import ClaudeCodeAdapter
 
         return ClaudeCodeAdapter()
+    if backend == "claude_cli":
+        from .adapters.claude_cli import ClaudeCliAdapter
+
+        return ClaudeCliAdapter()
     if backend == "ollama":
         from .adapters.ollama import OllamaAdapter
 
@@ -90,5 +94,5 @@ def get_adapter(backend: str | None = None) -> InferenceAdapter:
         return OpenAICompatAdapter()
     raise InferenceError(
         f"Unknown RM_INFERENCE_BACKEND={backend!r}. "
-        f"Expected one of: mock, claude_code, ollama, openai_compat."
+        f"Expected one of: mock, claude_code, claude_cli, ollama, openai_compat."
     )

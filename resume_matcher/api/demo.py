@@ -17,12 +17,14 @@ import os
 import secrets
 import threading
 import time
+from concurrent.futures import ThreadPoolExecutor
 from dataclasses import dataclass, field
 
 from ..ingestion.job_posting import build_job_spec, skill_options
 from ..ingestion.parser import ParseError, SUPPORTED_EXTS, parse_resume_bytes
 from ..inference.adapter import get_adapter
-from ..matching.pipeline import run_matching
+from ..matching import coaching as coaching_mod
+from ..matching.evaluator import evaluate
 from .serialize import result_to_dict
 
 
@@ -37,7 +39,10 @@ MAX_RESUMES = _int_env("RM_DEMO_MAX_RESUMES", 10)
 MAX_FILE_MB = _int_env("RM_DEMO_MAX_FILE_MB", 4)
 TTL_MINUTES = _int_env("RM_DEMO_TTL_MINUTES", 30)
 MAX_SESSIONS = _int_env("RM_DEMO_MAX_SESSIONS", 100)
-DEMO_BACKEND = os.environ.get("RM_DEMO_BACKEND", "mock")  # deterministic + fully local by default
+# Matching engine: "mock" (deterministic, default) or "claude_cli" (Claude on your subscription via
+# the local Claude Code CLI — no API key). claude_cli falls back to mock if the CLI/token is absent.
+DEMO_BACKEND = os.environ.get("RM_DEMO_BACKEND", "mock")
+CONCURRENCY = max(1, _int_env("RM_DEMO_CONCURRENCY", 4))  # parallel extractions per upload batch
 
 
 class DemoError(Exception):
@@ -54,6 +59,7 @@ class DemoSession:
     results: list[dict] = field(default_factory=list)
     n_resumes: int = 0
     warnings: list[str] = field(default_factory=list)
+    engine: str = "mock"  # which matching engine actually ran ("mock" | "claude_cli")
     # NB: raw resume text is intentionally NOT a field here — it is dropped after scoring.
 
     @property
@@ -68,6 +74,7 @@ class DemoSession:
             "results": self.results,
             "n_resumes": self.n_resumes,
             "warnings": self.warnings,
+            "engine": self.engine,
             "score_kind": "fit_readiness_not_hire_probability",
             "privacy": {
                 "stored_on_disk": False,
@@ -93,7 +100,8 @@ class SessionStore:
         self._sessions: dict[str, DemoSession] = {}
         self._lock = threading.Lock()
 
-    def create(self, job: dict, results: list[dict], n_resumes: int, warnings: list[str]) -> DemoSession:
+    def create(self, job: dict, results: list[dict], n_resumes: int, warnings: list[str],
+               engine: str = "mock") -> DemoSession:
         now = time.time()
         sid = secrets.token_urlsafe(24)
         sess = DemoSession(
@@ -105,6 +113,7 @@ class SessionStore:
             results=results,
             n_resumes=n_resumes,
             warnings=warnings,
+            engine=engine,
         )
         with self._lock:
             self._evict_if_needed_locked(now)
@@ -221,9 +230,9 @@ def run_demo(
         seen_labels.add(label)
         labels[cid] = label
         try:
-            # Clients consent to PII, so names are kept (auto_redact_name=False) for identifiable
-            # results; contact identifiers are still redacted at ingestion.
-            cand = parse_resume_bytes(cid, filename or f"{cid}.txt", data, auto_redact_name=False)
+            # Clients consent to PII: no redaction at all (redact=False) so the resume reaches the
+            # matcher exactly as written. Invisible/zero-width chars are still stripped (safety).
+            cand = parse_resume_bytes(cid, filename or f"{cid}.txt", data, redact=False)
         except ParseError as exc:
             warnings.append(f"{label}: {exc}")
             continue
@@ -238,15 +247,29 @@ def run_demo(
             + (" ".join(warnings) if warnings else "")
         )
 
-    adapter = get_adapter(backend or DEMO_BACKEND)
-    n = len(candidates)
-    run = run_matching(candidates, [job], adapter=adapter, retrieve_k=n, shortlist_k=n)
-    shortlist = run.shortlists[0]
+    adapter, engine, fallback_note = _resolve_adapter(backend or DEMO_BACKEND)
+    if fallback_note:
+        warnings.append(fallback_note)
 
+    # Score every uploaded resume against the one job, in parallel (the LLM backend is the slow part;
+    # each evaluate() does anti-gaming checks + extraction + the deterministic ranker). A per-candidate
+    # failure (e.g. an LLM timeout) fails quiet to the deterministic mock so one bad call never sinks
+    # the whole batch.
+    def _score_one(cand):
+        try:
+            return evaluate(cand, job, adapter)
+        except Exception:  # noqa: BLE001
+            return evaluate(cand, job, get_adapter("mock"))
+
+    workers = min(len(candidates), CONCURRENCY) or 1
+    with ThreadPoolExecutor(max_workers=workers) as pool:
+        scored = list(pool.map(_score_one, candidates))
+
+    ranked = sorted(scored, key=lambda r: r.fit_score, reverse=True)
     by_id = {c.candidate_id: c for c in candidates}
     results = []
-    for res, coach in zip(shortlist.ranked, shortlist.coaching):
-        row = result_to_dict(res, coach, label=labels.get(res.candidate_id))
+    for res in ranked:
+        row = result_to_dict(res, coaching_mod.coach(res, job), label=labels.get(res.candidate_id))
         cand = by_id.get(res.candidate_id)
         if cand is not None:
             row["education_level"] = cand.education_level
@@ -262,8 +285,26 @@ def run_demo(
         "min_education": job.min_education,
     }
     # Local resume text / bytes go out of scope here and are garbage-collected; only `results`
-    # (de-identified breakdown) is persisted in the session.
-    return store.create(job=job_summary, results=results, n_resumes=n, warnings=warnings)
+    # (the score breakdown) is persisted in the session.
+    return store.create(
+        job=job_summary, results=results, n_resumes=len(candidates), warnings=warnings, engine=engine
+    )
+
+
+def _resolve_adapter(name: str):
+    """Return (adapter, engine_name, fallback_note). If the Claude CLI backend is requested but not
+    available (CLI/token missing), fall back to the deterministic mock so the demo always works."""
+    if name == "claude_cli":
+        from ..inference.adapters.claude_cli import available
+
+        if not available():
+            return (
+                get_adapter("mock"),
+                "mock",
+                "Claude backend unavailable (CLI or CLAUDE_CODE_OAUTH_TOKEN missing) — "
+                "used the deterministic engine instead.",
+            )
+    return get_adapter(name), name, ""
 
 
 _STORE: SessionStore | None = None
