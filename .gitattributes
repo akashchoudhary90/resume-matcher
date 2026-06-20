@@ -1,0 +1,14 @@
+# Normalize line endings. Force LF on everything that runs on the Linux VPS, so a Windows edit
+# (autocrlf=true) can never inject CRLF and break a bash script with `bad interpreter: ...^M`.
+* text=auto
+
+*.sh            text eol=lf
+*.service       text eol=lf
+*.timer         text eol=lf
+Dockerfile      text eol=lf
+*.Dockerfile    text eol=lf
+Caddyfile       text eol=lf
+*.yml           text eol=lf
+*.yaml          text eol=lf
+*.env           text eol=lf
+.env.example    text eol=lf
