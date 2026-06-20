@@ -19,9 +19,10 @@ team can drop in their own backend later with a one-line config change.
    data planes (`stores/data_planes.py`).
 3. **PII stays local by default.** A mandatory redaction pass (`inference/redaction.py`) runs before
    any non-local adapter ever sees text.
-4. **No fabricated "% chance of hire."** We ship an honest **fit/readiness score** with visible
-   components, and the LLM never makes the scoring decision — a deterministic ranker does
-   (`matching/ranker.py`).
+4. **No fabricated "% chance of hire."** We ship an honest **fit/readiness score** with a
+   point-by-point breakdown — every point is tied to a skill the job asked for and the **verbatim
+   quote** from the resume that proves it. The LLM never makes the scoring decision; a deterministic
+   ranker does (`matching/ranker.py`), and the breakdown reconciles exactly to the headline number.
 
 ---
 
@@ -53,13 +54,40 @@ uvicorn resume_matcher.api.app:app --reload
 
 The dashboard ([resume_matcher/api/static/index.html](resume_matcher/api/static/index.html)) is a thin,
 no-build-step client over the `/api/*` endpoints — a coordinator can browse per-job shortlists with fit
-scores + review flags, look up a student's closest-fit roles, and read the live bias-audit panel. The
-API is the contract (see `/docs`); a React front-end can replace the bundled HTML later. Key endpoints:
-`POST /api/load-synthetic`, `GET /api/jobs`, `GET /api/jobs/{id}/shortlist`, `GET /api/candidates/{id}`,
-`GET /api/audit`, `POST /api/score`.
+scores + review flags, expand **"why this score?"** for the full point-by-point breakdown (each skill,
+its verbatim resume quote, and the points it earned), look up a student's closest-fit roles, and read
+the live bias-audit panel. The API is the contract (see `/docs`); a React front-end can replace the
+bundled HTML later. Key endpoints: `POST /api/load-synthetic`, `GET /api/jobs`,
+`GET /api/jobs/{id}/shortlist`, `GET /api/candidates/{id}`, `GET /api/audit`, `POST /api/score`.
 
 **Admin password:** set `RM_ADMIN_PASSWORD` (and optionally `RM_ADMIN_USER`, default `admin`) to put
 the whole app — dashboard, API, and docs — behind HTTP Basic auth. Unset = open (local dev only).
+
+### Try it with your own data — the ephemeral demo (`/demo`)
+
+For client demos, open **`/demo`**: upload **one job posting + up to 10 resumes** (`.pdf`/`.docx`/`.txt`),
+auto-detect and re-tag the job's skills, and get every resume scored with the full reasoning breakdown.
+
+**Privacy is the whole point of this flow** (see **[PRIVACY.md](PRIVACY.md)**):
+
+- Resumes are parsed **in memory only — never written to disk**.
+- The **full resume text is discarded the instant scoring finishes**; the session keeps only the
+  score breakdown (with short evidence quotes). Results are labelled by the uploaded filename so
+  they're identifiable (clients consent to this PII); contact identifiers are still redacted.
+- Sessions **auto-delete after idle TTL** *and* there is a **"Delete my data now"** button that wipes
+  everything immediately. A server restart also erases all sessions.
+
+Endpoints: `POST /api/demo/parse-job`, `POST /api/demo/run` (multipart upload),
+`GET /api/demo/session/{id}`, `DELETE /api/demo/session/{id}`, `GET /api/demo/config`. Tunables (env):
+
+| Variable | Default | Meaning |
+|---|---|---|
+| `RM_DEMO_ENABLED` | `1` | Set `0` to disable the upload flow (e.g. keep a public host synthetic-only). |
+| `RM_DEMO_TTL_MINUTES` | `30` | Idle minutes before a session auto-deletes. |
+| `RM_DEMO_MAX_RESUMES` | `10` | Max resumes per upload. |
+| `RM_DEMO_MAX_FILE_MB` | `4` | Max size per uploaded file. |
+| `RM_DEMO_MAX_SESSIONS` | `100` | In-memory session cap (oldest evicted past this). |
+| `RM_DEMO_BACKEND` | `mock` | Matching engine for the demo (deterministic + fully local by default). |
 
 ### Deploying behind a domain (Docker + automatic HTTPS)
 
@@ -99,13 +127,13 @@ adapter and asserts schema-valid output — that is the proof of swappability.
 
 ```
 resume_matcher/
-  inference/    InferenceAdapter + adapters, MatchExtraction/ScoreResult schema, redaction, MCP server
-  ingestion/    Handshake-export importer, resume parser, synthetic-data generator
-  matching/     skill taxonomy, retrieval, rerank, LLM evaluator, deterministic ranker, coaching
+  inference/    InferenceAdapter + adapters, MatchExtraction/ScoreResult+ScoreExplanation schema, redaction, MCP server
+  ingestion/    Handshake-export importer, resume parser (PDF/DOCX/TXT, in-memory), job-posting parser, synthetic data
+  matching/     skill taxonomy, retrieval, rerank, LLM evaluator, deterministic ranker + score explanation, coaching, flag text
   audit/        bias-audit metrics (4/5ths + Fisher + rank-aware + homophily), proxy-leakage test
   antigaming/   hidden-text detection, keyword-stuffing checks, prompt-injection detection
   stores/       scoring_store + audit_store — two physically separated data planes
-  api/          FastAPI wiring (optional)
+  api/          FastAPI wiring + dashboard (index.html) + ephemeral demo (demo.py, demo.html), result serializer
   ui/           Streamlit coordinator dashboard (optional)
 scripts/        gen_synthetic.py, run_demo.py
 tests/          unit + contract + injection + audit + e2e smoke

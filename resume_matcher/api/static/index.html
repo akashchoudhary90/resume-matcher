@@ -55,6 +55,7 @@
 <div class="toolbar">
   <button id="loadBtn">Load synthetic data</button>
   <button id="regenBtn" class="ghost">Regenerate</button>
+  <a href="/demo" style="text-decoration:none"><button class="ghost">📤 Try with your own data →</button></a>
   <span class="pill" id="backendPill">backend: —</span>
   <span class="status" id="status">No data loaded.</span>
 </div>
@@ -93,12 +94,42 @@
 const $ = s => document.querySelector(s);
 const api = async (path, opts) => (await fetch(path, opts)).json();
 
+function esc(s){ return (s==null?'':String(s)).replace(/[&<>"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c])); }
 function gradeClass(g){ return 'g-'+g; }
+function scoreGrade(s){ return s>=80?'A':s>=65?'B':s>=50?'C':'D'; }
 function flagChip(f){
   let cls = 'chip';
   if (f.startsWith('injection')||f.startsWith('unverifiable')||f.startsWith('hidden')) cls='chip bad';
-  else if (f.startsWith('stuffing')||f.startsWith('below_min')) cls='chip warn';
-  return `<span class="${cls}">${f}</span>`;
+  else if (f.startsWith('stuffing')||f.startsWith('below_min')||f.startsWith('no_required')) cls='chip warn';
+  return `<span class="${cls}">${esc(f)}</span>`;
+}
+function flagChipFull(fe){
+  const cls = fe.severity==='bad'?'chip bad':fe.severity==='warn'?'chip warn':'chip';
+  return `<span class="${cls}" title="${esc(fe.text)}">${esc(fe.flag)}</span>`;
+}
+function statusCell(c){
+  if(c.verified && c.status==='match') return `<span style="color:var(--green);font-weight:700">✓ match</span>`;
+  if(c.verified && c.status==='partial') return `<span style="color:var(--amber);font-weight:700">◐ partial</span>`;
+  if(!c.verified && c.status!=='missing') return `<span style="color:var(--red);font-weight:700">⚠ not counted</span>`;
+  return `<span class="muted">✗ missing</span>`;
+}
+function explanationHtml(ex){
+  if(!ex) return '<div class="muted">No breakdown available.</div>';
+  const rows = (ex.components||[]).filter(c=>c.bucket==='required'||c.bucket==='preferred').map(c=>`
+    <tr><td><b>${esc(c.skill_name)}</b> <span class="muted" style="text-transform:capitalize">(${esc(c.bucket)})</span></td>
+        <td>${statusCell(c)}</td>
+        <td>${c.evidence_span?`<code>“${esc(c.evidence_span)}”</code>`:`<span class="muted">${esc(c.note)}</span>`}</td>
+        <td style="white-space:nowrap"><b>${c.points_earned}</b> <span class="muted">/ ${c.points_possible}</span></td></tr>`).join('');
+  const edu = (ex.components||[]).find(c=>c.bucket==='education');
+  return `<div class="muted" style="font-family:monospace;font-size:12px;margin:6px 0">${esc(ex.formula)}</div>
+    <table><thead><tr><th>Skill the job needs</th><th>Result</th><th>Evidence from resume</th><th>Points</th></tr></thead>
+    <tbody>${rows||'<tr><td colspan="4" class="muted">No skills listed.</td></tr>'}</tbody>
+    <tfoot>
+      <tr><td colspan="3" class="muted">Required earned</td><td><b>${ex.required_earned}</b> / ${ex.required_possible}</td></tr>
+      <tr><td colspan="3" class="muted">Preferred earned</td><td><b>${ex.preferred_earned}</b> / ${ex.preferred_possible}</td></tr>
+      <tr><td colspan="3">Subtotal × education ${edu?`(×${ex.education_factor})`:''}</td><td><b>${ex.subtotal}</b> × ${ex.education_factor}</td></tr>
+      <tr><td colspan="3"><b>Final fit</b></td><td><span class="score ${gradeClass(scoreGrade(ex.final_score))}">${ex.final_score}</span></td></tr>
+    </tfoot></table>`;
 }
 
 async function refreshStatus(){
@@ -113,8 +144,8 @@ async function loadJobs(){
   const el = $('#jobList');
   if(!jobs.length){ el.innerHTML='<div class="muted">No jobs.</div>'; return; }
   el.innerHTML = jobs.map(j =>
-    `<div class="row" data-job="${j.job_id}">${j.title}
-       <small>${j.employer} · ${j.shortlisted} shortlisted · top fit ${j.top_fit ?? '—'}</small></div>`).join('');
+    `<div class="row" data-job="${esc(j.job_id)}">${esc(j.title)}
+       <small>${esc(j.employer)} · ${j.shortlisted} shortlisted · top fit ${j.top_fit ?? '—'}</small></div>`).join('');
   el.querySelectorAll('.row').forEach(r => r.onclick = () => {
     el.querySelectorAll('.row').forEach(x=>x.classList.remove('sel'));
     r.classList.add('sel'); showShortlist(r.dataset.job);
@@ -123,60 +154,69 @@ async function loadJobs(){
 
 async function showShortlist(jobId){
   const data = await api(`/api/jobs/${jobId}/shortlist`);
-  const rows = data.shortlist.map(c => `
+  const rows = data.shortlist.map(c => {
+    const flags = (c.flags_explained && c.flags_explained.length)
+      ? c.flags_explained.map(flagChipFull).join('')
+      : ((c.flags||[]).map(flagChip).join('') || '<span class="muted">—</span>');
+    const expl = explanationHtml(c.explanation);
+    return `
     <tr>
-      <td><b>${c.candidate_id}</b></td>
+      <td><b>${esc(c.candidate_id)}</b></td>
       <td><span class="score ${gradeClass(c.grade)}">${c.fit_score}</span></td>
-      <td>${c.grade}</td>
-      <td class="muted">${c.confidence}</td>
-      <td>${(c.flags||[]).map(flagChip).join('') || '<span class="muted">—</span>'}</td>
+      <td>${esc(c.grade)}</td>
+      <td class="muted">${esc(c.confidence)}</td>
+      <td>${flags}</td>
       <td>
+        <details><summary>why this score?</summary>
+          <div class="muted" style="margin:6px 0">${esc(c.explanation?c.explanation.summary:'')}</div>
+          ${expl}
+        </details>
         <details><summary>coaching</summary>
           <div class="muted" style="margin-top:6px">verified: ${(c.verified_skills||[]).join(', ')||'—'}</div>
-          ${(c.blocking_gaps||[]).map(g=>`<div>• <b>${g.skill}</b> (${g.difficulty}) — ${g.action}</div>`).join('')||'<div class="muted">no essential gaps</div>'}
+          ${(c.blocking_gaps||[]).map(g=>`<div>• <b>${esc(g.skill)}</b> (${esc(g.difficulty)}) — ${esc(g.action)}</div>`).join('')||'<div class="muted">no essential gaps</div>'}
         </details>
       </td>
-    </tr>`).join('');
+    </tr>`; }).join('');
   $('#shortlist').innerHTML = `
-    <h3 style="margin-top:0">${data.job.title} <span class="muted">@ ${data.job.employer}</span></h3>
-    <div class="muted" style="margin-bottom:8px">requires: ${data.job.required_skills.join(', ')}</div>
+    <h3 style="margin-top:0">${esc(data.job.title)} <span class="muted">@ ${esc(data.job.employer)}</span></h3>
+    <div class="muted" style="margin-bottom:8px">requires: ${(data.job.required_skills||[]).map(esc).join(', ')}</div>
     <table><thead><tr><th>Candidate</th><th>Fit</th><th>Grade</th><th>Conf.</th><th>Review flags</th><th></th></tr></thead>
     <tbody>${rows}</tbody></table>`;
 }
 
 async function loadCandidates(){
   const ids = await api('/api/candidates');
-  $('#candList').innerHTML = ids.map(i=>`<option value="${i}">`).join('');
+  $('#candList').innerHTML = ids.map(i=>`<option value="${esc(i)}">`).join('');
 }
 async function showCandidate(){
   const id = $('#candInput').value.trim();
   if(!id) return;
-  const c = await api(`/api/candidates/${id}`);
-  if(c.detail){ $('#candView').innerHTML = `<div class="chip bad">${c.detail}</div>`; return; }
+  const c = await api(`/api/candidates/${encodeURIComponent(id)}`);
+  if(c.detail){ $('#candView').innerHTML = `<div class="chip bad">${esc(c.detail)}</div>`; return; }
   const roles = (c.closest_fit||[]).map(r=>`
-    <tr><td>${r.title}</td><td class="muted">${r.employer}</td>
+    <tr><td>${esc(r.title)}</td><td class="muted">${esc(r.employer)}</td>
         <td><span class="score ${gradeClass(r.grade)}">${r.fit_score}</span></td>
-        <td>${(r.blocking_gaps||[]).join(', ')||'<span class="muted">—</span>'}</td></tr>`).join('');
+        <td>${(r.blocking_gaps||[]).map(esc).join(', ')||'<span class="muted">—</span>'}</td></tr>`).join('');
   $('#candView').innerHTML = `
     <div class="cards">
-      <div class="card"><b>${c.candidate_id}</b><div class="muted">education: ${c.education_level||'—'} · ${c.years_experience} yrs · resume: ${c.has_resume}</div>
-        <div style="margin-top:8px">${c.skills.map(s=>`<span class="chip">${s}</span>`).join('')||'<span class="muted">no skills parsed</span>'}</div></div>
+      <div class="card"><b>${esc(c.candidate_id)}</b><div class="muted">education: ${esc(c.education_level||'—')} · ${c.years_experience} yrs · resume: ${c.has_resume}</div>
+        <div style="margin-top:8px">${c.skills.map(s=>`<span class="chip">${esc(s)}</span>`).join('')||'<span class="muted">no skills parsed</span>'}</div></div>
     </div>
-    <h3>Roles ${c.candidate_id} is closest to</h3>
+    <h3>Roles ${esc(c.candidate_id)} is closest to</h3>
     <table><thead><tr><th>Role</th><th>Employer</th><th>Fit</th><th>Blocking gaps</th></tr></thead><tbody>${roles}</tbody></table>`;
 }
 
 async function showAudit(){
   const a = await api('/api/audit');
   const el = $('#auditView');
-  if(!a.available){ el.innerHTML = `<div class="muted">Audit unavailable: ${a.reason||'load data first'}.</div>`; return; }
+  if(!a.available){ el.innerHTML = `<div class="muted">Audit unavailable: ${esc(a.reason||'load data first')}.</div>`; return; }
   const attrTable = (name, r) => `
     <div class="card">
       <h3 style="margin-top:0">${name.replace('_',' ')}
         <span class="badge ${r.four_fifths_pass?'pass':'fail'}">${r.four_fifths_pass?'four-fifths PASS':'FLAGGED'}</span></h3>
       <div class="muted" style="margin-bottom:6px">min impact ratio: ${r.min_impact_ratio ?? '—'}</div>
       <table><thead><tr><th>Group</th><th>n</th><th>Selected</th><th>Rate</th><th>Impact ratio</th><th>Fisher p</th></tr></thead>
-      <tbody>${r.groups.map(g=>`<tr><td>${g.group}${g.below_min_cell?' <span class="chip warn">small cell</span>':''}</td>
+      <tbody>${r.groups.map(g=>`<tr><td>${esc(g.group)}${g.below_min_cell?' <span class="chip warn">small cell</span>':''}</td>
         <td>${g.n}</td><td>${g.selected}</td><td>${g.selection_rate}</td>
         <td>${g.impact_ratio ?? '—'}</td><td class="muted">${g.fisher_p ?? '—'}</td></tr>`).join('')}</tbody></table>
     </div>`;
@@ -184,15 +224,15 @@ async function showAudit(){
   const homoCard = h ? `<div class="card"><h3 style="margin-top:0">Homophily disparity
       <span class="badge ${h.flagged?'fail':'pass'}">${h.flagged?'FLAGGED':'ok'}</span></h3>
       <div class="muted">The reframed "hire from own community" hunch — measured, never an input.</div>
-      ${h.computable?`<p>reference group <code>${h.reference_group}</code>: same-group rate ${h.same_group_selection_rate},
+      ${h.computable?`<p>reference group <code>${esc(h.reference_group)}</code>: same-group rate ${h.same_group_selection_rate},
          different-group rate ${h.different_group_selection_rate}, disparity ratio <b>${h.disparity_ratio}</b></p>`
-        :`<p class="muted">${h.reason}</p>`}</div>` : '';
+        :`<p class="muted">${esc(h.reason)}</p>`}</div>` : '';
   const p = a.proxy_leakage;
   const proxyCard = p ? `<div class="card"><h3 style="margin-top:0">Proxy-leakage diagnostic
       <span class="badge ${p.leakage?'fail':'pass'}">${p.leakage?'LEAKAGE':'clean'}</span></h3>
       <div class="muted">Can scoring features predict the protected attribute? (they shouldn't)</div>
       ${p.computable?`<p>AUC <b>${p.auc}</b> · accuracy ${p.classifier_accuracy} vs baseline ${p.baseline_accuracy}</p>`
-        :`<p class="muted">${p.reason}</p>`}</div>` : '';
+        :`<p class="muted">${esc(p.reason)}</p>`}</div>` : '';
   el.innerHTML = `<div class="muted" style="margin-bottom:10px">${a.n_selected} of ${a.n_pool} candidates shortlisted somewhere. Protected attributes are read aggregate-only and never feed scoring.</div>
     <div class="cards">${Object.entries(a.attributes).map(([k,v])=>attrTable(k,v)).join('')}${homoCard}${proxyCard}</div>`;
 }

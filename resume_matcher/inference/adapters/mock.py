@@ -17,10 +17,11 @@ from ..schema import (
     SkillEvidence,
 )
 from ..adapter import InferenceAdapter
+from ...matching.taxonomy import canonical_name
 
 
 def _surface_forms(skill_id: str) -> list[str]:
-    return [skill_id.replace("_", " "), skill_id]
+    return [canonical_name(skill_id), skill_id.replace("_", " "), skill_id]
 
 
 def _find_span(text: str, skill_id: str) -> str | None:
@@ -33,7 +34,7 @@ def _find_span(text: str, skill_id: str) -> str | None:
 
 
 def _name(skill_id: str) -> str:
-    return skill_id.replace("_", " ").title()
+    return canonical_name(skill_id)
 
 
 class MockAdapter(InferenceAdapter):

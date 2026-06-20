@@ -53,6 +53,45 @@ _CANONICAL: dict[str, str] = {
     "spark": "Apache Spark",
     "hadoop": "Hadoop",
     "r_lang": "R",
+    # --- common additions for better coverage of real postings (unambiguous surface forms only) ---
+    "kotlin": "Kotlin",
+    "scala": "Scala",
+    "php": "PHP",
+    "rust": "Rust",
+    "golang": "Golang",  # NOT "Go" — that would make bare "go" match ordinary English text
+    "ruby": "Ruby",
+    "rails": "Ruby on Rails",
+    "dotnet": ".NET",
+    "fastapi": "FastAPI",
+    "spring_boot": "Spring Boot",
+    "angular": "Angular",
+    "vue": "Vue.js",
+    "svelte": "Svelte",
+    "nextjs": "Next.js",
+    "redux": "Redux",
+    "graphql": "GraphQL",
+    "terraform": "Terraform",
+    "ansible": "Ansible",
+    "jenkins": "Jenkins",
+    "ci_cd": "CI/CD",
+    "kafka": "Apache Kafka",
+    "redis": "Redis",
+    "elasticsearch": "Elasticsearch",
+    "rabbitmq": "RabbitMQ",
+    "snowflake": "Snowflake",
+    "databricks": "Databricks",
+    "airflow": "Apache Airflow",
+    "bigquery": "BigQuery",
+    "redshift": "Amazon Redshift",
+    "mysql": "MySQL",
+    "selenium": "Selenium",
+    "pytest": "pytest",
+    "jira": "Jira",
+    "confluence": "Confluence",
+    "figma": "Figma",
+    "salesforce": "Salesforce",
+    "powerpoint": "PowerPoint",
+    "matplotlib": "Matplotlib",
 }
 
 # surface form (lowercase) -> canonical_id. Includes the canonical names themselves + synonyms.
@@ -82,6 +121,26 @@ _SYNONYMS: dict[str, str] = {
     "r programming": "r_lang",
     "scikit-learn": "machine_learning",
     "sklearn": "machine_learning",
+    # synonyms for the expanded skill set
+    "go lang": "golang",
+    "ruby on rails": "rails",
+    "asp.net": "dotnet",
+    ".net core": "dotnet",
+    ".net": "dotnet",
+    "vuejs": "vue",
+    "vue.js": "vue",
+    "next.js": "nextjs",
+    "ci/cd": "ci_cd",
+    "cicd": "ci_cd",
+    "continuous integration": "ci_cd",
+    "apache kafka": "kafka",
+    "apache airflow": "airflow",
+    "elastic search": "elasticsearch",
+    "big query": "bigquery",
+    "amazon redshift": "redshift",
+    "spring boot": "spring_boot",
+    "springboot": "spring_boot",
+    "power point": "powerpoint",
 }
 
 
@@ -114,8 +173,10 @@ def normalize_skills(text: str) -> list[str]:
     low = " " + text.lower() + " "
     found: set[str] = set()
     for surface, cid in _SURFACE_INDEX:
-        # word-ish boundaries; allow +, #, . inside surface forms (c++, node.js)
-        pattern = r"(?<![\w+#.])" + re.escape(surface) + r"(?![\w+#.])"
+        # word-ish boundaries; allow +, #, . INSIDE surface forms (c++, node.js) but treat a
+        # trailing "." as a boundary unless it's followed by a word char — so "Docker." at the end
+        # of a sentence still matches, while "node" inside "node.js" does not match on its own.
+        pattern = r"(?<![\w+#.])" + re.escape(surface) + r"(?![\w+#])(?!\.\w)"
         if re.search(pattern, low):
             found.add(cid)
     return sorted(found)

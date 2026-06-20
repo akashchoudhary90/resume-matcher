@@ -10,11 +10,13 @@ scikit-learn>=1.4
 ollama>=0.2          # RM_INFERENCE_BACKEND=ollama
 openai>=1.30         # RM_INFERENCE_BACKEND=openai_compat
 mcp>=1.2             # stdio MCP score_resume server (inference/server.py)
-# Real PDF resume parsing (parser falls back to plain-text ingestion without these):
+# Real PDF/DOCX resume parsing (parser falls back to plain-text ingestion without these):
 pdfplumber>=0.11
 pypdf>=4.0
+python-docx>=1.1     # parse uploaded .docx resumes (ingestion/parser.py)
 # Optional service + UI layers:
 fastapi>=0.110
 uvicorn>=0.29
+python-multipart>=0.0.9   # file uploads for the ephemeral real-data demo (/api/demo/run)
 httpx>=0.27          # FastAPI TestClient (tests/test_api.py)
 streamlit>=1.33

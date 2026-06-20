@@ -21,6 +21,7 @@ from ..inference.adapter import get_adapter
 from ..inference.schema import CandidateProfile
 from ..matching.pipeline import MatchingRun, run_matching
 from ..stores.data_planes import AuditStore
+from .serialize import result_to_dict
 
 DATA = Path("data/synthetic")
 
@@ -99,21 +100,7 @@ class AppState:
         sl = next((s for s in self.run.shortlists if s.job.job_id == job_id), None)
         if sl is None:
             return None
-        rows = []
-        for r, coach in zip(sl.ranked, sl.coaching):
-            rows.append(
-                {
-                    "candidate_id": r.candidate_id,
-                    "fit_score": r.fit_score,
-                    "grade": r.grade,
-                    "confidence": r.confidence.value,
-                    "flags": r.flags,
-                    "subscores": r.subscores,
-                    "blocking_gaps": coach["blocking_gaps"],
-                    "next_actions": coach["next_actions"],
-                    "verified_skills": [m.skill_name for m in r.verified_matches],
-                }
-            )
+        rows = [result_to_dict(r, coach) for r, coach in zip(sl.ranked, sl.coaching)]
         return {
             "job": {"job_id": sl.job.job_id, "title": sl.job.title, "employer": sl.job.employer,
                      "required_skills": sl.job.required_skills, "preferred_skills": sl.job.preferred_skills},

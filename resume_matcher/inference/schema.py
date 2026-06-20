@@ -109,12 +109,55 @@ class MatchExtraction(BaseModel):
 
 
 # --------------------------------------------------------------------------------------
+# Score explanation — the auditable derivation of the number (every point is traceable)
+# --------------------------------------------------------------------------------------
+class ScoreComponent(BaseModel):
+    """One line item in the score breakdown. Every point of `fit_score` is attributed to exactly
+    one of these, so a coordinator (or the candidate) can see WHY the number is what it is.
+
+    `points_earned` is the actual contribution to the 0-100 score; `points_possible` is the most
+    this skill could have contributed. `evidence_span` is the verbatim resume quote that justifies a
+    match — the heart of the "valid reasoning" requirement. `verified` is False when the model
+    claimed a skill but the quote could not be found in the resume (the claim is then NOT counted)."""
+
+    skill_id: str
+    skill_name: str
+    bucket: str  # "required" | "preferred" | "education" | "info"
+    importance: Importance = Importance.important
+    status: MatchStatus = MatchStatus.missing
+    verified: bool = False
+    evidence_span: str | None = None  # verbatim quote from the resume that proves the match
+    points_possible: float = 0.0
+    points_earned: float = 0.0
+    note: str = ""  # plain-English reason for this line
+
+
+class ScoreExplanation(BaseModel):
+    """A fully decomposed, human-readable derivation of `fit_score`. The components reconcile
+    EXACTLY to the headline number:
+        round(sum(c.points_earned for required+preferred) * education_factor, 1) == fit_score
+    so the UI can show the arithmetic and the user can check it themselves."""
+
+    formula: str = ""  # the literal arithmetic, e.g. "100 x (0.75 x req_cov + 0.25 x pref_cov) x edu"
+    components: list[ScoreComponent] = Field(default_factory=list)
+    required_possible: float = 0.0
+    preferred_possible: float = 0.0
+    required_earned: float = 0.0
+    preferred_earned: float = 0.0
+    subtotal: float = 0.0  # required_earned + preferred_earned, BEFORE the education factor
+    education_factor: float = 1.0
+    education_note: str = ""
+    final_score: float = 0.0  # == fit_score (round(subtotal * education_factor, 1))
+    summary: str = ""  # one-paragraph plain-English "why this score"
+
+
+# --------------------------------------------------------------------------------------
 # Final, user-facing output — produced deterministically, NOT by the LLM
 # --------------------------------------------------------------------------------------
 class ScoreResult(BaseModel):
     """The honest deliverable. `fit_score` is a FIT/READINESS score (0-100), explicitly NOT a
     predicted probability of being hired — we lack the outcome labels for that (see plan §B).
-    `subscores` and `verified_matches` make every point traceable."""
+    `subscores`, `verified_matches`, and `explanation` make every point traceable."""
 
     candidate_id: str
     job_id: str
@@ -122,6 +165,7 @@ class ScoreResult(BaseModel):
     grade: str  # "A" | "B" | "C" | "D"
     confidence: Confidence = Confidence.medium
     subscores: dict[str, float] = Field(default_factory=dict)
+    explanation: ScoreExplanation | None = None  # auditable point-by-point derivation
     verified_matches: list[SkillEvidence] = Field(default_factory=list)
     discarded_matches: list[SkillEvidence] = Field(default_factory=list)  # unverifiable / flagged
     gaps: list[Gap] = Field(default_factory=list)

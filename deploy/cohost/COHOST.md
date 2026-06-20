@@ -52,6 +52,30 @@ Open `https://schulich.edufund.ca:8443` → log in (`admin` / your password). Th
 > briefly appears in your Hostinger DNS zone is a short-lived `_acme-challenge` TXT record that Caddy
 > adds and removes automatically.
 
+## Real-data demo (`/demo`) on this box
+
+The deployed app also serves the **ephemeral "try it with your own data"** flow at
+`https://schulich.edufund.ca:8443/demo` — upload 1 job posting + up to 10 resumes and get fully
+explained scores. It is **enabled by default** and needs no compose change; just rebuild so the image
+picks up the upload/parsing deps (`python-multipart`, `pypdf`, `python-docx`, added to the Dockerfile):
+
+```bash
+docker compose -f deploy/cohost/docker-compose.cohost.yml -p rmdemo up -d --build
+```
+
+**Privacy posture (decided 2026-06-20):** resumes are parsed **in memory only, never written to
+disk**; the full text is **dropped right after scoring**; sessions **auto-delete after 30 min idle**
+and clients can **"Delete my data now"** on demand. See **[../../PRIVACY.md](../../PRIVACY.md)**. This
+is the conscious, ephemeral exception to "synthetic-only on this VPS" — real PII transits RAM briefly
+and is never persisted. For ongoing real-student use, move to a York-controlled host (below).
+
+Tunables (set in the `app` service `environment:` if you want to change defaults):
+`RM_DEMO_ENABLED` (set `0` to make this host synthetic-only again), `RM_DEMO_TTL_MINUTES`,
+`RM_DEMO_MAX_RESUMES`, `RM_DEMO_MAX_FILE_MB`, `RM_DEMO_MAX_SESSIONS`, `RM_DEMO_BACKEND`.
+
+> Memory headroom: the stack is capped at 512 MB. Up to 10 resumes in RAM (text dropped after
+> scoring) is tiny; the cap is not a concern for the demo.
+
 ## Fallbacks (if the DNS plugin ever misbehaves)
 
 - **Quick self-signed:** in `Caddyfile`, replace the whole `tls { ... }` block with `tls internal`,

@@ -3,8 +3,11 @@ FROM python:3.12-slim
 WORKDIR /app
 
 # Core deps run the full app on the deterministic Mock backend (no model / GPU needed).
+# Extras here power the web layer + the real-data demo: python-multipart (file uploads),
+# pypdf + python-docx (parse uploaded .pdf/.docx resumes in memory).
 COPY requirements.txt .
-RUN pip install --no-cache-dir -r requirements.txt fastapi "uvicorn>=0.29"
+RUN pip install --no-cache-dir -r requirements.txt \
+    fastapi "uvicorn>=0.29" python-multipart pypdf python-docx
 
 COPY resume_matcher ./resume_matcher
 COPY scripts ./scripts

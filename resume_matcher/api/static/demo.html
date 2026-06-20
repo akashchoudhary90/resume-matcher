@@ -1,0 +1,381 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>Resume Matcher — Try it with your own data</title>
+<style>
+  :root {
+    --bg:#0f1419; --panel:#1a2029; --panel2:#222b36; --line:#2c3744; --text:#e6edf3;
+    --muted:#9aa7b4; --accent:#4f9dde; --green:#3fb950; --blue:#4f9dde; --amber:#d29922; --red:#f85149;
+  }
+  * { box-sizing:border-box; }
+  body { margin:0; font:14px/1.55 -apple-system,Segoe UI,Roboto,Helvetica,Arial,sans-serif;
+         background:var(--bg); color:var(--text); }
+  a { color:var(--accent); }
+  header { padding:16px 24px; border-bottom:1px solid var(--line); background:var(--panel); }
+  h1 { margin:0; font-size:18px; } h1 span { color:var(--accent); }
+  h2 { font-size:15px; margin:0 0 10px; }
+  h3 { font-size:14px; margin:14px 0 6px; }
+  main { padding:20px 24px; max-width:1060px; margin:0 auto; }
+  .privacy { margin:0; padding:12px 24px; background:#102a1b; border-bottom:1px solid #1c4a30;
+             color:#bfe9cd; font-size:13px; display:flex; gap:14px; align-items:center; flex-wrap:wrap; }
+  .privacy b { color:#eafff1; }
+  .privacy .spacer { flex:1; }
+  .card { background:var(--panel); border:1px solid var(--line); border-radius:8px; padding:16px; margin-bottom:16px; }
+  label { display:block; font-size:12px; color:var(--muted); margin:8px 0 3px; text-transform:uppercase; letter-spacing:.03em; }
+  input[type=text], textarea, select {
+    width:100%; background:var(--panel2); border:1px solid var(--line); color:var(--text);
+    border-radius:6px; padding:9px 11px; font:inherit; }
+  textarea { min-height:130px; resize:vertical; }
+  .row2 { display:grid; grid-template-columns:1fr 1fr; gap:12px; }
+  button { background:var(--accent); color:#06121f; border:0; padding:9px 16px; border-radius:6px;
+           font-weight:600; cursor:pointer; } button:hover { filter:brightness(1.08); }
+  button:disabled { opacity:.5; cursor:not-allowed; }
+  button.ghost { background:transparent; color:var(--text); border:1px solid var(--line); }
+  button.danger { background:var(--red); color:#1a0606; }
+  .chips { margin-top:8px; display:flex; flex-wrap:wrap; gap:6px; }
+  .skill { display:inline-flex; align-items:center; gap:6px; padding:4px 9px; border-radius:999px;
+           border:1px solid var(--line); background:var(--panel2); font-size:12.5px; }
+  .skill .seg { display:inline-flex; border-radius:5px; overflow:hidden; border:1px solid var(--line); }
+  .skill .seg button { padding:1px 8px; font-size:11px; font-weight:600; border-radius:0; background:transparent; color:var(--muted); }
+  .skill .seg button.on-req { background:var(--blue); color:#06121f; }
+  .skill .seg button.on-pref { background:var(--amber); color:#1a1402; }
+  .skill .x { cursor:pointer; color:var(--muted); font-weight:700; }
+  .drop { border:1.5px dashed var(--line); border-radius:8px; padding:22px; text-align:center; color:var(--muted);
+          background:var(--panel2); cursor:pointer; }
+  .drop.hot { border-color:var(--accent); color:var(--text); }
+  .filelist { margin-top:10px; }
+  .filelist .f { display:flex; align-items:center; gap:8px; padding:6px 8px; border-bottom:1px solid var(--line); font-size:13px; }
+  .filelist .f .x { cursor:pointer; color:var(--muted); margin-left:auto; }
+  .muted { color:var(--muted); } .hidden { display:none; }
+  .err { color:var(--red); } .warn { color:var(--amber); }
+  table { width:100%; border-collapse:collapse; } th,td { text-align:left; padding:8px 10px; border-bottom:1px solid var(--line); vertical-align:top; }
+  th { color:var(--muted); font-weight:600; font-size:11px; text-transform:uppercase; letter-spacing:.03em; }
+  .score { font-weight:700; padding:2px 9px; border-radius:6px; display:inline-block; min-width:46px; text-align:center; }
+  .g-A { background:rgba(63,185,80,.18); color:var(--green); } .g-B { background:rgba(79,157,222,.18); color:var(--blue); }
+  .g-C { background:rgba(210,153,34,.18); color:var(--amber); } .g-D { background:rgba(248,81,73,.16); color:var(--red); }
+  details { margin-top:6px; } summary { cursor:pointer; color:var(--accent); font-weight:600; }
+  .resultcard { border:1px solid var(--line); border-radius:8px; padding:14px; margin-bottom:12px; background:var(--panel); }
+  .resulthead { display:flex; align-items:center; gap:12px; flex-wrap:wrap; }
+  .resulthead .who { font-weight:700; font-size:15px; }
+  .quote { color:#cfe6ff; background:#13202e; border-left:3px solid var(--blue); padding:2px 8px; border-radius:4px;
+           font-size:12.5px; display:inline-block; max-width:100%; }
+  .st { font-weight:700; }
+  .st-ok { color:var(--green); } .st-part { color:var(--amber); } .st-bad { color:var(--red); } .st-miss { color:var(--muted); }
+  .flag { font-size:12px; padding:4px 8px; border-radius:6px; margin:4px 0; display:block; border:1px solid var(--line); }
+  .flag.bad { color:#ffd9d6; border-color:rgba(248,81,73,.5); background:rgba(248,81,73,.08); }
+  .flag.warn { color:#ffe9bf; border-color:rgba(210,153,34,.45); background:rgba(210,153,34,.08); }
+  .formula { font-family:ui-monospace,SFMono-Regular,Consolas,monospace; font-size:12.5px; color:var(--muted);
+             background:var(--panel2); padding:8px 10px; border-radius:6px; margin:6px 0; }
+  .total { font-weight:700; }
+  .pill { font-size:12px; padding:3px 9px; border-radius:999px; border:1px solid var(--line); color:var(--muted); }
+  .step { font-size:12px; color:var(--accent); font-weight:700; letter-spacing:.04em; }
+</style>
+</head>
+<body>
+<header>
+  <h1>Resume <span>Matcher</span> — try it with your own data</h1>
+  <div class="muted" style="margin-top:5px;font-size:12.5px">
+    Upload one job posting and up to <b id="maxN">10</b> resumes. Every score is broken down skill-by-skill
+    with the exact quote from each resume — nothing is a black box.
+    <a href="/">Coordinator dashboard →</a>
+  </div>
+</header>
+
+<div class="privacy">
+  🔒 <span><b>Your data stays in memory only.</b> Resumes are parsed in RAM, never written to disk;
+  the full resume text is discarded the instant scoring finishes (only the score breakdown is kept),
+  the session auto-deletes when idle, and you can delete it anytime.</span>
+  <span id="ttlInfo" class="pill hidden"></span>
+  <span class="spacer"></span>
+  <button id="deleteBtn" class="danger hidden">Delete my data now</button>
+</div>
+
+<main>
+  <div id="banner" class="card hidden"></div>
+
+  <!-- STEP 1: JOB -->
+  <div class="card" id="jobCard">
+    <div class="step">STEP 1</div>
+    <h2>The job posting</h2>
+    <div class="row2">
+      <div><label>Job title</label><input id="jobTitle" type="text" placeholder="e.g. Junior Data Analyst" /></div>
+      <div><label>Employer</label><input id="jobEmployer" type="text" placeholder="e.g. Acme Corp" /></div>
+    </div>
+    <label>Paste the job description</label>
+    <textarea id="jobText" placeholder="Paste the full job posting here. We'll detect the skills it asks for — you can edit them below."></textarea>
+    <div style="margin-top:10px"><button id="detectBtn" class="ghost">Detect skills from posting</button></div>
+
+    <div id="skillsBox" class="hidden">
+      <h3>Skills this job needs <span class="muted" style="font-weight:400">— tag each Required or Preferred; required skills are worth 75 of 100 points, preferred 25.</span></h3>
+      <div id="skillChips" class="chips"></div>
+      <div style="margin-top:10px;display:flex;gap:8px;align-items:end;flex-wrap:wrap">
+        <div style="flex:1;min-width:200px"><label>Add a skill (e.g. python, sql, react)</label><input id="addSkill" type="text" placeholder="type a skill and press Enter" /></div>
+        <div style="min-width:180px"><label>Minimum education</label>
+          <select id="minEdu">
+            <option value="">— none —</option>
+            <option value="diploma">Diploma / certificate</option>
+            <option value="associate">Associate</option>
+            <option value="bachelor">Bachelor</option>
+            <option value="master">Master</option>
+            <option value="phd">PhD</option>
+          </select>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- STEP 2: RESUMES -->
+  <div class="card">
+    <div class="step">STEP 2</div>
+    <h2>The resumes <span class="muted" style="font-weight:400">— up to <span class="maxN">10</span>, as .pdf, .docx, or .txt</span></h2>
+    <div id="drop" class="drop">Drag &amp; drop resume files here, or <u>click to choose</u>.
+      <input id="fileInput" type="file" multiple accept=".pdf,.docx,.txt,.text,.md" class="hidden" />
+    </div>
+    <div id="fileList" class="filelist"></div>
+  </div>
+
+  <div style="display:flex;gap:10px;align-items:center;margin-bottom:18px">
+    <button id="runBtn">Score the resumes</button>
+    <span id="runStatus" class="muted"></span>
+  </div>
+
+  <!-- RESULTS -->
+  <div id="results"></div>
+</main>
+
+<script>
+const $ = s => document.querySelector(s);
+let CFG = {max_resumes:10, max_file_mb:4, ttl_minutes:30, supported_exts:[".pdf",".docx",".txt"]};
+let SKILLS = [];            // [{id,name,bucket:'required'|'preferred'}]
+let FILES = [];             // File objects
+let SESSION = null;         // session id
+let ttlTimer = null;
+
+function esc(s){ return (s==null?'':String(s)).replace(/[&<>"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c])); }
+function gradeClass(g){ return 'g-'+g; }
+
+async function loadConfig(){
+  try{
+    const r = await fetch('/api/demo/config'); CFG = await r.json();
+    $('#maxN').textContent = CFG.max_resumes;
+    document.querySelectorAll('.maxN').forEach(e=>e.textContent=CFG.max_resumes);
+  }catch(e){}
+}
+
+/* ---------- skills ---------- */
+function renderSkills(){
+  const box = $('#skillsBox'); box.classList.remove('hidden');
+  $('#skillChips').innerHTML = SKILLS.map((s,i)=>`
+    <span class="skill" data-i="${i}">
+      ${esc(s.name)}
+      <span class="seg">
+        <button data-act="req" class="${s.bucket==='required'?'on-req':''}">Required</button>
+        <button data-act="pref" class="${s.bucket==='preferred'?'on-pref':''}">Preferred</button>
+      </span>
+      <span class="x" data-act="rm" title="remove">✕</span>
+    </span>`).join('') || '<span class="muted">No skills yet — add some below or paste a posting.</span>';
+  $('#skillChips').querySelectorAll('.skill').forEach(el=>{
+    const i = +el.dataset.i;
+    el.querySelectorAll('[data-act]').forEach(b=> b.onclick = ()=>{
+      const act=b.dataset.act;
+      if(act==='req') SKILLS[i].bucket='required';
+      else if(act==='pref') SKILLS[i].bucket='preferred';
+      else if(act==='rm') SKILLS.splice(i,1);
+      renderSkills();
+    });
+  });
+}
+function addSkill(name){
+  const id = name.trim().toLowerCase().replace(/[^a-z0-9+#.]+/g,'_').replace(/^_|_$/g,'');
+  if(!id) return;
+  if(SKILLS.some(s=>s.id===id)) return;
+  SKILLS.push({id, name:name.trim(), bucket:'required'}); renderSkills();
+}
+
+$('#detectBtn').onclick = async () => {
+  const fd = new FormData();
+  fd.append('job_text', $('#jobText').value);
+  fd.append('title', $('#jobTitle').value);
+  fd.append('employer', $('#jobEmployer').value);
+  $('#detectBtn').disabled = true; $('#detectBtn').textContent='Detecting…';
+  try{
+    const r = await fetch('/api/demo/parse-job', {method:'POST', body:fd});
+    const d = await r.json();
+    const req = new Set((d.required_skills||[]).map(s=>s.id));
+    const all = d.detected_skills||[];
+    // keep any manually added skills, merge detected
+    const have = new Set(SKILLS.map(s=>s.id));
+    all.forEach(s=>{ if(!have.has(s.id)) SKILLS.push({id:s.id, name:s.name, bucket: req.has(s.id)?'required':'required'}); });
+    if(d.min_education) $('#minEdu').value = d.min_education;
+    if(!SKILLS.length){ banner('No known skills were detected in the posting. Add the key skills manually below.', 'warn'); }
+    renderSkills();
+  }catch(e){ banner('Could not parse the posting: '+e, 'err'); }
+  $('#detectBtn').disabled=false; $('#detectBtn').textContent='Detect skills from posting';
+};
+$('#addSkill').addEventListener('keydown', e=>{ if(e.key==='Enter'){ e.preventDefault(); addSkill($('#addSkill').value); $('#addSkill').value=''; }});
+
+/* ---------- files ---------- */
+const drop = $('#drop'), fileInput = $('#fileInput');
+drop.onclick = ()=> fileInput.click();
+['dragover','dragenter'].forEach(ev=>drop.addEventListener(ev, e=>{e.preventDefault();drop.classList.add('hot');}));
+['dragleave','drop'].forEach(ev=>drop.addEventListener(ev, e=>{e.preventDefault();drop.classList.remove('hot');}));
+drop.addEventListener('drop', e=> addFiles(e.dataTransfer.files));
+fileInput.addEventListener('change', e=> addFiles(e.target.files));
+function addFiles(list){
+  for(const f of list){
+    if(FILES.length >= CFG.max_resumes){ banner(`Limit is ${CFG.max_resumes} resumes.`, 'warn'); break; }
+    if(f.size > CFG.max_file_mb*1024*1024){ banner(`${f.name} exceeds ${CFG.max_file_mb} MB.`, 'warn'); continue; }
+    FILES.push(f);
+  }
+  renderFiles();
+}
+function renderFiles(){
+  $('#fileList').innerHTML = FILES.map((f,i)=>`
+    <div class="f">📄 ${esc(f.name)} <span class="muted">(${(f.size/1024).toFixed(0)} KB)</span>
+      <span class="x" data-i="${i}" title="remove">✕</span></div>`).join('');
+  $('#fileList').querySelectorAll('.x').forEach(x=> x.onclick=()=>{ FILES.splice(+x.dataset.i,1); renderFiles(); });
+}
+
+/* ---------- run ---------- */
+$('#runBtn').onclick = async () => {
+  if(!FILES.length){ banner('Add at least one resume.', 'warn'); return; }
+  if(!SKILLS.length && !$('#jobText').value.trim()){ banner('Paste a job posting or add at least one required skill.', 'warn'); return; }
+  const fd = new FormData();
+  fd.append('job_text', $('#jobText').value);
+  fd.append('title', $('#jobTitle').value);
+  fd.append('employer', $('#jobEmployer').value);
+  fd.append('required_skills', SKILLS.filter(s=>s.bucket==='required').map(s=>s.id).join(';'));
+  fd.append('preferred_skills', SKILLS.filter(s=>s.bucket==='preferred').map(s=>s.id).join(';'));
+  fd.append('min_education', $('#minEdu').value);
+  FILES.forEach(f=> fd.append('resumes', f, f.name));
+  $('#runBtn').disabled=true; $('#runStatus').textContent='Scoring… (your files are processed in memory and discarded after)';
+  try{
+    const r = await fetch('/api/demo/run', {method:'POST', body:fd});
+    const d = await r.json();
+    if(!r.ok){ banner(d.detail||'Scoring failed.', 'err'); }
+    else { SESSION = d.session_id; renderResults(d); }
+  }catch(e){ banner('Request failed: '+e, 'err'); }
+  $('#runBtn').disabled=false; $('#runStatus').textContent='';
+};
+
+/* ---------- delete ---------- */
+$('#deleteBtn').onclick = async () => {
+  if(!SESSION) return;
+  $('#deleteBtn').disabled=true;
+  try{
+    const r = await fetch('/api/demo/session/'+encodeURIComponent(SESSION), {method:'DELETE'});
+    const d = await r.json();
+    SESSION=null; clearTTL();
+    $('#results').innerHTML = `<div class="card"><b>✅ ${esc(d.message||'Your data has been deleted.')}</b>
+      <div class="muted" style="margin-top:6px">The in-memory session was wiped. Nothing was ever written to disk.</div></div>`;
+    $('#deleteBtn').classList.add('hidden'); $('#ttlInfo').classList.add('hidden');
+  }catch(e){ banner('Delete failed: '+e, 'err'); }
+  $('#deleteBtn').disabled=false;
+};
+
+/* ---------- rendering ---------- */
+function banner(msg, kind){
+  const b = $('#banner'); b.classList.remove('hidden');
+  b.className = 'card ' + (kind==='err'?'err':kind==='warn'?'warn':'');
+  b.innerHTML = esc(msg);
+  if(kind!=='err'){ setTimeout(()=>{ b.classList.add('hidden'); }, 6000); }
+}
+
+function statusCell(c){
+  if(c.verified && c.status==='match') return `<span class="st st-ok">✓ match</span>`;
+  if(c.verified && c.status==='partial') return `<span class="st st-part">◐ partial</span>`;
+  if(!c.verified && c.status!=='missing') return `<span class="st st-bad">⚠ not counted</span>`;
+  return `<span class="st st-miss">✗ missing</span>`;
+}
+
+function explanationHtml(ex){
+  if(!ex) return '';
+  const rows = (ex.components||[]).filter(c=>c.bucket==='required'||c.bucket==='preferred').map(c=>`
+    <tr>
+      <td><b>${esc(c.skill_name)}</b><div class="muted" style="font-size:11px;text-transform:capitalize">${esc(c.bucket)}</div></td>
+      <td>${statusCell(c)}</td>
+      <td>${c.evidence_span?`<span class="quote">“${esc(c.evidence_span)}”</span>`:`<span class="muted">${esc(c.note)}</span>`}</td>
+      <td style="white-space:nowrap"><b>${c.points_earned}</b> <span class="muted">/ ${c.points_possible}</span></td>
+    </tr>`).join('');
+  const edu = (ex.components||[]).find(c=>c.bucket==='education');
+  return `
+    <div class="formula">${esc(ex.formula)}</div>
+    <table>
+      <thead><tr><th>Skill the job needs</th><th>Result</th><th>Evidence from the resume</th><th>Points</th></tr></thead>
+      <tbody>${rows||'<tr><td colspan="4" class="muted">No skills listed.</td></tr>'}</tbody>
+      <tfoot>
+        <tr><td colspan="3" class="muted">Required skills earned</td><td><b>${ex.required_earned}</b> <span class="muted">/ ${ex.required_possible}</span></td></tr>
+        <tr><td colspan="3" class="muted">Preferred skills earned</td><td><b>${ex.preferred_earned}</b> <span class="muted">/ ${ex.preferred_possible}</span></td></tr>
+        <tr><td colspan="3">Subtotal</td><td class="total">${ex.subtotal} / 100</td></tr>
+        <tr><td colspan="3">${esc(edu?edu.note:'Education gate')} (×${ex.education_factor})</td><td class="total">—</td></tr>
+        <tr><td colspan="3"><b>Final fit score</b></td><td><span class="score ${gradeClass(scoreGrade(ex.final_score))}">${ex.final_score}</span></td></tr>
+      </tfoot>
+    </table>`;
+}
+function scoreGrade(s){ return s>=80?'A':s>=65?'B':s>=50?'C':'D'; }
+
+function resultCard(res){
+  const ex = res.explanation;
+  const flags = (res.flags_explained||[]).map(f=>`<div class="flag ${f.severity}">${esc(f.text)}</div>`).join('');
+  const gaps = (res.blocking_gaps||[]).map(g=>`<div>• <b>${esc(g.skill)}</b> (${esc(g.difficulty)}) — ${esc(g.action)}</div>`).join('')
+             || '<div class="muted">No blocking essential gaps.</div>';
+  const meta = [];
+  if(res.education_level) meta.push(`education: ${esc(res.education_level)}`);
+  if(res.years_experience) meta.push(`${res.years_experience} yrs exp`);
+  if(res.skills_found!=null) meta.push(`${res.skills_found} skills detected`);
+  return `
+  <div class="resultcard">
+    <div class="resulthead">
+      <span class="who">${esc(res.label)}</span>
+      <span class="score ${gradeClass(res.grade)}">${res.fit_score}</span>
+      <span class="pill">grade ${esc(res.grade)}</span>
+      <span class="pill">confidence: ${esc(res.confidence)}</span>
+      <span class="muted" style="flex:1"></span>
+    </div>
+    ${meta.length?`<div class="muted" style="margin-top:6px">${meta.join(' · ')}</div>`:''}
+    <div class="muted" style="margin:8px 0">${esc(ex?ex.summary:'')}</div>
+    <details open><summary>Why this score? (point-by-point)</summary>${explanationHtml(ex)}</details>
+    ${flags?`<h3>Flags for human review <span class="muted" style="font-weight:400">— advisory only, never auto-reject</span></h3>${flags}`:''}
+    <details><summary>Coaching — how to close the gap</summary>
+      <div style="margin-top:6px">${gaps}</div>
+      ${(res.next_actions&&res.next_actions.length)?`<div class="muted" style="margin-top:6px">Next: ${res.next_actions.map(esc).join(' · ')}</div>`:''}
+    </details>
+  </div>`;
+}
+
+function renderResults(d){
+  $('#deleteBtn').classList.remove('hidden');
+  const warn = (d.warnings&&d.warnings.length)? `<div class="card warn">⚠ ${d.warnings.map(esc).join('<br>')}</div>`:'';
+  const job = d.job||{};
+  const reqList = (job.required_skills||[]).map(s=>esc(s.name)).join(', ')||'—';
+  const prefList = (job.preferred_skills||[]).map(s=>esc(s.name)).join(', ')||'—';
+  const head = `<div class="card">
+      <h2>${esc(job.title||'Role')} <span class="muted" style="font-weight:400">@ ${esc(job.employer||'')}</span></h2>
+      <div class="muted">Required: ${reqList} &nbsp;·&nbsp; Preferred: ${prefList}${job.min_education?` &nbsp;·&nbsp; min education: ${esc(job.min_education)}`:''}</div>
+      <div class="muted" style="margin-top:6px">${d.n_resumes} resume(s) scored. ${esc((d.privacy&&d.privacy.note)||'')}</div>
+    </div>`;
+  $('#results').innerHTML = warn + head + (d.results||[]).map(resultCard).join('');
+  startTTL(d.privacy && d.privacy.seconds_until_auto_delete);
+}
+
+/* ---------- ttl countdown ---------- */
+function startTTL(secs){
+  clearTTL();
+  if(secs==null) return;
+  const info = $('#ttlInfo'); info.classList.remove('hidden');
+  let s = secs;
+  const tick = ()=>{
+    if(s<=0){ info.textContent='auto-deleted (idle)'; clearInterval(ttlTimer); return; }
+    const m = Math.floor(s/60), ss = String(s%60).padStart(2,'0');
+    info.textContent = `auto-deletes in ${m}:${ss} (idle)`; s--;
+  };
+  tick(); ttlTimer = setInterval(tick, 1000);
+}
+function clearTTL(){ if(ttlTimer){ clearInterval(ttlTimer); ttlTimer=null; } $('#ttlInfo').classList.add('hidden'); }
+
+loadConfig();
+</script>
+</body>
+</html>
