@@ -1,0 +1,32 @@
+# The DEMO's OWN Caddyfile — used only by the rmdemo-caddy container in docker-compose.cohost.yml.
+# Completely separate from the trading stack's Caddyfile.
+#
+# Trusted cert via DNS-01 (Hostinger), so it needs NO port 80/443 and never touches ati's Caddy.
+# Caddy proves control of the domain by creating a temporary _acme-challenge TXT record through the
+# Hostinger API (token in HOSTINGER_API_TOKEN), gets a real Let's Encrypt cert, and serves it on the
+# container's :443 (published to the host as :8443). Auto-renews the same way.
+#
+# Fallback to a quick self-signed cert (no token, no DNS API): replace the whole `tls { ... }` block
+# with `tls internal`.
+
+{$RM_PUBLIC_DOMAIN} {
+	tls {
+		dns hostinger {env.HOSTINGER_API_TOKEN}
+	}
+
+	encode gzip zstd
+	reverse_proxy app:8000
+
+	header {
+		Strict-Transport-Security "max-age=31536000; includeSubDomains"
+		X-Frame-Options DENY
+		X-Content-Type-Options nosniff
+		Referrer-Policy strict-origin-when-cross-origin
+		-Server
+	}
+
+	log {
+		output stdout
+		format console
+	}
+}

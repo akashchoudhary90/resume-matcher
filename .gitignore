@@ -1,0 +1,24 @@
+# Python
+__pycache__/
+*.py[cod]
+*.egg-info/
+.venv/
+venv/
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+
+# Local data — NEVER commit real student PII. Synthetic data is regenerable.
+data/synthetic/*
+!data/synthetic/.gitkeep
+data/real/
+*.zip
+*.csv
+*.pdf
+
+# Generated schema is derived from code; keep the canonical copy only if intentionally committed.
+# (run `make schema` to regenerate)
+
+# Env / secrets
+.env
+*.key

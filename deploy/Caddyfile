@@ -1,0 +1,13 @@
+# Caddy reverse proxy with automatic HTTPS (Let's Encrypt).
+# Reverse-proxies the subdomain to the app container. The app itself enforces the admin password,
+# so no basicauth directive is needed here. Replace the hostname if you deploy elsewhere.
+
+schulich.edufund.ca {
+	reverse_proxy app:8000
+	encode gzip
+}
+
+# For a quick HTTP-only local test (no TLS), you can instead use:
+# :80 {
+# 	reverse_proxy app:8000
+# }

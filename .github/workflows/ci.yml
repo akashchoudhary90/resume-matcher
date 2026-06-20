@@ -1,0 +1,29 @@
+name: ci
+
+on:
+  push:
+  pull_request:
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        python-version: ["3.11", "3.12", "3.13"]
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: ${{ matrix.python-version }}
+      - name: Install core dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install -r requirements.txt
+      - name: Pin the adapter JSON Schema (fails if the contract drifts uncommitted)
+        run: python -c "from resume_matcher.inference.schema import write_json_schema; write_json_schema()"
+      - name: Run tests (mock backend — no LLM required)
+        env:
+          RM_INFERENCE_BACKEND: mock
+        run: pytest -q
+      - name: End-to-end demo smoke
+        run: python scripts/run_demo.py

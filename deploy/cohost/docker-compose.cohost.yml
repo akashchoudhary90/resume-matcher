@@ -1,0 +1,67 @@
+# Fully self-contained demo stack — safe to run on the SAME box as the Kotak trading API
+# WITHOUT touching it. Its OWN Caddy + app, OWN network, OWN host port (8443).
+#
+# It does NOT share a network, volume, env file, or port with the `ati` / trading stack, and it
+# NEVER edits the trading Caddyfile or compose. Caddy gets a TRUSTED cert via Hostinger DNS-01, so it
+# needs no port 80/443 (those stay with the trading Caddy). Tear-down leaves zero residue:
+#   docker compose -f deploy/cohost/docker-compose.cohost.yml -p rmdemo down -v
+#
+# Bring up (from the repo root):
+#   export RM_ADMIN_PASSWORD='a-strong-password'
+#   export HOSTINGER_API_TOKEN='<token from Hostinger panel, with DNS permission>'
+#   docker compose -f deploy/cohost/docker-compose.cohost.yml -p rmdemo up -d --build
+#
+# Then open  https://schulich.edufund.ca:8443  (trusted cert, own port). See COHOST.md.
+
+services:
+  app:
+    build:
+      context: ../..
+      dockerfile: Dockerfile
+    image: rmdemo-app:latest
+    container_name: rmdemo-app
+    environment:
+      RM_ADMIN_USER: "${RM_ADMIN_USER:-admin}"
+      RM_ADMIN_PASSWORD: "${RM_ADMIN_PASSWORD:?set RM_ADMIN_PASSWORD before deploying}"
+      RM_INFERENCE_BACKEND: "mock"
+      RM_AUTOLOAD: "1"
+    expose:
+      - "8000"                 # reachable only inside this stack's private network
+    networks:
+      - rmdemo
+    mem_limit: 512m            # hard caps: the demo cannot starve the trading bot on the same host
+    cpus: 0.5
+    restart: unless-stopped
+
+  caddy:
+    # Custom image: stock Caddy + the Hostinger DNS-01 plugin (see Caddy.hostinger.Dockerfile).
+    build:
+      context: .
+      dockerfile: Caddy.hostinger.Dockerfile
+    image: rmdemo-caddy-hostinger:latest
+    container_name: rmdemo-caddy
+    ports:
+      - "${RM_HTTPS_PORT:-8443}:443"      # NOT 443 — that stays with the trading Caddy
+    environment:
+      RM_PUBLIC_DOMAIN: "${RM_PUBLIC_DOMAIN:-schulich.edufund.ca}"
+      # Hostinger API token with DNS permission — used ONLY for the ACME DNS-01 challenge.
+      HOSTINGER_API_TOKEN: "${HOSTINGER_API_TOKEN:?set HOSTINGER_API_TOKEN for the DNS-01 trusted cert}"
+    volumes:
+      - ./Caddyfile:/etc/caddy/Caddyfile:ro
+      - rmdemo_caddy_data:/data          # persists the issued cert across restarts
+      - rmdemo_caddy_config:/config
+    networks:
+      - rmdemo
+    depends_on:
+      - app
+    restart: unless-stopped
+
+# Dedicated, named network — isolated from the trading stack's network.
+networks:
+  rmdemo:
+    name: rmdemo_net
+
+# Dedicated volumes (prefixed) — nothing shared with the trading stack.
+volumes:
+  rmdemo_caddy_data:
+  rmdemo_caddy_config:

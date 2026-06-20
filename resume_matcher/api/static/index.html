@@ -1,0 +1,220 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>Resume Matcher — Coordinator Dashboard</title>
+<style>
+  :root {
+    --bg:#0f1419; --panel:#1a2029; --panel2:#222b36; --line:#2c3744; --text:#e6edf3;
+    --muted:#9aa7b4; --accent:#4f9dde; --green:#3fb950; --blue:#4f9dde; --amber:#d29922; --red:#f85149;
+  }
+  * { box-sizing:border-box; }
+  body { margin:0; font:14px/1.5 -apple-system,Segoe UI,Roboto,Helvetica,Arial,sans-serif;
+         background:var(--bg); color:var(--text); }
+  header { padding:16px 24px; border-bottom:1px solid var(--line); background:var(--panel); }
+  h1 { margin:0; font-size:18px; } h1 span { color:var(--accent); }
+  .banner { margin-top:6px; font-size:12.5px; color:var(--amber); }
+  .toolbar { display:flex; gap:12px; align-items:center; padding:12px 24px; border-bottom:1px solid var(--line);
+             background:var(--panel2); flex-wrap:wrap; }
+  button { background:var(--accent); color:#06121f; border:0; padding:8px 14px; border-radius:6px;
+           font-weight:600; cursor:pointer; } button:hover { filter:brightness(1.08); }
+  button.ghost { background:transparent; color:var(--text); border:1px solid var(--line); }
+  .pill { font-size:12px; padding:3px 9px; border-radius:999px; border:1px solid var(--line); color:var(--muted); }
+  .status { color:var(--muted); font-size:13px; }
+  nav { display:flex; gap:4px; padding:10px 24px 0; }
+  nav a { padding:8px 14px; border-radius:6px 6px 0 0; cursor:pointer; color:var(--muted); }
+  nav a.active { background:var(--panel); color:var(--text); border:1px solid var(--line); border-bottom:0; }
+  main { padding:20px 24px; }
+  .grid { display:grid; grid-template-columns:280px 1fr; gap:16px; }
+  .card { background:var(--panel); border:1px solid var(--line); border-radius:8px; padding:14px; }
+  .list { max-height:70vh; overflow:auto; } .list .row { padding:9px 10px; border-radius:6px; cursor:pointer; }
+  .list .row:hover { background:var(--panel2); } .list .row.sel { background:#1f3247; }
+  .list .row small { color:var(--muted); display:block; }
+  table { width:100%; border-collapse:collapse; } th,td { text-align:left; padding:8px 10px; border-bottom:1px solid var(--line); }
+  th { color:var(--muted); font-weight:600; font-size:12px; text-transform:uppercase; letter-spacing:.03em; }
+  .score { font-weight:700; padding:2px 8px; border-radius:6px; display:inline-block; min-width:46px; text-align:center; }
+  .g-A { background:rgba(63,185,80,.18); color:var(--green); } .g-B { background:rgba(79,157,222,.18); color:var(--blue); }
+  .g-C { background:rgba(210,153,34,.18); color:var(--amber); } .g-D { background:rgba(248,81,73,.16); color:var(--red); }
+  .chip { font-size:11px; padding:2px 7px; border-radius:5px; margin:2px 4px 2px 0; display:inline-block; background:var(--panel2); border:1px solid var(--line); color:var(--muted); }
+  .chip.warn { color:var(--amber); border-color:rgba(210,153,34,.4);} .chip.bad { color:var(--red); border-color:rgba(248,81,73,.4);} .chip.ok{color:var(--green);}
+  .badge { font-weight:700; padding:3px 10px; border-radius:6px; }
+  .badge.pass { background:rgba(63,185,80,.18); color:var(--green);} .badge.fail{background:rgba(248,81,73,.18); color:var(--red);}
+  .muted { color:var(--muted); } .hidden { display:none; }
+  details { margin-top:6px; } summary { cursor:pointer; color:var(--accent); }
+  .cards { display:grid; grid-template-columns:repeat(auto-fit,minmax(260px,1fr)); gap:14px; }
+  code { background:var(--panel2); padding:1px 5px; border-radius:4px; }
+</style>
+</head>
+<body>
+<header>
+  <h1>Resume <span>Matcher</span> — Coordinator Dashboard</h1>
+  <div class="banner">⚠ Scores are <b>fit / readiness</b>, not a probability of being hired. Flags are advisory — for human review, never auto-reject.</div>
+</header>
+
+<div class="toolbar">
+  <button id="loadBtn">Load synthetic data</button>
+  <button id="regenBtn" class="ghost">Regenerate</button>
+  <span class="pill" id="backendPill">backend: —</span>
+  <span class="status" id="status">No data loaded.</span>
+</div>
+
+<nav>
+  <a data-tab="jobs" class="active">Jobs &amp; shortlists</a>
+  <a data-tab="candidate">Candidate lookup</a>
+  <a data-tab="audit">Bias audit</a>
+</nav>
+
+<main>
+  <section id="tab-jobs">
+    <div class="grid">
+      <div class="card list" id="jobList"><div class="muted">Load data to see jobs.</div></div>
+      <div class="card" id="shortlist"><div class="muted">Select a job.</div></div>
+    </div>
+  </section>
+
+  <section id="tab-candidate" class="hidden">
+    <div class="card">
+      <label>Candidate ID
+        <input id="candInput" list="candList" placeholder="e.g. S0001" />
+      </label>
+      <datalist id="candList"></datalist>
+      <button id="candBtn">Look up</button>
+      <div id="candView" style="margin-top:14px"></div>
+    </div>
+  </section>
+
+  <section id="tab-audit" class="hidden">
+    <div id="auditView" class="card"><div class="muted">Load data to run the bias audit.</div></div>
+  </section>
+</main>
+
+<script>
+const $ = s => document.querySelector(s);
+const api = async (path, opts) => (await fetch(path, opts)).json();
+
+function gradeClass(g){ return 'g-'+g; }
+function flagChip(f){
+  let cls = 'chip';
+  if (f.startsWith('injection')||f.startsWith('unverifiable')||f.startsWith('hidden')) cls='chip bad';
+  else if (f.startsWith('stuffing')||f.startsWith('below_min')) cls='chip warn';
+  return `<span class="${cls}">${f}</span>`;
+}
+
+async function refreshStatus(){
+  const s = await api('/api/status');
+  $('#backendPill').textContent = 'backend: ' + s.backend;
+  $('#status').textContent = s.loaded ? s.summary : 'No data loaded.';
+  return s;
+}
+
+async function loadJobs(){
+  const jobs = await api('/api/jobs');
+  const el = $('#jobList');
+  if(!jobs.length){ el.innerHTML='<div class="muted">No jobs.</div>'; return; }
+  el.innerHTML = jobs.map(j =>
+    `<div class="row" data-job="${j.job_id}">${j.title}
+       <small>${j.employer} · ${j.shortlisted} shortlisted · top fit ${j.top_fit ?? '—'}</small></div>`).join('');
+  el.querySelectorAll('.row').forEach(r => r.onclick = () => {
+    el.querySelectorAll('.row').forEach(x=>x.classList.remove('sel'));
+    r.classList.add('sel'); showShortlist(r.dataset.job);
+  });
+}
+
+async function showShortlist(jobId){
+  const data = await api(`/api/jobs/${jobId}/shortlist`);
+  const rows = data.shortlist.map(c => `
+    <tr>
+      <td><b>${c.candidate_id}</b></td>
+      <td><span class="score ${gradeClass(c.grade)}">${c.fit_score}</span></td>
+      <td>${c.grade}</td>
+      <td class="muted">${c.confidence}</td>
+      <td>${(c.flags||[]).map(flagChip).join('') || '<span class="muted">—</span>'}</td>
+      <td>
+        <details><summary>coaching</summary>
+          <div class="muted" style="margin-top:6px">verified: ${(c.verified_skills||[]).join(', ')||'—'}</div>
+          ${(c.blocking_gaps||[]).map(g=>`<div>• <b>${g.skill}</b> (${g.difficulty}) — ${g.action}</div>`).join('')||'<div class="muted">no essential gaps</div>'}
+        </details>
+      </td>
+    </tr>`).join('');
+  $('#shortlist').innerHTML = `
+    <h3 style="margin-top:0">${data.job.title} <span class="muted">@ ${data.job.employer}</span></h3>
+    <div class="muted" style="margin-bottom:8px">requires: ${data.job.required_skills.join(', ')}</div>
+    <table><thead><tr><th>Candidate</th><th>Fit</th><th>Grade</th><th>Conf.</th><th>Review flags</th><th></th></tr></thead>
+    <tbody>${rows}</tbody></table>`;
+}
+
+async function loadCandidates(){
+  const ids = await api('/api/candidates');
+  $('#candList').innerHTML = ids.map(i=>`<option value="${i}">`).join('');
+}
+async function showCandidate(){
+  const id = $('#candInput').value.trim();
+  if(!id) return;
+  const c = await api(`/api/candidates/${id}`);
+  if(c.detail){ $('#candView').innerHTML = `<div class="chip bad">${c.detail}</div>`; return; }
+  const roles = (c.closest_fit||[]).map(r=>`
+    <tr><td>${r.title}</td><td class="muted">${r.employer}</td>
+        <td><span class="score ${gradeClass(r.grade)}">${r.fit_score}</span></td>
+        <td>${(r.blocking_gaps||[]).join(', ')||'<span class="muted">—</span>'}</td></tr>`).join('');
+  $('#candView').innerHTML = `
+    <div class="cards">
+      <div class="card"><b>${c.candidate_id}</b><div class="muted">education: ${c.education_level||'—'} · ${c.years_experience} yrs · resume: ${c.has_resume}</div>
+        <div style="margin-top:8px">${c.skills.map(s=>`<span class="chip">${s}</span>`).join('')||'<span class="muted">no skills parsed</span>'}</div></div>
+    </div>
+    <h3>Roles ${c.candidate_id} is closest to</h3>
+    <table><thead><tr><th>Role</th><th>Employer</th><th>Fit</th><th>Blocking gaps</th></tr></thead><tbody>${roles}</tbody></table>`;
+}
+
+async function showAudit(){
+  const a = await api('/api/audit');
+  const el = $('#auditView');
+  if(!a.available){ el.innerHTML = `<div class="muted">Audit unavailable: ${a.reason||'load data first'}.</div>`; return; }
+  const attrTable = (name, r) => `
+    <div class="card">
+      <h3 style="margin-top:0">${name.replace('_',' ')}
+        <span class="badge ${r.four_fifths_pass?'pass':'fail'}">${r.four_fifths_pass?'four-fifths PASS':'FLAGGED'}</span></h3>
+      <div class="muted" style="margin-bottom:6px">min impact ratio: ${r.min_impact_ratio ?? '—'}</div>
+      <table><thead><tr><th>Group</th><th>n</th><th>Selected</th><th>Rate</th><th>Impact ratio</th><th>Fisher p</th></tr></thead>
+      <tbody>${r.groups.map(g=>`<tr><td>${g.group}${g.below_min_cell?' <span class="chip warn">small cell</span>':''}</td>
+        <td>${g.n}</td><td>${g.selected}</td><td>${g.selection_rate}</td>
+        <td>${g.impact_ratio ?? '—'}</td><td class="muted">${g.fisher_p ?? '—'}</td></tr>`).join('')}</tbody></table>
+    </div>`;
+  const h = a.homophily;
+  const homoCard = h ? `<div class="card"><h3 style="margin-top:0">Homophily disparity
+      <span class="badge ${h.flagged?'fail':'pass'}">${h.flagged?'FLAGGED':'ok'}</span></h3>
+      <div class="muted">The reframed "hire from own community" hunch — measured, never an input.</div>
+      ${h.computable?`<p>reference group <code>${h.reference_group}</code>: same-group rate ${h.same_group_selection_rate},
+         different-group rate ${h.different_group_selection_rate}, disparity ratio <b>${h.disparity_ratio}</b></p>`
+        :`<p class="muted">${h.reason}</p>`}</div>` : '';
+  const p = a.proxy_leakage;
+  const proxyCard = p ? `<div class="card"><h3 style="margin-top:0">Proxy-leakage diagnostic
+      <span class="badge ${p.leakage?'fail':'pass'}">${p.leakage?'LEAKAGE':'clean'}</span></h3>
+      <div class="muted">Can scoring features predict the protected attribute? (they shouldn't)</div>
+      ${p.computable?`<p>AUC <b>${p.auc}</b> · accuracy ${p.classifier_accuracy} vs baseline ${p.baseline_accuracy}</p>`
+        :`<p class="muted">${p.reason}</p>`}</div>` : '';
+  el.innerHTML = `<div class="muted" style="margin-bottom:10px">${a.n_selected} of ${a.n_pool} candidates shortlisted somewhere. Protected attributes are read aggregate-only and never feed scoring.</div>
+    <div class="cards">${Object.entries(a.attributes).map(([k,v])=>attrTable(k,v)).join('')}${homoCard}${proxyCard}</div>`;
+}
+
+// tabs
+document.querySelectorAll('nav a').forEach(a => a.onclick = () => {
+  document.querySelectorAll('nav a').forEach(x=>x.classList.remove('active')); a.classList.add('active');
+  ['jobs','candidate','audit'].forEach(t => $('#tab-'+t).classList.toggle('hidden', t!==a.dataset.tab));
+  if(a.dataset.tab==='audit') showAudit();
+});
+
+async function fullLoad(regen){
+  $('#status').textContent = regen?'Regenerating…':'Loading…';
+  await api('/api/load-synthetic'+(regen?'?regenerate=true':''), {method:'POST'});
+  await refreshStatus(); await loadJobs(); await loadCandidates();
+}
+$('#loadBtn').onclick = () => fullLoad(false);
+$('#regenBtn').onclick = () => fullLoad(true);
+$('#candBtn').onclick = showCandidate;
+$('#candInput').addEventListener('change', showCandidate);
+
+(async () => { const s = await refreshStatus(); if(s.loaded){ loadJobs(); loadCandidates(); } })();
+</script>
+</body>
+</html>

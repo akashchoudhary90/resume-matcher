@@ -1,0 +1,36 @@
+# One-command deploy: app (FastAPI, admin-password gated) behind Caddy (automatic HTTPS).
+#
+#   export RM_ADMIN_PASSWORD='choose-a-strong-password'
+#   docker compose up -d --build
+#
+# Prereqs: this host is reachable on ports 80+443, and DNS for schulich.edufund.ca points to it.
+# Caddy then fetches a Let's Encrypt certificate automatically. See DEPLOY.md.
+
+services:
+  app:
+    build: .
+    environment:
+      RM_ADMIN_USER: "${RM_ADMIN_USER:-admin}"
+      RM_ADMIN_PASSWORD: "${RM_ADMIN_PASSWORD:?set RM_ADMIN_PASSWORD before deploying}"
+      RM_INFERENCE_BACKEND: "mock"
+      RM_AUTOLOAD: "1"
+    expose:
+      - "8000"
+    restart: unless-stopped
+
+  caddy:
+    image: caddy:2
+    ports:
+      - "80:80"
+      - "443:443"
+    volumes:
+      - ./deploy/Caddyfile:/etc/caddy/Caddyfile:ro
+      - caddy_data:/data
+      - caddy_config:/config
+    depends_on:
+      - app
+    restart: unless-stopped
+
+volumes:
+  caddy_data:
+  caddy_config:

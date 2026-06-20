@@ -1,0 +1,40 @@
+[build-system]
+requires = ["setuptools>=68"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "resume-matcher"
+version = "0.1.0"
+description = "York career-services Handshake job-to-student matching & coaching tool"
+requires-python = ">=3.11"
+readme = "README.md"
+dependencies = [
+    "pydantic>=2.5,<3",
+    "numpy>=1.26",
+    "scipy>=1.11",
+    "Faker>=24.0",
+    "jsonschema>=4.21",
+]
+
+[project.optional-dependencies]
+extra = [
+    "sentence-transformers>=2.6",
+    "fairlearn>=0.10",
+    "scikit-learn>=1.4",
+    "ollama>=0.2",
+    "openai>=1.30",
+    "mcp>=1.2",
+    "pdfplumber>=0.11",
+    "pypdf>=4.0",
+    "fastapi>=0.110",
+    "uvicorn>=0.29",
+    "streamlit>=1.33",
+]
+
+[tool.setuptools.packages.find]
+include = ["resume_matcher*"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+addopts = "-q"
+pythonpath = ["."]

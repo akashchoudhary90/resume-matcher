@@ -1,0 +1,154 @@
+{
+  "$defs": {
+    "Difficulty": {
+      "enum": [
+        "low",
+        "medium",
+        "high"
+      ],
+      "title": "Difficulty",
+      "type": "string"
+    },
+    "Gap": {
+      "properties": {
+        "skill_id": {
+          "title": "Skill Id",
+          "type": "string"
+        },
+        "skill_name": {
+          "title": "Skill Name",
+          "type": "string"
+        },
+        "importance": {
+          "$ref": "#/$defs/Importance",
+          "default": "important"
+        },
+        "acquisition_difficulty": {
+          "$ref": "#/$defs/Difficulty",
+          "default": "medium"
+        },
+        "suggested_action": {
+          "default": "",
+          "title": "Suggested Action",
+          "type": "string"
+        }
+      },
+      "required": [
+        "skill_id",
+        "skill_name"
+      ],
+      "title": "Gap",
+      "type": "object"
+    },
+    "Importance": {
+      "enum": [
+        "essential",
+        "important",
+        "optional"
+      ],
+      "title": "Importance",
+      "type": "string"
+    },
+    "MatchStatus": {
+      "enum": [
+        "match",
+        "partial",
+        "missing"
+      ],
+      "title": "MatchStatus",
+      "type": "string"
+    },
+    "SkillEvidence": {
+      "description": "One skill assessed against the job. `evidence_span` MUST be a verbatim substring of the\ncandidate's redacted text; the deterministic ranker discards any match whose span cannot be\nfound in the source text (defeats fabricated/injected claims).",
+      "properties": {
+        "skill_id": {
+          "title": "Skill Id",
+          "type": "string"
+        },
+        "skill_name": {
+          "title": "Skill Name",
+          "type": "string"
+        },
+        "status": {
+          "$ref": "#/$defs/MatchStatus"
+        },
+        "importance": {
+          "$ref": "#/$defs/Importance",
+          "default": "important"
+        },
+        "evidence_span": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Evidence Span"
+        },
+        "recency_years": {
+          "anyOf": [
+            {
+              "type": "number"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Recency Years"
+        }
+      },
+      "required": [
+        "skill_id",
+        "skill_name",
+        "status"
+      ],
+      "title": "SkillEvidence",
+      "type": "object"
+    }
+  },
+  "description": "EXACTLY what an InferenceAdapter must return. This is structured EXTRACTION only \u2014 the model\nproposes skill matches/gaps and a free-text rationale, but holds NO authority over the final\nnumeric score. matching/ranker.py turns this into a ScoreResult deterministically.",
+  "properties": {
+    "candidate_id": {
+      "title": "Candidate Id",
+      "type": "string"
+    },
+    "job_id": {
+      "title": "Job Id",
+      "type": "string"
+    },
+    "skill_matches": {
+      "items": {
+        "$ref": "#/$defs/SkillEvidence"
+      },
+      "title": "Skill Matches",
+      "type": "array"
+    },
+    "gaps": {
+      "items": {
+        "$ref": "#/$defs/Gap"
+      },
+      "title": "Gaps",
+      "type": "array"
+    },
+    "seniority_assessment": {
+      "default": "",
+      "title": "Seniority Assessment",
+      "type": "string"
+    },
+    "rationale": {
+      "default": "",
+      "title": "Rationale",
+      "type": "string"
+    }
+  },
+  "required": [
+    "candidate_id",
+    "job_id"
+  ],
+  "title": "MatchExtraction",
+  "type": "object"
+}

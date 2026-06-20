@@ -1,0 +1,8 @@
+# Core dependencies — the full demo (scripts/run_demo.py) and the test suite run on these alone.
+# Heavy / optional packages live in requirements-extra.txt and are import-guarded everywhere.
+pydantic>=2.5,<3
+numpy>=1.26
+scipy>=1.11
+Faker>=24.0
+jsonschema>=4.21
+pytest>=8.0
