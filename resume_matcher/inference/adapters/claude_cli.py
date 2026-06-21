@@ -51,6 +51,11 @@ def available() -> bool:
     return bool(shutil.which("claude")) and bool(os.environ.get("CLAUDE_CODE_OAUTH_TOKEN"))
 
 
+def model_name() -> str:
+    """The model the Claude backend is configured to use (for the config endpoint / verification)."""
+    return _MODEL
+
+
 def supports_file(filename: str) -> bool:
     return os.path.splitext(filename or "")[1].lower() in FILE_DIRECT_EXTS
 

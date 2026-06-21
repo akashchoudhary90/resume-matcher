@@ -152,6 +152,8 @@ def create_app():
     # ---- Ephemeral real-data demo: upload 1 job + up to N resumes, scored then forgotten --------
     @app.get("/api/demo/config")
     def demo_config() -> dict:
+        from ..inference.adapters import claude_cli as _cc
+
         return {
             "enabled": demo_enabled,
             "max_resumes": demo_mod.MAX_RESUMES,
@@ -159,6 +161,8 @@ def create_app():
             "ttl_minutes": demo_mod.TTL_MINUTES,
             "supported_exts": sorted(SUPPORTED_EXTS),
             "backend": demo_mod.DEMO_BACKEND,
+            "model": _cc.model_name(),
+            "claude_available": _cc.available(),
             "active_sessions": demo_store.active_count(),
         }
 
