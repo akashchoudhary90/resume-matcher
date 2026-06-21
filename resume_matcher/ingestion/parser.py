@@ -65,9 +65,25 @@ def infer_education_level(text: str) -> str | None:
     return None
 
 
+_NUM_WORDS = {
+    "one": 1, "two": 2, "three": 3, "four": 4, "five": 5, "six": 6, "seven": 7, "eight": 8,
+    "nine": 9, "ten": 10, "eleven": 11, "twelve": 12, "fifteen": 15, "twenty": 20,
+}
+# "X years/yrs" (digit or spelled), optional "+", not followed by "ago"/"old" (those aren't tenure).
+_YEARS_DIGIT = re.compile(r"\b(\d+(?:\.\d+)?)\s*\+?\s*(?:years?|yrs?)\b(?!\s+(?:ago|old))")
+_YEARS_WORD = re.compile(
+    r"\b(" + "|".join(_NUM_WORDS) + r")\s*\+?\s*(?:years?|yrs?)\b(?!\s+(?:ago|old))"
+)
+
+
 def infer_years_experience(text: str) -> float:
-    m = re.search(r"(\d+(?:\.\d+)?)\s*\+?\s*years?\s+(?:of\s+)?experience", text.lower())
-    return float(m.group(1)) if m else 0.0
+    """Best-effort total years of experience. Handles digits and spelled-out numbers, "X+ years",
+    and "X years as a ..." (not just "X years of experience"); ignores "X years ago/old". Returns the
+    LARGEST plausible figure mentioned (a recruiter reads total tenure)."""
+    low = (text or "").lower()
+    yrs = [float(m.group(1)) for m in _YEARS_DIGIT.finditer(low)]
+    yrs += [float(_NUM_WORDS[m.group(1)]) for m in _YEARS_WORD.finditer(low)]
+    return max(yrs) if yrs else 0.0
 
 
 def guess_name(text: str) -> str | None:

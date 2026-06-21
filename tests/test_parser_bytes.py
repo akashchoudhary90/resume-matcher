@@ -6,8 +6,17 @@ import pytest
 from resume_matcher.ingestion.parser import (
     ParseError,
     extract_bytes_text,
+    infer_years_experience,
     parse_resume_bytes,
 )
+
+
+def test_infer_years_experience_robust():
+    assert infer_years_experience("two years as an operations coordinator") == 2.0  # spelled-out
+    assert infer_years_experience("3+ years building pipelines") == 3.0  # "X+ years … as"
+    assert infer_years_experience("Senior dev. 6 years experience.") == 6.0
+    assert infer_years_experience("graduated 4 years ago") == 0.0  # "ago" is not tenure
+    assert infer_years_experience("no experience mentioned") == 0.0
 
 
 def test_txt_bytes_parsed_and_redacted():
