@@ -13,6 +13,8 @@ app.py; the matching itself reuses the same deterministic pipeline as the synthe
 """
 from __future__ import annotations
 
+import hashlib
+import json
 import os
 import secrets
 import tempfile
@@ -36,7 +38,6 @@ from ..inference.adapters import claude_cli as _claude_cli
 from ..inference.schema import CandidateProfile
 from ..matching import coaching as coaching_mod
 from ..matching import ranker
-from ..matching.evaluator import evaluate
 from ..matching.taxonomy import canonical_name, normalize_skills
 from .serialize import result_to_dict
 
@@ -60,6 +61,42 @@ CONCURRENCY = max(1, _int_env("RM_DEMO_CONCURRENCY", 4))  # parallel extractions
 # With the Claude engine, send PDFs/images to Claude directly (vision) instead of extracting text
 # first — reads scanned resumes + preserves layout. Set RM_DEMO_SEND_FILE=0 to force text extraction.
 SEND_FILE = os.environ.get("RM_DEMO_SEND_FILE", "1").lower() in ("1", "true", "yes")
+CACHE_MAX = _int_env("RM_DEMO_CACHE_MAX", 512)  # in-memory extraction cache (consistency + speed)
+
+# Cache the LLM EXTRACTION keyed by (content, job, model). The LLM is non-deterministic, so this makes
+# re-scoring the SAME resume against the SAME job IDENTICAL (and instant). In-memory only (no disk),
+# bounded, cleared on restart — consistent with the ephemeral privacy posture.
+_EXTRACT_CACHE: dict[str, object] = {}
+_CACHE_LOCK = threading.Lock()
+
+
+def _job_signature(job) -> str:
+    return json.dumps(
+        {"r": sorted(job.required_skills), "p": sorted(job.preferred_skills),
+         "m": sorted(job.must_have_skills), "y": job.min_years, "e": job.min_education},
+        sort_keys=True,
+    )
+
+
+def _cache_key(kind: str, model: str, job_sig: str, content: bytes) -> str:
+    h = hashlib.sha256()
+    for part in (kind.encode(), model.encode(), job_sig.encode()):
+        h.update(part)
+        h.update(b"\x00")
+    h.update(content)
+    return h.hexdigest()
+
+
+def _cache_get(key: str):
+    with _CACHE_LOCK:
+        return _EXTRACT_CACHE.get(key)
+
+
+def _cache_put(key: str, value) -> None:
+    with _CACHE_LOCK:
+        if len(_EXTRACT_CACHE) >= CACHE_MAX:
+            _EXTRACT_CACHE.clear()
+        _EXTRACT_CACHE[key] = value
 
 
 class DemoError(Exception):
@@ -282,12 +319,21 @@ def run_demo(
     adapter, engine = _resolve_adapter(backend or DEMO_BACKEND)
     # File-direct (Claude reads the actual PDF/image) is on only when the Claude engine is active.
     send_file = SEND_FILE and engine == "claude_cli"
+    model = _claude_cli.model_name() if engine == "claude_cli" else engine
+    job_sig = _job_signature(job)
 
-    def _eval_text(cand: CandidateProfile):
+    def _text_extraction(cand: CandidateProfile):
+        """Extraction for a text candidate, cached (consistent + fast); fail-quiet to mock."""
+        key = _cache_key("text", model, job_sig, cand.text.encode("utf-8"))
+        cached = _cache_get(key)
+        if cached is not None:
+            return cached
         try:
-            return evaluate(cand, job, adapter)
+            ex = adapter.extract(cand, job)
         except Exception:  # noqa: BLE001 - per-candidate fail-quiet to the deterministic engine
-            return evaluate(cand, job, get_adapter("mock"))
+            ex = get_adapter("mock").extract(cand, job)
+        _cache_put(key, ex)
+        return ex
 
     def _score_upload(item):
         """Return (ScoreResult|None, CandidateProfile|None, label, note|None)."""
@@ -296,12 +342,18 @@ def run_demo(
         note = None
         # --- File-direct: Claude reads the actual PDF/image (best fidelity, reads scans) ---
         if send_file and _claude_cli.supports_file(filename or ""):
+            key = _cache_key("file", model, job_sig, data)
+            cached = _cache_get(key)
             tmp = None
             try:
-                fd, tmp = tempfile.mkstemp(suffix=ext or ".pdf")
-                with os.fdopen(fd, "wb") as fh:
-                    fh.write(data)  # written briefly so the CLI can read it; deleted in finally
-                resume_text, extraction = _claude_cli.extract_from_file(tmp, job, cid)
+                if cached is not None:
+                    resume_text, extraction = cached  # identical re-score, no LLM call
+                else:
+                    fd, tmp = tempfile.mkstemp(suffix=ext or ".pdf")
+                    with os.fdopen(fd, "wb") as fh:
+                        fh.write(data)  # written briefly so the CLI can read it; deleted in finally
+                    resume_text, extraction = _claude_cli.extract_from_file(tmp, job, cid)
+                    _cache_put(key, (resume_text, extraction))
                 if resume_text.strip():
                     cand = _candidate_from_text(cid, resume_text)
                     flags = scan_injection(resume_text) + scan_keyword_stuffing(resume_text, job)
@@ -325,7 +377,8 @@ def run_demo(
                 f"{label}: no readable text. If it's a scanned/photo PDF, the NDR AI engine can read "
                 f"it — otherwise upload a text-based PDF, a .docx, or a .txt."
             )
-        return _eval_text(cand), cand, label, note
+        flags = scan_injection(cand.text) + scan_keyword_stuffing(cand.text, job)
+        return ranker.score(_text_extraction(cand), cand, job, extra_flags=flags), cand, label, note
 
     workers = min(len(items), CONCURRENCY) or 1
     with ThreadPoolExecutor(max_workers=workers) as pool:

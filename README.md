@@ -95,6 +95,7 @@ brings) plus the point-by-point breakdown. Endpoints: `POST /api/demo/parse-job`
 | `RM_CLAUDE_CLI_MODEL` | `opus` | Model for the Claude backend (`opus` best / `sonnet` balanced / `haiku` fastest). |
 | `RM_DEMO_CONCURRENCY` | `4` | Parallel resume extractions per upload (Claude backend). |
 | `RM_DEMO_SEND_FILE` | `1` | With the Claude engine, send PDFs/images to Claude directly (vision). `0` = text only. |
+| `RM_DEMO_CACHE_MAX` | `512` | In-memory extraction-cache size. Same résumé+job+model → identical, instant re-score. |
 
 **Claude matching on your subscription (no API key).** The demo **defaults to the Claude engine**
 (`RM_DEMO_BACKEND=claude_cli`) — scoring via the local **Claude Code CLI** authenticated by your

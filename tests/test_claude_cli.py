@@ -94,6 +94,30 @@ def test_demo_file_direct_reads_pdf_via_claude(monkeypatch):
     assert r["label"] == "scan" and r["fit_score"] == 100.0 and r["skills_found"] >= 2
 
 
+def test_extraction_cache_makes_rescore_consistent_and_skips_llm(monkeypatch):
+    from resume_matcher.api import demo as demo_mod
+
+    demo_mod._EXTRACT_CACHE.clear()
+    monkeypatch.setenv("CLAUDE_CODE_OAUTH_TOKEN", "tok")
+    monkeypatch.setattr(claude_cli, "available", lambda: True)
+    calls = {"n": 0}
+    payload = {"candidate_id": "x", "job_id": "x",
+               "skill_matches": [{"skill_id": "python", "skill_name": "Python", "status": "match", "evidence_span": "Python"}],
+               "gaps": [], "rationale": ""}
+
+    def fake(prompt, **kw):
+        calls["n"] += 1
+        return json.dumps(payload)
+
+    monkeypatch.setattr(claude_cli, "_run_cli", fake)
+    store = SessionStore(ttl_seconds=600)
+    files = [("a.txt", b"Senior Python developer with strong experience. " * 6)]
+    s1 = run_demo(store=store, backend="claude_cli", required_skills=["python"], files=files)
+    s2 = run_demo(store=store, backend="claude_cli", required_skills=["python"], files=files)
+    assert s1.results[0]["fit_score"] == s2.results[0]["fit_score"] == 100.0  # identical re-score
+    assert calls["n"] == 1  # second run hit the cache — no second LLM call
+
+
 def test_demo_claude_per_candidate_failure_falls_back(monkeypatch):
     # An LLM error on a single resume must not sink the batch — that candidate scores via mock.
     monkeypatch.setenv("CLAUDE_CODE_OAUTH_TOKEN", "tok")
