@@ -201,6 +201,12 @@ def create_app():
             v = form.get(name)
             return v if isinstance(v, str) else ""
 
+        def num(name: str):
+            try:
+                return float(field(name)) if field(name).strip() else None
+            except ValueError:
+                return None
+
         try:
             # run_demo is synchronous + CPU-bound (PDF/DOCX parse, matching); keep it off the event
             # loop so one upload doesn't stall other requests on this worker.
@@ -212,7 +218,9 @@ def create_app():
                 employer=field("employer"),
                 required_skills=_split_ids(field("required_skills")) or None,
                 preferred_skills=_split_ids(field("preferred_skills")) or None,
+                must_have_skills=_split_ids(field("must_have_skills")) or None,
                 min_education=field("min_education") or None,
+                min_years=num("min_years"),
                 files=files,
             )
         except DemoError as exc:

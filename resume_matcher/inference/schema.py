@@ -55,7 +55,9 @@ class JobSpec(BaseModel):
     description: str = ""
     required_skills: list[str] = Field(default_factory=list)
     preferred_skills: list[str] = Field(default_factory=list)
+    must_have_skills: list[str] = Field(default_factory=list)  # deal-breakers: weigh 2x + gate the score
     min_education: str | None = None  # e.g. "bachelor"; used as a level gate, never a proxy feature
+    min_years: float | None = None  # minimum years of experience the role expects (graded penalty)
 
 
 class CandidateProfile(BaseModel):
@@ -144,10 +146,14 @@ class ScoreExplanation(BaseModel):
     preferred_possible: float = 0.0
     required_earned: float = 0.0
     preferred_earned: float = 0.0
-    subtotal: float = 0.0  # required_earned + preferred_earned, BEFORE the education factor
+    subtotal: float = 0.0  # required_earned + preferred_earned, BEFORE the multipliers
     education_factor: float = 1.0
     education_note: str = ""
-    final_score: float = 0.0  # == fit_score (round(subtotal * education_factor, 1))
+    experience_factor: float = 1.0  # graded penalty when below the job's minimum years
+    experience_note: str = ""
+    must_have_factor: float = 1.0  # penalty when a deal-breaker (must-have) skill is missing
+    must_have_note: str = ""
+    final_score: float = 0.0  # round(subtotal * education * experience * must_have, 1) == fit_score
     summary: str = ""  # one-paragraph plain-English "why this score"
 
 

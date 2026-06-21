@@ -39,6 +39,7 @@
            border:1px solid var(--line); background:var(--panel2); font-size:12.5px; }
   .skill .seg { display:inline-flex; border-radius:5px; overflow:hidden; border:1px solid var(--line); }
   .skill .seg button { padding:1px 8px; font-size:11px; font-weight:600; border-radius:0; background:transparent; color:var(--muted); }
+  .skill .seg button.on-must { background:var(--red); color:#1a0606; }
   .skill .seg button.on-req { background:var(--blue); color:#06121f; }
   .skill .seg button.on-pref { background:var(--amber); color:#1a1402; }
   .skill .x { cursor:pointer; color:var(--muted); font-weight:700; }
@@ -108,10 +109,11 @@
     <div style="margin-top:10px"><button id="detectBtn" class="ghost">Detect skills from posting</button></div>
 
     <div id="skillsBox" class="hidden">
-      <h3>Skills this job needs <span class="muted" style="font-weight:400">— tag each Required or Preferred; required skills are worth 75 of 100 points, preferred 25.</span></h3>
+      <h3>Skills this job needs <span class="muted" style="font-weight:400">— tag each <b style="color:var(--red)">Must-have</b> (deal-breaker), <b style="color:var(--blue)">Required</b>, or <b style="color:var(--amber)">Preferred</b>. Must-haves weigh double and missing one heavily lowers the score.</span></h3>
       <div id="skillChips" class="chips"></div>
       <div style="margin-top:10px;display:flex;gap:8px;align-items:end;flex-wrap:wrap">
         <div style="flex:1;min-width:200px"><label>Add a skill (e.g. python, sql, react)</label><input id="addSkill" type="text" placeholder="type a skill and press Enter" /></div>
+        <div style="min-width:140px"><label>Min. years experience</label><input id="minYears" type="text" inputmode="decimal" placeholder="e.g. 3" /></div>
         <div style="min-width:180px"><label>Minimum education</label>
           <select id="minEdu">
             <option value="">— none —</option>
@@ -171,6 +173,7 @@ function renderSkills(){
     <span class="skill" data-i="${i}">
       ${esc(s.name)}
       <span class="seg">
+        <button data-act="must" class="${s.bucket==='must'?'on-must':''}">Must-have</button>
         <button data-act="req" class="${s.bucket==='required'?'on-req':''}">Required</button>
         <button data-act="pref" class="${s.bucket==='preferred'?'on-pref':''}">Preferred</button>
       </span>
@@ -180,7 +183,8 @@ function renderSkills(){
     const i = +el.dataset.i;
     el.querySelectorAll('[data-act]').forEach(b=> b.onclick = ()=>{
       const act=b.dataset.act;
-      if(act==='req') SKILLS[i].bucket='required';
+      if(act==='must') SKILLS[i].bucket='must';
+      else if(act==='req') SKILLS[i].bucket='required';
       else if(act==='pref') SKILLS[i].bucket='preferred';
       else if(act==='rm') SKILLS.splice(i,1);
       renderSkills();
@@ -246,9 +250,11 @@ $('#runBtn').onclick = async () => {
   fd.append('job_text', $('#jobText').value);
   fd.append('title', $('#jobTitle').value);
   fd.append('employer', $('#jobEmployer').value);
+  fd.append('must_have_skills', SKILLS.filter(s=>s.bucket==='must').map(s=>s.id).join(';'));
   fd.append('required_skills', SKILLS.filter(s=>s.bucket==='required').map(s=>s.id).join(';'));
   fd.append('preferred_skills', SKILLS.filter(s=>s.bucket==='preferred').map(s=>s.id).join(';'));
   fd.append('min_education', $('#minEdu').value);
+  fd.append('min_years', $('#minYears').value.trim());
   FILES.forEach(f=> fd.append('resumes', f, f.name));
   $('#runBtn').disabled=true; $('#runStatus').textContent='Scoring… (processed in memory, discarded after; NDR AI matching can take a bit for several resumes)';
   try{
@@ -292,24 +298,26 @@ function statusCell(c){
 
 function explanationHtml(ex){
   if(!ex) return '';
+  const impLabel = c => c.importance==='essential'?'must-have':c.importance==='optional'?'preferred':'required';
   const rows = (ex.components||[]).filter(c=>c.bucket==='required'||c.bucket==='preferred').map(c=>`
     <tr>
-      <td><b>${esc(c.skill_name)}</b><div class="muted" style="font-size:11px;text-transform:capitalize">${esc(c.bucket)}</div></td>
+      <td><b>${esc(c.skill_name)}</b><div class="muted" style="font-size:11px">${impLabel(c)}</div></td>
       <td>${statusCell(c)}</td>
       <td>${c.evidence_span?`<span class="quote">“${esc(c.evidence_span)}”</span>`:`<span class="muted">${esc(c.note)}</span>`}</td>
       <td style="white-space:nowrap"><b>${c.points_earned}</b> <span class="muted">/ ${c.points_possible}</span></td>
     </tr>`).join('');
-  const edu = (ex.components||[]).find(c=>c.bucket==='education');
+  const mult = (label, factor, note) => factor!=null && factor!==1
+    ? `<tr><td colspan="3">${esc(label)} <span class="muted">${esc(note||'')}</span></td><td class="total">×${factor}</td></tr>` : '';
   return `
     <div class="formula">${esc(ex.formula)}</div>
     <table>
       <thead><tr><th>Skill the job needs</th><th>Result</th><th>Evidence from the resume</th><th>Points</th></tr></thead>
       <tbody>${rows||'<tr><td colspan="4" class="muted">No skills listed.</td></tr>'}</tbody>
       <tfoot>
-        <tr><td colspan="3" class="muted">Required skills earned</td><td><b>${ex.required_earned}</b> <span class="muted">/ ${ex.required_possible}</span></td></tr>
-        <tr><td colspan="3" class="muted">Preferred skills earned</td><td><b>${ex.preferred_earned}</b> <span class="muted">/ ${ex.preferred_possible}</span></td></tr>
-        <tr><td colspan="3">Subtotal</td><td class="total">${ex.subtotal} / 100</td></tr>
-        <tr><td colspan="3">${esc(edu?edu.note:'Education gate')} (×${ex.education_factor})</td><td class="total">—</td></tr>
+        <tr><td colspan="3">Skills subtotal</td><td class="total">${ex.subtotal} / 100</td></tr>
+        ${mult('Education', ex.education_factor, ex.education_note)}
+        ${mult('Experience', ex.experience_factor, ex.experience_note)}
+        ${mult('Must-have penalty', ex.must_have_factor, ex.must_have_note)}
         <tr><td colspan="3"><b>Final fit score</b></td><td><span class="score ${gradeClass(scoreGrade(ex.final_score))}">${ex.final_score}</span></td></tr>
       </tfoot>
     </table>`;
@@ -351,12 +359,13 @@ function renderResults(d){
   const job = d.job||{};
   const reqList = (job.required_skills||[]).map(s=>esc(s.name)).join(', ')||'—';
   const prefList = (job.preferred_skills||[]).map(s=>esc(s.name)).join(', ')||'—';
+  const mustList = (job.must_have_skills||[]).map(s=>esc(s.name)).join(', ');
   const engine = d.engine==='claude_cli'
     ? `<span class="pill" style="color:var(--green)">engine: NDR AI</span>`
     : `<span class="pill">engine: standard</span>`;
   const head = `<div class="card">
       <h2>${esc(job.title||'Role')} <span class="muted" style="font-weight:400">@ ${esc(job.employer||'')}</span> ${engine}</h2>
-      <div class="muted">Required: ${reqList} &nbsp;·&nbsp; Preferred: ${prefList}${job.min_education?` &nbsp;·&nbsp; min education: ${esc(job.min_education)}`:''}</div>
+      <div class="muted">${mustList?`<b style="color:var(--red)">Must-have: ${mustList}</b> &nbsp;·&nbsp; `:''}Required: ${reqList} &nbsp;·&nbsp; Preferred: ${prefList}${job.min_education?` &nbsp;·&nbsp; min education: ${esc(job.min_education)}`:''}${job.min_years?` &nbsp;·&nbsp; min experience: ${esc(String(job.min_years))} yrs`:''}</div>
       <div class="muted" style="margin-top:6px">${d.n_resumes} resume(s) scored. ${esc((d.privacy&&d.privacy.note)||'')}</div>
     </div>`;
   $('#results').innerHTML = warn + head + (d.results||[]).map(resultCard).join('');

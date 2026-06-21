@@ -3,10 +3,15 @@
 It takes the LLM's MatchExtraction and:
   1. VERIFIES every claimed evidence span is a real verbatim substring of the candidate's text.
      Unverifiable matches are discarded and flagged — this defeats fabricated/injected skill claims.
-  2. Computes an explainable fit/readiness score from coverage of essential vs preferred skills,
-     with an education-level gate. The number is reproducible and decomposed into subscores AND a
-     point-by-point `ScoreExplanation` whose line items reconcile EXACTLY to `fit_score` — so the
-     coordinator (and the candidate) can see why the number is what it is.
+  2. Computes an explainable fit/readiness score that "thinks like a recruiter":
+       - skills are weighted by importance (must-have 2x > required > preferred),
+       - a missing MUST-HAVE (deal-breaker) heavily penalizes the score,
+       - below the job's minimum experience applies a graded penalty,
+       - below the minimum education applies a fixed penalty.
+     The number is reproducible and decomposed into a point-by-point `ScoreExplanation` whose line
+     items + multipliers reconcile EXACTLY to `fit_score`.
+
+Backward-compatible: with no must-haves and no min_years, scoring matches the prior 75/25 model.
 
 This is the honesty boundary: `fit_score` is fit/readiness, NOT a predicted probability of hire.
 """
@@ -15,6 +20,7 @@ from __future__ import annotations
 from ..inference.schema import (
     CandidateProfile,
     Confidence,
+    Importance,
     JobSpec,
     MatchExtraction,
     MatchStatus,
@@ -26,47 +32,32 @@ from ..inference.schema import (
 from .taxonomy import canonical_name
 
 _EDU_RANK = {
-    "highschool": 0,
-    "high school": 0,
-    "diploma": 1,
-    "certificate": 1,
-    "associate": 2,
-    "bachelor": 3,
-    "bachelors": 3,
-    "master": 4,
-    "masters": 4,
-    "phd": 5,
-    "doctorate": 5,
+    "highschool": 0, "high school": 0, "diploma": 1, "certificate": 1, "associate": 2,
+    "bachelor": 3, "bachelors": 3, "master": 4, "masters": 4, "phd": 5, "doctorate": 5,
 }
 
 _STATUS_WEIGHT = {MatchStatus.match: 1.0, MatchStatus.partial: 0.5, MatchStatus.missing: 0.0}
 
-# The score is 100 points split between the two skill buckets. Required dominates (3:1).
 _REQUIRED_WEIGHT = 75.0
 _PREFERRED_WEIGHT = 25.0
 _BELOW_EDU_FACTOR = 0.85
-_MAX_EVIDENCE_SPAN = 160  # chars; the schema promises a SHORT quote (bounds retained verbatim text)
+_MUST_HAVE_WEIGHT = 2.0          # a must-have skill weighs 2x a regular required skill
+_MISSING_MUST_HAVE_FACTOR = 0.4  # missing a deal-breaker heavily penalizes (but never auto-rejects)
+_MIN_EXPERIENCE_FACTOR = 0.7     # floor of the graded experience penalty
+_MAX_EVIDENCE_SPAN = 160
 
 
 def _edu_rank(level: str | None) -> int | None:
-    if not level:
-        return None
-    return _EDU_RANK.get(level.strip().lower())
+    return _EDU_RANK.get(level.strip().lower()) if level else None
 
 
 def _verify(text: str, ev: SkillEvidence) -> bool:
-    """A match/partial is verified only if its evidence span is genuinely present in the text."""
-    if ev.status == MatchStatus.missing:
-        return False
-    if not ev.evidence_span:
+    if ev.status == MatchStatus.missing or not ev.evidence_span:
         return False
     return ev.evidence_span.lower() in text.lower()
 
 
 def _clip_span(span: str | None) -> str | None:
-    """Bound a retained evidence quote to a short snippet. The full span is still used for the
-    verbatim-substring check in _verify(); we only clip what we KEEP, so a long span (possible with a
-    non-mock LLM backend) cannot carry a paragraph of residual PII into the persisted breakdown."""
     if not span:
         return None
     span = span.strip()
@@ -83,127 +74,85 @@ def _dedupe(items: list[str]) -> list[str]:
     return out
 
 
-def _bucket_components(
+def _weighted_components(
     skill_ids: list[str],
     bucket_name: str,
-    bucket_weight: float,
+    bucket_total: float,
+    weight_of: dict[str, float],
+    importance_of: dict[str, Importance],
     verified_by_skill: dict[str, SkillEvidence],
     discarded_by_skill: dict[str, SkillEvidence],
 ) -> tuple[list[ScoreComponent], float]:
-    """Build one ScoreComponent per job skill in this bucket and return (components, earned_total).
-
-    The DISPLAYED per-row points are allocated by a cumulative-rounding scheme so they sum EXACTLY to
-    the rounded bucket totals (no per-row drift). `earned_total` is the unrounded sum, used for the
-    headline coverage math. An empty bucket contributes nothing (its weight is redistributed to the
-    other bucket by the caller — we never award free points for skills the job didn't list)."""
-    if not skill_ids or bucket_weight <= 0:
+    """One ScoreComponent per job skill, each weighted by importance. Displayed per-row points are
+    cumulative-rounded so they sum EXACTLY to the rounded bucket total. Returns (components, earned)."""
+    if not skill_ids or bucket_total <= 0:
         return [], 0.0
-
-    per = bucket_weight / len(skill_ids)
+    total_w = sum(weight_of[s] for s in skill_ids) or 1.0
     comps: list[ScoreComponent] = []
     earned_total = 0.0
     cum_poss_raw = cum_poss_alloc = 0.0
     cum_earn_raw = cum_earn_alloc = 0.0
 
     for sid in skill_ids:
+        skill_max = bucket_total * weight_of[sid] / total_w
         ev = verified_by_skill.get(sid)
-        weight = _STATUS_WEIGHT[ev.status] if ev is not None else 0.0
-        earned_total += per * weight
+        status_w = _STATUS_WEIGHT[ev.status] if ev is not None else 0.0
+        earned_total += skill_max * status_w
 
-        # Cumulative allocation: each row gets the delta of the rounded running total, so the rows
-        # provably sum to round(bucket_weight) / round(earned_total).
-        cum_poss_raw += per
+        cum_poss_raw += skill_max
         row_possible = round(round(cum_poss_raw, 2) - cum_poss_alloc, 2)
         cum_poss_alloc = round(cum_poss_alloc + row_possible, 2)
-        cum_earn_raw += per * weight
+        cum_earn_raw += skill_max * status_w
         row_earned = round(round(cum_earn_raw, 2) - cum_earn_alloc, 2)
         cum_earn_alloc = round(cum_earn_alloc + row_earned, 2)
 
+        importance = importance_of[sid]
         if ev is not None:
             note = (
                 "Found in the resume — quote verified verbatim."
                 if ev.status == MatchStatus.match
                 else "Partially evidenced — counted at half weight."
             )
-            comps.append(
-                ScoreComponent(
-                    skill_id=sid,
-                    skill_name=canonical_name(sid),
-                    bucket=bucket_name,
-                    importance=ev.importance,
-                    status=ev.status,
-                    verified=True,
-                    evidence_span=_clip_span(ev.evidence_span),
-                    points_possible=row_possible,
-                    points_earned=row_earned,
-                    note=note,
-                )
-            )
+            comps.append(ScoreComponent(
+                skill_id=sid, skill_name=canonical_name(sid), bucket=bucket_name,
+                importance=importance, status=ev.status, verified=True,
+                evidence_span=_clip_span(ev.evidence_span),
+                points_possible=row_possible, points_earned=row_earned, note=note,
+            ))
             continue
-
         dev = discarded_by_skill.get(sid)
         if dev is not None:
-            comps.append(
-                ScoreComponent(
-                    skill_id=sid,
-                    skill_name=canonical_name(sid),
-                    bucket=bucket_name,
-                    importance=dev.importance,
-                    status=dev.status,
-                    verified=False,
-                    evidence_span=None,  # ungrounded model text — not a resume substring; never retained
-                    points_possible=row_possible,
-                    points_earned=0.0,
-                    note=(
-                        "Claimed, but the supporting quote could not be found verbatim in the "
-                        "resume — NOT counted (anti-fabrication / anti-injection safeguard)."
-                    ),
-                )
-            )
+            comps.append(ScoreComponent(
+                skill_id=sid, skill_name=canonical_name(sid), bucket=bucket_name,
+                importance=importance, status=dev.status, verified=False, evidence_span=None,
+                points_possible=row_possible, points_earned=0.0,
+                note="Claimed, but the supporting quote could not be found verbatim in the resume — "
+                     "NOT counted (anti-fabrication / anti-injection safeguard).",
+            ))
             continue
-
-        comps.append(
-            ScoreComponent(
-                skill_id=sid,
-                skill_name=canonical_name(sid),
-                bucket=bucket_name,
-                status=MatchStatus.missing,
-                verified=False,
-                points_possible=row_possible,
-                points_earned=0.0,
-                note="Not found in the resume.",
-            )
-        )
+        comps.append(ScoreComponent(
+            skill_id=sid, skill_name=canonical_name(sid), bucket=bucket_name,
+            importance=importance, status=MatchStatus.missing, verified=False,
+            points_possible=row_possible, points_earned=0.0, note="Not found in the resume.",
+        ))
     return comps, earned_total
 
 
-def _summary(
-    fit: float,
-    grade: str,
-    req_comps: list[ScoreComponent],
-    pref_comps: list[ScoreComponent],
-    n_discarded: int,
-    edu_factor: float,
-    edu_note: str,
-) -> str:
-    def counts(comps: list[ScoreComponent]) -> tuple[int, int]:
-        real = [c for c in comps if c.bucket != "info"]
-        got = sum(1 for c in real if c.verified and c.status == MatchStatus.match)
-        return got, len(real)
-
-    rgot, rtot = counts(req_comps)
-    pgot, ptot = counts(pref_comps)
+def _summary(fit, grade, comps, n_discarded, missing_must, edu_factor, exp_factor) -> str:
+    real = [c for c in comps if c.bucket in ("required", "preferred")]
+    got = sum(1 for c in real if c.verified and c.status == MatchStatus.match)
     parts = [f"Fit {fit:.1f} (grade {grade})."]
-    if rtot:
-        parts.append(f"Matched {rgot} of {rtot} required skills with verbatim evidence.")
-    if ptot:
-        parts.append(f"Matched {pgot} of {ptot} preferred skills.")
+    if real:
+        parts.append(f"Matched {got} of {len(real)} listed skills with verbatim evidence.")
+    if missing_must:
+        parts.append(f"Missing must-have skill(s): {', '.join(canonical_name(s) for s in missing_must)} "
+                     f"— heavily penalized.")
     if n_discarded:
-        parts.append(
-            f"{n_discarded} claimed skill(s) could not be verified against the resume and were not counted."
-        )
+        parts.append(f"{n_discarded} claimed skill(s) could not be verified and were not counted.")
+    if exp_factor < 1.0:
+        parts.append("Below the job's minimum experience (penalty applied).")
     if edu_factor < 1.0:
-        parts.append(edu_note)
+        parts.append("Below the job's minimum education (penalty applied).")
     return " ".join(parts)
 
 
@@ -215,32 +164,27 @@ def score(
 ) -> ScoreResult:
     flags = list(extra_flags or [])
 
-    # De-duplicate job skills (a malformed jobs.csv can repeat a skill or list it in both buckets);
-    # a skill is counted once, as required if it appears there. JobSpec carries no uniqueness
-    # guarantee, so the ranker must not assume de-duped input.
-    req_ids = _dedupe(job.required_skills)
+    must_set = set(_dedupe(job.must_have_skills))
+    # must-haves are required skills (weighted higher); merge so a must-have is always scored.
+    req_ids = _dedupe(list(job.required_skills) + list(job.must_have_skills))
     req_set = set(req_ids)
     pref_ids = [s for s in _dedupe(job.preferred_skills) if s not in req_set]
-    if len(req_ids) != len(job.required_skills) or len(pref_ids) != len(job.preferred_skills):
+    if (len(_dedupe(job.required_skills)) != len(job.required_skills)
+            or len(pref_ids) != len(job.preferred_skills)):
         flags.append("duplicate_skill_ids_collapsed")
     job_skill_ids = req_set | set(pref_ids)
 
     verified: list[SkillEvidence] = []
     discarded: list[SkillEvidence] = []
-
     for ev in extraction.skill_matches:
-        if ev.status == MatchStatus.missing:
-            continue
-        if ev.skill_id not in job_skill_ids:
-            continue  # off-spec claim: not part of this job -> never counted as verified/discarded
+        if ev.status == MatchStatus.missing or ev.skill_id not in job_skill_ids:
+            continue  # off-spec or non-match -> never counted
         if _verify(candidate.text, ev):
             verified.append(ev)
         else:
             discarded.append(ev)
             flags.append(f"unverifiable_evidence:{ev.skill_id}")
 
-    # On duplicate evidence for one skill, keep the STRONGEST verified status (order-independent),
-    # and flag the collapse so it is auditable — never let a later weaker claim silently downgrade.
     verified_by_skill: dict[str, SkillEvidence] = {}
     for ev in verified:
         prev = verified_by_skill.get(ev.skill_id)
@@ -253,10 +197,8 @@ def score(
     if not req_ids:
         flags.append("no_required_skills")
 
-    # Weights are renormalized so points come ONLY from skills the job actually listed:
-    #   both buckets present -> 75 / 25 ; only one present -> that bucket gets the full 100.
-    has_req = bool(req_ids)
-    has_pref = bool(pref_ids)
+    # Bucket weights: both present -> 75/25; only one -> that bucket gets 100.
+    has_req, has_pref = bool(req_ids), bool(pref_ids)
     if has_req and has_pref:
         req_w, pref_w = _REQUIRED_WEIGHT, _PREFERRED_WEIGHT
     elif has_req:
@@ -264,86 +206,81 @@ def score(
     elif has_pref:
         req_w, pref_w = 0.0, 100.0
     else:
-        req_w, pref_w = 0.0, 0.0  # no skills at all -> nothing to score
+        req_w, pref_w = 0.0, 0.0
 
-    # ---- the breakdown: one line item per job skill, reconciling exactly to fit_score ----------
-    req_comps, req_earned = _bucket_components(
-        req_ids, "required", req_w, verified_by_skill, discarded_by_skill
-    )
-    pref_comps, pref_earned = _bucket_components(
-        pref_ids, "preferred", pref_w, verified_by_skill, discarded_by_skill
-    )
+    # Per-skill importance + weight. Must-haves weigh 2x within the required bucket.
+    importance_of: dict[str, Importance] = {}
+    weight_of: dict[str, float] = {}
+    for s in req_ids:
+        is_must = s in must_set
+        importance_of[s] = Importance.essential if is_must else Importance.important
+        weight_of[s] = _MUST_HAVE_WEIGHT if is_must else 1.0
+    for s in pref_ids:
+        importance_of[s] = Importance.optional
+        weight_of[s] = 1.0
 
-    required_cov = req_earned / req_w if req_w else 0.0
-    preferred_cov = pref_earned / pref_w if pref_w else 0.0
-    # Use the rounded, DISPLAYED earnings so the on-screen math reconciles exactly:
-    #   final == round(subtotal * education_factor, 1), and subtotal == required + preferred.
+    req_comps, req_earned = _weighted_components(
+        req_ids, "required", req_w, weight_of, importance_of, verified_by_skill, discarded_by_skill)
+    pref_comps, pref_earned = _weighted_components(
+        pref_ids, "preferred", pref_w, weight_of, importance_of, verified_by_skill, discarded_by_skill)
+
     required_earned = round(req_earned, 2)
     preferred_earned = round(pref_earned, 2)
     subtotal = round(required_earned + preferred_earned, 2)
 
-    # Education gate: below the stated minimum applies a penalty, never an outright proxy feature.
-    edu_factor = 1.0
-    edu_note = "Education meets or exceeds the job's stated minimum (no adjustment)."
-    need = _edu_rank(job.min_education)
-    have = _edu_rank(candidate.education_level)
-    if need is not None and have is not None and have < need:
+    # ---- multipliers ------------------------------------------------------------------------
+    # Education gate.
+    edu_factor, edu_note = 1.0, "The job specified no minimum education (no adjustment)."
+    need_e, have_e = _edu_rank(job.min_education), _edu_rank(candidate.education_level)
+    if need_e is not None and have_e is not None and have_e < need_e:
         edu_factor = _BELOW_EDU_FACTOR
-        edu_note = (
-            f"Listed education ({candidate.education_level}) is below the job minimum "
-            f"({job.min_education}); a x{_BELOW_EDU_FACTOR} penalty was applied "
-            f"(self-reported, not evidence-verified)."
-        )
+        edu_note = (f"Listed education ({candidate.education_level}) is below the job minimum "
+                    f"({job.min_education}); x{_BELOW_EDU_FACTOR} (self-reported).")
         flags.append("below_min_education")
-    elif need is None:
-        edu_note = "The job specified no minimum education (no adjustment)."
-    elif have is None:
+    elif need_e is not None and have_e is not None:
+        edu_note = "Education meets or exceeds the minimum (self-reported; no adjustment)."
+    elif need_e is not None:
         edu_note = "Education level could not be determined from the resume (no adjustment)."
-    else:  # meets or exceeds the minimum
-        edu_note = (
-            "Education meets or exceeds the job's stated minimum "
-            "(self-reported, not evidence-verified; no adjustment)."
-        )
 
-    fit = round(subtotal * edu_factor, 1)
+    # Experience gate (graded): below min_years scales between _MIN_EXPERIENCE_FACTOR and 1.0.
+    exp_factor, exp_note = 1.0, "The job specified no minimum experience (no adjustment)."
+    if job.min_years and job.min_years > 0:
+        have_y = candidate.years_experience or 0.0
+        if have_y < job.min_years:
+            ratio = max(0.0, min(1.0, have_y / job.min_years))
+            exp_factor = round(_MIN_EXPERIENCE_FACTOR + (1.0 - _MIN_EXPERIENCE_FACTOR) * ratio, 3)
+            exp_note = (f"{have_y:g} yrs experience vs {job.min_years:g} required; "
+                        f"x{exp_factor} (self-reported).")
+            flags.append("below_min_experience")
+        else:
+            exp_note = f"Meets the minimum experience ({job.min_years:g}+ yrs; no adjustment)."
+
+    # Must-have gate: a missing deal-breaker heavily penalizes (still listed, never auto-rejected).
+    missing_must = [s for s in req_ids if s in must_set and s not in verified_by_skill]
+    must_factor, must_note = 1.0, ""
+    if must_set:
+        if missing_must:
+            must_factor = _MISSING_MUST_HAVE_FACTOR
+            must_note = ("Missing must-have skill(s): "
+                         f"{', '.join(canonical_name(s) for s in missing_must)} — x{must_factor}.")
+            for s in missing_must:
+                flags.append(f"missing_must_have:{s}")
+        else:
+            must_note = "All must-have skills are present (no adjustment)."
+
+    fit = round(subtotal * edu_factor * exp_factor * must_factor, 1)
     grade = "A" if fit >= 80 else "B" if fit >= 65 else "C" if fit >= 50 else "D"
-
-    edu_comp = ScoreComponent(
-        skill_id="-",
-        skill_name="Education gate",
-        bucket="education",
-        status=MatchStatus.match if edu_factor == 1.0 else MatchStatus.partial,
-        verified=True,
-        points_possible=0.0,
-        points_earned=round(fit - subtotal, 2),  # 0 or a negative adjustment; residual to the rounded fit so subtotal + adj == fit_score
-        note=edu_note,
-    )
 
     info_comps: list[ScoreComponent] = []
     if not has_req and not has_pref:
-        info_comps.append(
-            ScoreComponent(
-                skill_id="-",
-                skill_name="(no skills provided)",
-                bucket="info",
-                status=MatchStatus.missing,
-                verified=False,
-                points_possible=0.0,
-                points_earned=0.0,
-                note="No required or preferred skills were provided, so no fit score can be computed.",
-            )
-        )
+        info_comps.append(ScoreComponent(
+            skill_id="-", skill_name="(no skills provided)", bucket="info",
+            status=MatchStatus.missing, verified=False, points_possible=0.0, points_earned=0.0,
+            note="No required or preferred skills were provided, so no fit score can be computed."))
 
-    weighting = (
-        f"Required worth {req_w:.0f} pts, preferred worth {pref_w:.0f} pts."
-        if (has_req or has_pref)
-        else "No skills were provided."
-    )
     explanation = ScoreExplanation(
-        formula=(
-            f"{weighting} fit = round( (required_earned + preferred_earned) x education_factor , 1 )"
-        ),
-        components=req_comps + pref_comps + [edu_comp] + info_comps,
+        formula="fit = round( skills_subtotal x education x experience x must_have , 1 )",
+        components=req_comps + pref_comps + info_comps,
         required_possible=round(req_w, 1),
         preferred_possible=round(pref_w, 1),
         required_earned=required_earned,
@@ -351,11 +288,15 @@ def score(
         subtotal=subtotal,
         education_factor=edu_factor,
         education_note=edu_note,
+        experience_factor=exp_factor,
+        experience_note=exp_note,
+        must_have_factor=must_factor,
+        must_have_note=must_note,
         final_score=fit,
-        summary=_summary(fit, grade, req_comps, pref_comps, len(discarded), edu_factor, edu_note),
+        summary=_summary(fit, grade, req_comps + pref_comps, len(discarded), missing_must,
+                         edu_factor, exp_factor),
     )
 
-    # Confidence reflects how much we can trust the inputs, not how good the candidate is.
     if not candidate.has_resume or len(candidate.text) < 200:
         conf = Confidence.low
     elif discarded:
@@ -364,9 +305,11 @@ def score(
         conf = Confidence.high
 
     subscores = {
-        "required_coverage": round(required_cov, 3),
-        "preferred_coverage": round(preferred_cov, 3),
+        "required_coverage": round(req_earned / req_w, 3) if req_w else 0.0,
+        "preferred_coverage": round(pref_earned / pref_w, 3) if pref_w else 0.0,
         "education_factor": edu_factor,
+        "experience_factor": exp_factor,
+        "must_have_factor": must_factor,
         "verified_match_count": float(len(verified)),
         "discarded_match_count": float(len(discarded)),
     }

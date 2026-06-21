@@ -146,9 +146,9 @@ def test_education_row_reconciles_on_penalty():
                   min_education="bachelor")
     res = ranker.score(ext, cand, job)
     ex = res.explanation
-    edu = next(c for c in ex.components if c.bucket == "education")
     assert ex.education_factor == 0.85
-    assert round(ex.subtotal + edu.points_earned, 1) == res.fit_score  # displayed math reconciles
+    # displayed math reconciles: subtotal x all multipliers == fit_score
+    assert round(ex.subtotal * ex.education_factor * ex.experience_factor * ex.must_have_factor, 1) == res.fit_score
 
 
 def test_duplicate_skill_ids_collapsed():
@@ -170,6 +170,40 @@ def test_duplicate_evidence_keeps_strongest_regardless_of_order():
     rev = ranker.score(MatchExtraction(candidate_id="C", job_id="J", skill_matches=list(reversed(evs))), cand, _job(["python"]))
     assert fwd.fit_score == rev.fit_score == 100.0  # strongest match wins, order-independent
     assert any(f.startswith("duplicate_skill_evidence") for f in fwd.flags)
+
+
+def _ev(sid, span, status=MatchStatus.match):
+    return SkillEvidence(skill_id=sid, skill_name=sid, status=status, evidence_span=span)
+
+
+def test_must_have_missing_heavily_penalized_and_flagged():
+    job = JobSpec(job_id="J", title="t", employer="e",
+                  required_skills=["python", "sql"], must_have_skills=["python"], preferred_skills=["docker"])
+    cand = CandidateProfile(candidate_id="C", text="sql and docker expert " + "x" * 250, education_level="bachelor")
+    ext = MatchExtraction(candidate_id="C", job_id="J", skill_matches=[_ev("sql", "sql"), _ev("docker", "docker")])
+    res = ranker.score(ext, cand, job)
+    assert res.explanation.must_have_factor == 0.4
+    assert any(f == "missing_must_have:python" for f in res.flags)
+    assert res.fit_score < 50  # deal-breaker missing -> not shortlist-worthy
+
+
+def test_must_have_weighs_double_within_required():
+    job = JobSpec(job_id="J", title="t", employer="e",
+                  required_skills=["python", "sql"], must_have_skills=["python"])
+    cand = CandidateProfile(candidate_id="C", text="python sql " + "x" * 250)
+    ext = MatchExtraction(candidate_id="C", job_id="J", skill_matches=[_ev("python", "python"), _ev("sql", "sql")])
+    comps = {c.skill_id: c.points_possible for c in ranker.score(ext, cand, job).explanation.components}
+    assert abs(comps["python"] - 2 * comps["sql"]) < 0.1  # must-have weighs ~2x (allow rounding)
+
+
+def test_experience_below_minimum_graded_penalty():
+    job = JobSpec(job_id="J", title="t", employer="e", required_skills=["python"], min_years=4)
+    cand = CandidateProfile(candidate_id="C", text="python developer " + "x" * 250, years_experience=1.0)
+    ext = MatchExtraction(candidate_id="C", job_id="J", skill_matches=[_ev("python", "python")])
+    res = ranker.score(ext, cand, job)
+    assert 0.7 <= res.explanation.experience_factor < 1.0
+    assert "below_min_experience" in res.flags
+    assert round(res.explanation.subtotal * res.explanation.experience_factor, 1) == res.fit_score
 
 
 def test_off_spec_claim_not_counted():

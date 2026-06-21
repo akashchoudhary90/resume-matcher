@@ -21,6 +21,16 @@ _PREFIX_TEXT: list[tuple[str, str]] = [
         "penalty (x0.85) was applied to the score.",
     ),
     (
+        "missing_must_have",
+        "A MUST-HAVE (deal-breaker) skill for this job is missing from the resume, so the score was "
+        "heavily penalized. The candidate is still listed for human review, never auto-rejected.",
+    ),
+    (
+        "below_min_experience",
+        "The candidate has fewer years of experience than the job's stated minimum, so a graded "
+        "penalty was applied (self-reported, not evidence-verified).",
+    ),
+    (
         "no_required_skills",
         "No required skills were provided for this job. Preferred skills (if any) carried the full "
         "100 points; otherwise no score could be computed. Add required skills for a meaningful "
@@ -90,8 +100,8 @@ def humanize_flags(flags: list[str]) -> list[dict]:
 
 def flag_severity(flag: str) -> str:
     """'bad' (security / fabrication), 'warn' (advisory), or 'info'. Drives UI colour only."""
-    if flag.startswith(("injection", "unverifiable_evidence", "hidden_text")):
+    if flag.startswith(("injection", "unverifiable_evidence", "hidden_text", "missing_must_have")):
         return "bad"
-    if flag.startswith(("stuffing", "below_min_education", "no_required_skills")):
+    if flag.startswith(("stuffing", "below_min_education", "below_min_experience", "no_required_skills")):
         return "warn"
     return "info"

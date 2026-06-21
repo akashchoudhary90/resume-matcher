@@ -28,11 +28,15 @@ def build_job_spec(
     description: str = "",
     required_skills: list[str] | None = None,
     preferred_skills: list[str] | None = None,
+    must_have_skills: list[str] | None = None,
     min_education: str | None = None,
+    min_years: float | None = None,
 ) -> JobSpec:
-    """Assemble a JobSpec from (already-decided) fields, normalizing skill ids and dropping any skill
-    that appears in both buckets from `preferred` so it is counted once, as required."""
-    req = _dedupe([s for s in (required_skills or []) if s])
+    """Assemble a JobSpec from (already-decided) fields, normalizing skill ids. Must-have skills are
+    folded into required (they are scored there, weighted higher); a skill in both required and
+    preferred is counted once, as required."""
+    must = _dedupe([s for s in (must_have_skills or []) if s])
+    req = _dedupe([s for s in (required_skills or []) if s] + must)
     pref = [s for s in _dedupe([s for s in (preferred_skills or []) if s]) if s not in set(req)]
     return JobSpec(
         job_id=job_id or "JOB",
@@ -41,7 +45,9 @@ def build_job_spec(
         description=(description or "").strip(),
         required_skills=req,
         preferred_skills=pref,
+        must_have_skills=must,
         min_education=(min_education or None),
+        min_years=min_years,
     )
 
 

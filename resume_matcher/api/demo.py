@@ -226,7 +226,9 @@ def run_demo(
     employer: str = "",
     required_skills: list[str] | None = None,
     preferred_skills: list[str] | None = None,
+    must_have_skills: list[str] | None = None,
     min_education: str | None = None,
+    min_years: float | None = None,
     files: list[tuple[str, bytes]],
     backend: str | None = None,
 ) -> DemoSession:
@@ -235,12 +237,12 @@ def run_demo(
     `files` is a list of (filename, raw_bytes). Returns the created DemoSession. The raw bytes and
     parsed resume text exist only as locals here and are discarded on return."""
     validate_uploads(files)
-    if not (job_text or "").strip() and not (required_skills or preferred_skills):
+    if not (job_text or "").strip() and not (required_skills or preferred_skills or must_have_skills):
         raise DemoError("Paste a job posting or provide at least one required skill.")
 
     # If no explicit skills were tagged, auto-detect them from the pasted posting (so skipping the
     # "Detect skills" step still yields a meaningful match) and infer the minimum education.
-    if not required_skills and not preferred_skills and (job_text or "").strip():
+    if not required_skills and not preferred_skills and not must_have_skills and (job_text or "").strip():
         required_skills = detect_job_skills(job_text)
         if min_education is None:
             min_education = infer_education_level(job_text)
@@ -252,7 +254,9 @@ def run_demo(
         description=job_text or "",
         required_skills=required_skills,
         preferred_skills=preferred_skills,
+        must_have_skills=must_have_skills,
         min_education=min_education,
+        min_years=min_years,
     )
 
     # Without any job skills, every resume scores 0 — that's not a useful result. Refuse with a clear
@@ -347,12 +351,16 @@ def run_demo(
             row["skills_found"] = len(cand.skills)
         results.append(row)
 
+    must_set = set(job.must_have_skills)
     job_summary = {
         "title": job.title,
         "employer": job.employer,
-        "required_skills": skill_options(job.required_skills),
+        # required excludes must-haves here so the UI can show them as their own tier
+        "required_skills": skill_options([s for s in job.required_skills if s not in must_set]),
         "preferred_skills": skill_options(job.preferred_skills),
+        "must_have_skills": skill_options(job.must_have_skills),
         "min_education": job.min_education,
+        "min_years": job.min_years,
     }
     # Local resume text / bytes go out of scope here and are garbage-collected; only `results`
     # (the score breakdown) is persisted in the session.
