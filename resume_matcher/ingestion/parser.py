@@ -121,28 +121,49 @@ class ParseError(Exception):
 
 
 def _extract_pdf(source) -> str:
-    """Extract text from a PDF given a path or a binary file-like object. '' if no backend."""
+    """Extract text from a PDF (path or binary file-like). Tries pdfplumber (best), then pypdf.
+
+    Returns '' when the PDF has no extractable text layer (e.g. a scanned/photo PDF) — the caller
+    surfaces that as a clear 'no readable text' message. Raises ParseError only when NO PDF backend
+    is installed at all."""
+    text = ""
+    had_backend = False
     try:
         import pdfplumber
 
+        had_backend = True
+        if hasattr(source, "seek"):
+            source.seek(0)
         with pdfplumber.open(source) as pdf:
-            return "\n".join(page.extract_text() or "" for page in pdf.pages)
+            text = "\n".join(page.extract_text() or "" for page in pdf.pages)
     except ImportError:
         pass
-    except Exception:
-        return ""
+    except Exception:  # pdfplumber choked on this file — fall through to pypdf
+        text = ""
+    if text.strip():
+        return text
+
+    # Fall back to pypdf (also the path when pdfplumber isn't installed, or returned nothing).
     try:
         from pypdf import PdfReader
 
+        had_backend = True
         if hasattr(source, "seek"):
             source.seek(0)
-        return "\n".join(p.extract_text() or "" for p in PdfReader(source).pages)
-    except ImportError as exc:
-        raise ParseError(
-            "PDF support is not installed (pip install pypdf). Upload a .txt/.docx, or paste text."
-        ) from exc
+        text2 = "\n".join(p.extract_text() or "" for p in PdfReader(source).pages)
+        if text2.strip():
+            return text2
+    except ImportError:
+        pass
     except Exception:
-        return ""
+        pass
+
+    if not had_backend:
+        raise ParseError(
+            "PDF support is not installed (pip install pdfplumber pypdf). "
+            "Upload a .txt/.docx instead."
+        )
+    return text  # possibly '' -> scanned image / no text layer
 
 
 def _extract_docx(source) -> str:

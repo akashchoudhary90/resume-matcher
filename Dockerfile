@@ -7,7 +7,7 @@ WORKDIR /app
 # pypdf + python-docx (parse uploaded .pdf/.docx resumes in memory).
 COPY requirements.txt .
 RUN pip install --no-cache-dir -r requirements.txt \
-    fastapi "uvicorn>=0.29" python-multipart pypdf python-docx
+    fastapi "uvicorn>=0.29" python-multipart pdfplumber pypdf python-docx
 
 # OPTIONAL Claude backend (RM_DEMO_BACKEND=claude_cli): the Claude Code CLI native binary, used to
 # score via your SUBSCRIPTION (CLAUDE_CODE_OAUTH_TOKEN from `claude setup-token`) — no API key/bill.

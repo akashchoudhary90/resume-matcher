@@ -237,7 +237,10 @@ def run_demo(
             warnings.append(f"{label}: {exc}")
             continue
         if not cand.text.strip():
-            warnings.append(f"{label}: no readable text found (scanned image or empty file?).")
+            warnings.append(
+                f"{label}: no readable text. If it's a scanned or photo PDF (an image with no "
+                f"selectable text), upload a text-based PDF, a .docx, or a .txt instead."
+            )
             continue
         candidates.append(cand)
 
