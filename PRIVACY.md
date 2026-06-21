@@ -12,10 +12,12 @@ behaves (`resume_matcher/api/demo.py`, `resume_matcher/ingestion/parser.py`,
 
 ## What happens to it
 
-1. **Parsed in memory, never written to disk.** Uploaded files are read into RAM and parsed there.
-   The demo flow does not write resume files, extracted text, or results to any file or database.
-   (There is an automated test, `test_run_demo_writes_nothing_to_disk`, that fails the build if any
-   file appears on disk during a demo run.)
+1. **Processed transiently, not stored.** Uploaded files are read into RAM and parsed there; the
+   demo does not persist resume files, extracted text, or results to any file or database.
+   (`test_run_demo_writes_nothing_to_disk` fails the build if the deterministic path writes anything
+   to disk.) **One exception:** when the **Claude engine reads a PDF/image directly**, a temporary
+   copy of that file is written so the local Claude CLI can open it, then **deleted immediately**
+   after scoring. Nothing is retained either way.
 2. **Contact identifiers are redacted at ingestion; the data is treated as real PII otherwise.**
    Before scoring, a pass replaces email, phone, URLs, street address, and postal code with typed
    placeholders, and strips hidden/zero-width characters. The candidate's **name is kept** (results

@@ -15,16 +15,29 @@ from __future__ import annotations
 
 import os
 import secrets
+import tempfile
 import threading
 import time
 from concurrent.futures import ThreadPoolExecutor
 from dataclasses import dataclass, field
 
+from ..antigaming.injection import scan_injection
+from ..antigaming.keyword_stuffing import scan_keyword_stuffing
 from ..ingestion.job_posting import build_job_spec, skill_options
-from ..ingestion.parser import ParseError, SUPPORTED_EXTS, parse_resume_bytes
+from ..ingestion.parser import (
+    ParseError,
+    SUPPORTED_EXTS,
+    infer_education_level,
+    infer_years_experience,
+    parse_resume_bytes,
+)
 from ..inference.adapter import get_adapter
+from ..inference.adapters import claude_cli as _claude_cli
+from ..inference.schema import CandidateProfile
 from ..matching import coaching as coaching_mod
+from ..matching import ranker
 from ..matching.evaluator import evaluate
+from ..matching.taxonomy import normalize_skills
 from .serialize import result_to_dict
 
 
@@ -43,6 +56,9 @@ MAX_SESSIONS = _int_env("RM_DEMO_MAX_SESSIONS", 100)
 # the local Claude Code CLI — no API key). claude_cli falls back to mock if the CLI/token is absent.
 DEMO_BACKEND = os.environ.get("RM_DEMO_BACKEND", "mock")
 CONCURRENCY = max(1, _int_env("RM_DEMO_CONCURRENCY", 4))  # parallel extractions per upload batch
+# With the Claude engine, send PDFs/images to Claude directly (vision) instead of extracting text
+# first — reads scanned resumes + preserves layout. Set RM_DEMO_SEND_FILE=0 to force text extraction.
+SEND_FILE = os.environ.get("RM_DEMO_SEND_FILE", "1").lower() in ("1", "true", "yes")
 
 
 class DemoError(Exception):
@@ -82,10 +98,11 @@ class DemoSession:
                 "ttl_minutes": round(self.ttl_seconds / 60),
                 "seconds_until_auto_delete": max(0, int(self.expires_at - now)),
                 "note": (
-                    "Your resumes were processed in memory only — never written to disk — and the "
-                    "full resume text was discarded right after scoring (only the score breakdown "
-                    "with short quotes is kept). This session auto-deletes when idle and you can "
-                    "delete it now with the button below. A server restart also erases everything."
+                    "Your resumes were processed transiently and are not stored: the full resume "
+                    "text is discarded right after scoring (only the score breakdown with short "
+                    "quotes is kept). When Claude reads a PDF/image directly, a temporary copy is "
+                    "written so the local Claude CLI can open it, then deleted immediately. This "
+                    "session auto-deletes when idle and you can delete it now; a restart erases all."
                 ),
             },
         }
@@ -188,6 +205,18 @@ def _label_for(filename: str, idx: int) -> str:
     return stem or f"Resume {idx + 1}"
 
 
+def _candidate_from_text(cid: str, text: str) -> CandidateProfile:
+    """Build a CandidateProfile from already-clean text (e.g. Claude's file transcription)."""
+    return CandidateProfile(
+        candidate_id=cid,
+        text=text,
+        skills=normalize_skills(text),
+        education_level=infer_education_level(text),
+        years_experience=infer_years_experience(text),
+        has_resume=bool(text.strip()),
+    )
+
+
 def run_demo(
     *,
     store: SessionStore,
@@ -218,62 +247,85 @@ def run_demo(
         min_education=min_education,
     )
 
-    candidates = []
-    labels: dict[str, str] = {}
+    # Assign a candidate id + display label per upload up front.
+    items: list[tuple[str, str, str, bytes]] = []
     seen_labels: set[str] = set()
     warnings: list[str] = []
     for idx, (filename, data) in enumerate(files):
-        cid = f"R{idx + 1:02d}"
         label = _label_for(filename, idx)
         if label in seen_labels:  # disambiguate identical filenames
             label = f"{label} ({idx + 1})"
         seen_labels.add(label)
-        labels[cid] = label
-        try:
-            # Clients consent to PII: no redaction at all (redact=False) so the resume reaches the
-            # matcher exactly as written. Invisible/zero-width chars are still stripped (safety).
-            cand = parse_resume_bytes(cid, filename or f"{cid}.txt", data, redact=False)
-        except ParseError as exc:
-            warnings.append(f"{label}: {exc}")
-            continue
-        if not cand.text.strip():
-            warnings.append(
-                f"{label}: no readable text. If it's a scanned or photo PDF (an image with no "
-                f"selectable text), upload a text-based PDF, a .docx, or a .txt instead."
-            )
-            continue
-        candidates.append(cand)
-
-    if not candidates:
-        raise DemoError(
-            "None of the uploaded files yielded readable text. "
-            + (" ".join(warnings) if warnings else "")
-        )
+        items.append((f"R{idx + 1:02d}", label, filename, data))
 
     adapter, engine, fallback_note = _resolve_adapter(backend or DEMO_BACKEND)
     if fallback_note:
         warnings.append(fallback_note)
+    # File-direct (Claude reads the actual PDF/image) is on only when the Claude engine is active.
+    send_file = SEND_FILE and engine == "claude_cli"
 
-    # Score every uploaded resume against the one job, in parallel (the LLM backend is the slow part;
-    # each evaluate() does anti-gaming checks + extraction + the deterministic ranker). A per-candidate
-    # failure (e.g. an LLM timeout) fails quiet to the deterministic mock so one bad call never sinks
-    # the whole batch.
-    def _score_one(cand):
+    def _eval_text(cand: CandidateProfile):
         try:
             return evaluate(cand, job, adapter)
-        except Exception:  # noqa: BLE001
+        except Exception:  # noqa: BLE001 - per-candidate fail-quiet to the deterministic engine
             return evaluate(cand, job, get_adapter("mock"))
 
-    workers = min(len(candidates), CONCURRENCY) or 1
-    with ThreadPoolExecutor(max_workers=workers) as pool:
-        scored = list(pool.map(_score_one, candidates))
+    def _score_upload(item):
+        """Return (ScoreResult|None, CandidateProfile|None, label, note|None)."""
+        cid, label, filename, data = item
+        ext = os.path.splitext(filename or "")[1].lower()
+        note = None
+        # --- File-direct: Claude reads the actual PDF/image (best fidelity, reads scans) ---
+        if send_file and _claude_cli.supports_file(filename or ""):
+            tmp = None
+            try:
+                fd, tmp = tempfile.mkstemp(suffix=ext or ".pdf")
+                with os.fdopen(fd, "wb") as fh:
+                    fh.write(data)  # written briefly so the CLI can read it; deleted in finally
+                resume_text, extraction = _claude_cli.extract_from_file(tmp, job, cid)
+                if resume_text.strip():
+                    cand = _candidate_from_text(cid, resume_text)
+                    flags = scan_injection(resume_text) + scan_keyword_stuffing(resume_text, job)
+                    return ranker.score(extraction, cand, job, extra_flags=flags), cand, label, None
+                note = f"{label}: Claude read no text from the file; tried local text extraction."
+            except Exception as exc:  # noqa: BLE001 - fall back to text extraction
+                note = f"{label}: Claude file-read failed ({type(exc).__name__}); used text extraction."
+            finally:
+                if tmp:
+                    try:
+                        os.unlink(tmp)
+                    except OSError:
+                        pass
+        # --- Text path (default for .txt/.docx; also the fallback for the above) ---
+        try:
+            cand = parse_resume_bytes(cid, filename or f"{cid}.txt", data, redact=False)
+        except ParseError as exc:
+            return None, None, label, f"{label}: {exc}"
+        if not cand.text.strip():
+            return None, None, label, note or (
+                f"{label}: no readable text. If it's a scanned/photo PDF, the Claude engine can read "
+                f"it — otherwise upload a text-based PDF, a .docx, or a .txt."
+            )
+        return _eval_text(cand), cand, label, note
 
-    ranked = sorted(scored, key=lambda r: r.fit_score, reverse=True)
-    by_id = {c.candidate_id: c for c in candidates}
+    workers = min(len(items), CONCURRENCY) or 1
+    with ThreadPoolExecutor(max_workers=workers) as pool:
+        outcomes = list(pool.map(_score_upload, items))
+
+    scored = []
+    for res, cand, label, note in outcomes:
+        if note:
+            warnings.append(note)
+        if res is not None:
+            scored.append((res, cand, label))
+
+    if not scored:
+        raise DemoError("None of the uploaded files could be scored. " + " ".join(warnings[-3:]))
+
+    scored.sort(key=lambda t: t[0].fit_score, reverse=True)
     results = []
-    for res in ranked:
-        row = result_to_dict(res, coaching_mod.coach(res, job), label=labels.get(res.candidate_id))
-        cand = by_id.get(res.candidate_id)
+    for res, cand, label in scored:
+        row = result_to_dict(res, coaching_mod.coach(res, job), label=label)
         if cand is not None:
             row["education_level"] = cand.education_level
             row["years_experience"] = cand.years_experience
@@ -290,7 +342,7 @@ def run_demo(
     # Local resume text / bytes go out of scope here and are garbage-collected; only `results`
     # (the score breakdown) is persisted in the session.
     return store.create(
-        job=job_summary, results=results, n_resumes=len(candidates), warnings=warnings, engine=engine
+        job=job_summary, results=results, n_resumes=len(scored), warnings=warnings, engine=engine
     )
 
 

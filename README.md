@@ -90,12 +90,16 @@ Endpoints: `POST /api/demo/parse-job`, `POST /api/demo/run` (multipart upload),
 | `RM_DEMO_BACKEND` | `mock` | Matching engine: `mock` (deterministic) or `claude_cli` (Claude on your subscription). |
 | `RM_CLAUDE_CLI_MODEL` | `sonnet` | Model for the Claude backend (`sonnet` quality / `haiku` speed). |
 | `RM_DEMO_CONCURRENCY` | `4` | Parallel resume extractions per upload (Claude backend). |
+| `RM_DEMO_SEND_FILE` | `1` | With the Claude engine, send PDFs/images to Claude directly (vision). `0` = text only. |
 
 **Claude matching on your subscription (no API key).** Set `RM_DEMO_BACKEND=claude_cli` to score with
 Claude via the local **Claude Code CLI** authenticated by your subscription — same approach as the
-Kotak project, no per-token API bill. Claude does the skill *extraction* (which skills are evidenced,
-with verbatim quotes); the deterministic ranker still makes the score decision and discards any quote
-that isn't a real substring of the resume, so a hallucinated skill can't inflate the score. Setup:
+Kotak project, no per-token API bill. With the Claude engine, **PDFs/images are sent to Claude
+directly** (`RM_DEMO_SEND_FILE=1`) — it reads scanned/photo resumes natively and preserves layout,
+instead of relying on text extraction (`.docx`/`.txt` still use fast local extraction). Claude does
+the skill *extraction* (which skills are evidenced, with verbatim quotes) and returns its own
+transcription; the deterministic ranker still makes the score decision and discards any quote that
+isn't a real substring of that transcription, so a hallucinated skill can't inflate the score. Setup:
 (1) build the image with `--build-arg WITH_CLAUDE=1` (the cohost compose does this by default), (2) run
 `claude setup-token` on a logged-in machine and put the token in `CLAUDE_CODE_OAUTH_TOKEN`. Until the
 token is present it falls back to `mock` automatically. Note: with the Claude engine, resume text is

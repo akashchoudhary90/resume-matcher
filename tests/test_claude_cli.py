@@ -18,7 +18,7 @@ def test_adapter_parses_cli_output(monkeypatch):
         "gaps": [], "rationale": "ok",
     }
     # CLI may wrap JSON in prose/fences — parse_extraction tolerates it.
-    monkeypatch.setattr(claude_cli, "_run_cli", lambda prompt: "```json\n" + json.dumps(payload) + "\n```")
+    monkeypatch.setattr(claude_cli, "_run_cli", lambda prompt, **kw: "```json\n" + json.dumps(payload) + "\n```")
     cand = CandidateProfile(candidate_id="C1", text="Python developer.")
     job = JobSpec(job_id="J1", title="t", employer="e", required_skills=["python"])
     ext = claude_cli.ClaudeCliAdapter().extract(cand, job)
@@ -54,7 +54,7 @@ def test_demo_uses_claude_when_available(monkeypatch):
         ],
         "gaps": [], "rationale": "",
     }
-    monkeypatch.setattr(claude_cli, "_run_cli", lambda prompt: json.dumps(payload))
+    monkeypatch.setattr(claude_cli, "_run_cli", lambda prompt, **kw: json.dumps(payload))
     store = SessionStore(ttl_seconds=600)
     sess = run_demo(
         store=store, backend="claude_cli", required_skills=["python"],
@@ -65,12 +65,42 @@ def test_demo_uses_claude_when_available(monkeypatch):
     assert sess.results[0]["fit_score"] == 100.0
 
 
+def test_demo_file_direct_reads_pdf_via_claude(monkeypatch):
+    # Simulate Claude reading a (scanned) PDF directly and returning transcription + matches.
+    from resume_matcher.inference.schema import MatchExtraction, MatchStatus, SkillEvidence
+
+    monkeypatch.setenv("CLAUDE_CODE_OAUTH_TOKEN", "tok")
+    monkeypatch.setattr(claude_cli, "available", lambda: True)
+
+    def fake_from_file(path, job, cid):
+        text = "Jane Doe. Senior Python developer. Strong SQL. Bachelor of Science. 5 years."
+        ext = MatchExtraction(
+            candidate_id=cid, job_id=job.job_id,
+            skill_matches=[
+                SkillEvidence(skill_id="python", skill_name="Python", status=MatchStatus.match, evidence_span="Python"),
+                SkillEvidence(skill_id="sql", skill_name="SQL", status=MatchStatus.match, evidence_span="SQL"),
+            ],
+        )
+        return text, ext
+
+    monkeypatch.setattr(claude_cli, "extract_from_file", fake_from_file)
+    store = SessionStore(ttl_seconds=600)
+    # Bytes are an image-only "PDF" with no text layer — text extraction can't read it, file-direct can.
+    sess = run_demo(
+        store=store, backend="claude_cli", required_skills=["python", "sql"],
+        files=[("scan.pdf", b"%PDF-1.4 fake-image-no-text-layer")],
+    )
+    assert sess.engine == "claude_cli"
+    r = sess.results[0]
+    assert r["label"] == "scan" and r["fit_score"] == 100.0 and r["skills_found"] >= 2
+
+
 def test_demo_claude_per_candidate_failure_falls_back(monkeypatch):
     # An LLM error on a single resume must not sink the batch — that candidate scores via mock.
     monkeypatch.setenv("CLAUDE_CODE_OAUTH_TOKEN", "tok")
     monkeypatch.setattr(claude_cli, "available", lambda: True)
 
-    def boom(prompt):
+    def boom(prompt, **kw):
         raise RuntimeError("simulated CLI failure")
 
     monkeypatch.setattr(claude_cli, "_run_cli", boom)
