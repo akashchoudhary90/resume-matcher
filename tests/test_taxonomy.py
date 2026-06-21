@@ -1,5 +1,5 @@
 """Data-driven skill taxonomy: broad coverage with precision (no over-matching plain prose)."""
-from resume_matcher.matching.taxonomy import canonical_name, normalize_skills, skill_count
+from resume_matcher.matching.taxonomy import canonical_name, normalize_skills, search_skills, skill_count
 
 
 def test_vocabulary_is_large():
@@ -28,3 +28,10 @@ def test_trailing_punctuation_and_node_disambiguation():
 def test_core_skills_preserved_after_refactor():
     for s in ["python", "java", "javascript", "sql", "machine_learning", "aws", "git", "agile"]:
         assert s in normalize_skills(f"experience with {canonical_name(s)}"), s
+
+
+def test_search_skills_typeahead():
+    assert search_skills("pyth", 5)[0]["id"] == "python"  # best match first
+    ids = {s["id"] for s in search_skills("dock", 5)}
+    assert "docker" in ids
+    assert search_skills("", 5) == []  # empty query -> no suggestions

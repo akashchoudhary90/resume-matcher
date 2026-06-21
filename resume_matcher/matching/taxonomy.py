@@ -121,6 +121,37 @@ def skill_count() -> int:
     return len(_CANONICAL)
 
 
+def search_skills(query: str, limit: int = 10) -> list[dict]:
+    """Typeahead search over the vocabulary. Returns [{id, name}] ranked by match quality
+    (exact > name-prefix > name-substring > alias). Powers the guided skill picker."""
+    q = (query or "").strip().lower()
+    if not q:
+        return []
+    ranked: list[tuple] = []
+    for cid, name in _CANONICAL.items():
+        nl = name.lower()
+        rank = None
+        if nl == q:
+            rank = 0
+        elif nl.startswith(q):
+            rank = 1
+        elif q in nl:
+            rank = 2
+        else:
+            for alias in _RAW.get(cid, {}).get("aliases", []) or []:
+                al = alias.lower()
+                if al == q:
+                    rank = min(rank if rank is not None else 9, 0)
+                elif al.startswith(q):
+                    rank = min(rank if rank is not None else 9, 3)
+                elif q in al:
+                    rank = min(rank if rank is not None else 9, 4)
+        if rank is not None:
+            ranked.append((rank, len(name), name, cid))
+    ranked.sort()
+    return [{"id": cid, "name": name} for _, _, name, cid in ranked[:limit]]
+
+
 def normalize_skills(text: str) -> list[str]:
     """Return the sorted set of canonical skill IDs found in `text` (single regex pass)."""
     if not text or _PATTERN is None:

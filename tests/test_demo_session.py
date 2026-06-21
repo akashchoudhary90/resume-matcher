@@ -71,6 +71,17 @@ def test_results_labelled_by_filename_with_candidate_meta():
     assert row["skills_found"] >= 2
 
 
+def test_gap_view_extra_skills():
+    # The gap view shows skills the candidate has that the job didn't ask for.
+    store = SessionStore(ttl_seconds=600)
+    sess = run_demo(
+        store=store, required_skills=["python"],
+        files=[("R.txt", b"Python developer who also knows Docker and Tableau. " * 4)],
+    )
+    extra = sess.results[0]["extra_skills"]
+    assert "Docker" in extra and "Tableau" in extra and "Python" not in extra
+
+
 def test_run_demo_writes_nothing_to_disk():
     before = _snapshot(ROOT)
     store = SessionStore(ttl_seconds=600)

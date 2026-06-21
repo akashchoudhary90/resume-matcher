@@ -112,7 +112,9 @@
       <h3>Skills this job needs <span class="muted" style="font-weight:400">— tag each <b style="color:var(--red)">Must-have</b> (deal-breaker), <b style="color:var(--blue)">Required</b>, or <b style="color:var(--amber)">Preferred</b>. Must-haves weigh double and missing one heavily lowers the score.</span></h3>
       <div id="skillChips" class="chips"></div>
       <div style="margin-top:10px;display:flex;gap:8px;align-items:end;flex-wrap:wrap">
-        <div style="flex:1;min-width:200px"><label>Add a skill (e.g. python, sql, react)</label><input id="addSkill" type="text" placeholder="type a skill and press Enter" /></div>
+        <div style="flex:1;min-width:200px"><label>Add a skill (type to search, Enter to add)</label>
+          <input id="addSkill" type="text" list="skillSuggest" autocomplete="off" placeholder="e.g. python, kubernetes, financial modeling" />
+          <datalist id="skillSuggest"></datalist></div>
         <div style="min-width:140px"><label>Min. years experience</label><input id="minYears" type="text" inputmode="decimal" placeholder="e.g. 3" /></div>
         <div style="min-width:180px"><label>Minimum education</label>
           <select id="minEdu">
@@ -191,33 +193,53 @@ function renderSkills(){
     });
   });
 }
-function addSkill(name){
-  const id = name.trim().toLowerCase().replace(/[^a-z0-9+#.]+/g,'_').replace(/^_|_$/g,'');
-  if(!id) return;
-  if(SKILLS.some(s=>s.id===id)) return;
-  SKILLS.push({id, name:name.trim(), bucket:'required'}); renderSkills();
+let SUGGEST = {};  // lower(name) -> {id, name} from the typeahead
+function addSkill(name, id){
+  name = (name||'').trim();
+  if(!name) return;
+  const picked = SUGGEST[name.toLowerCase()];
+  id = id || (picked && picked.id) || name.toLowerCase().replace(/[^a-z0-9+#.]+/g,'_').replace(/^_|_$/g,'');
+  const disp = (picked && picked.name) || name;
+  if(!id || SKILLS.some(s=>s.id===id)) return;
+  SKILLS.push({id, name:disp, bucket:'required'}); renderSkills();
 }
+// typeahead: fetch canonical skills as the user types
+let suggestTimer=null;
+$('#addSkill').addEventListener('input', e=>{
+  const q=e.target.value.trim();
+  clearTimeout(suggestTimer);
+  if(q.length<2) return;
+  suggestTimer=setTimeout(async()=>{
+    try{
+      const list=await (await fetch('/api/demo/skills?q='+encodeURIComponent(q))).json();
+      SUGGEST={}; list.forEach(s=>SUGGEST[s.name.toLowerCase()]=s);
+      $('#skillSuggest').innerHTML=list.map(s=>`<option value="${esc(s.name)}">`).join('');
+    }catch(_){}
+  }, 150);
+});
 
-$('#detectBtn').onclick = async () => {
+async function detectSkills(silent){
+  if(!$('#jobText').value.trim()) return;
   const fd = new FormData();
   fd.append('job_text', $('#jobText').value);
   fd.append('title', $('#jobTitle').value);
   fd.append('employer', $('#jobEmployer').value);
-  $('#detectBtn').disabled = true; $('#detectBtn').textContent='Detecting…';
+  if(!silent){ $('#detectBtn').disabled = true; $('#detectBtn').textContent='Detecting…'; }
   try{
     const r = await fetch('/api/demo/parse-job', {method:'POST', body:fd});
     const d = await r.json();
-    const req = new Set((d.required_skills||[]).map(s=>s.id));
     const all = d.detected_skills||[];
-    // keep any manually added skills, merge detected
     const have = new Set(SKILLS.map(s=>s.id));
-    all.forEach(s=>{ if(!have.has(s.id)) SKILLS.push({id:s.id, name:s.name, bucket: req.has(s.id)?'required':'required'}); });
-    if(d.min_education) $('#minEdu').value = d.min_education;
-    if(!SKILLS.length){ banner('No known skills were detected in the posting. Add the key skills manually below.', 'warn'); }
+    all.forEach(s=>{ if(!have.has(s.id)){ SKILLS.push({id:s.id, name:s.name, bucket:'required'}); have.add(s.id); } });
+    if(d.min_education && !$('#minEdu').value) $('#minEdu').value = d.min_education;
+    if(!silent && !SKILLS.length){ banner('No known skills detected — add the key skills manually below.', 'warn'); }
     renderSkills();
-  }catch(e){ banner('Could not parse the posting: '+e, 'err'); }
+  }catch(e){ if(!silent) banner('Could not parse the posting: '+e, 'err'); }
   $('#detectBtn').disabled=false; $('#detectBtn').textContent='Detect skills from posting';
-};
+}
+$('#detectBtn').onclick = () => detectSkills(false);
+// Auto-detect when the user finishes pasting/typing the posting and hasn't tagged skills yet.
+$('#jobText').addEventListener('blur', () => { if(!SKILLS.length) detectSkills(true); });
 $('#addSkill').addEventListener('keydown', e=>{ if(e.key==='Enter'){ e.preventDefault(); addSkill($('#addSkill').value); $('#addSkill').value=''; }});
 
 /* ---------- files ---------- */
@@ -324,6 +346,22 @@ function explanationHtml(ex){
 }
 function scoreGrade(s){ return s>=80?'A':s>=65?'B':s>=50?'C':'D'; }
 
+function gapView(res){
+  const ex = res.explanation; if(!ex) return '';
+  const has=[], miss=[];
+  (ex.components||[]).filter(c=>c.bucket==='required'||c.bucket==='preferred')
+    .forEach(c=> (c.points_earned>0?has:miss).push(c.skill_name));
+  const extra = res.extra_skills||[];
+  const tag=(s,color)=>`<span style="display:inline-block;font-size:11.5px;padding:2px 7px;border-radius:5px;margin:2px;border:1px solid var(--line);color:${color}">${esc(s)}</span>`;
+  const col=(title,items,color,empty)=>`<div style="flex:1;min-width:150px;background:var(--panel2);border:1px solid var(--line);border-radius:6px;padding:8px">
+     <div style="font-size:11px;text-transform:uppercase;color:var(--muted);margin-bottom:6px">${title} (${items.length})</div>
+     ${items.length?items.map(s=>tag(s,color)).join(''):`<span class="muted">${empty}</span>`}</div>`;
+  return `<div style="display:flex;gap:10px;flex-wrap:wrap;margin:8px 0">
+    ${col('✓ Has — job wants',has,'var(--green)','—')}
+    ${col('✗ Missing',miss,'var(--red)','none')}
+    ${col('+ Also brings',extra,'var(--muted)','—')}</div>`;
+}
+
 function resultCard(res){
   const ex = res.explanation;
   const flags = (res.flags_explained||[]).map(f=>`<div class="flag ${f.severity}">${esc(f.text)}</div>`).join('');
@@ -344,6 +382,7 @@ function resultCard(res){
     </div>
     ${meta.length?`<div class="muted" style="margin-top:6px">${meta.join(' · ')}</div>`:''}
     <div class="muted" style="margin:8px 0">${esc(ex?ex.summary:'')}</div>
+    ${gapView(res)}
     <details open><summary>Why this score? (point-by-point)</summary>${explanationHtml(ex)}</details>
     ${flags?`<h3>Flags for human review <span class="muted" style="font-weight:400">— advisory only, never auto-reject</span></h3>${flags}`:''}
     <details><summary>Coaching — how to close the gap</summary>

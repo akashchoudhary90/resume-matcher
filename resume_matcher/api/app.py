@@ -162,6 +162,12 @@ def create_app():
             "active_sessions": demo_store.active_count(),
         }
 
+    @app.get("/api/demo/skills")
+    def demo_skills(q: str = "", limit: int = 10) -> list[dict]:
+        from ..matching.taxonomy import search_skills
+
+        return search_skills(q, limit=max(1, min(25, limit)))
+
     @app.post("/api/demo/parse-job")
     def demo_parse_job(
         job_text: str = Form(""), title: str = Form(""), employer: str = Form("")

@@ -77,7 +77,11 @@ auto-detect and re-tag the job's skills, and get every resume scored with the fu
 - Sessions **auto-delete after idle TTL** *and* there is a **"Delete my data now"** button that wipes
   everything immediately. A server restart also erases all sessions.
 
-Endpoints: `POST /api/demo/parse-job`, `POST /api/demo/run` (multipart upload),
+The job setup is guided: paste the posting (skills auto-detect on blur), tag each skill
+**Must-have / Required / Preferred**, set a minimum experience, and add skills via a typeahead over
+the vocabulary. Each result shows a **gap view** (skills the candidate has, is missing, and also
+brings) plus the point-by-point breakdown. Endpoints: `POST /api/demo/parse-job`,
+`POST /api/demo/run` (multipart upload), `GET /api/demo/skills?q=` (typeahead),
 `GET /api/demo/session/{id}`, `DELETE /api/demo/session/{id}`, `GET /api/demo/config`. Tunables (env):
 
 | Variable | Default | Meaning |

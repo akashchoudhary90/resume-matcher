@@ -37,7 +37,7 @@ from ..inference.schema import CandidateProfile
 from ..matching import coaching as coaching_mod
 from ..matching import ranker
 from ..matching.evaluator import evaluate
-from ..matching.taxonomy import normalize_skills
+from ..matching.taxonomy import canonical_name, normalize_skills
 from .serialize import result_to_dict
 
 
@@ -341,6 +341,7 @@ def run_demo(
     if not scored:
         raise DemoError("None of the uploaded files could be scored. " + " ".join(warnings[-3:]))
 
+    job_skill_set = set(job.required_skills) | set(job.preferred_skills)
     scored.sort(key=lambda t: t[0].fit_score, reverse=True)
     results = []
     for res, cand, label in scored:
@@ -349,6 +350,8 @@ def run_demo(
             row["education_level"] = cand.education_level
             row["years_experience"] = cand.years_experience
             row["skills_found"] = len(cand.skills)
+            # Skills the candidate has that the job didn't ask for (the "also brings" half of the gap view).
+            row["extra_skills"] = [canonical_name(s) for s in cand.skills if s not in job_skill_set]
         results.append(row)
 
     must_set = set(job.must_have_skills)
