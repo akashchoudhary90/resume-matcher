@@ -1,0 +1,728 @@
+{
+  "_README": "LLM-simulated holistic 'coordinator' ratings (proxy for real human ratings) to stress-test the harness. Replace with real coordinator ratings when available.",
+  "examples": [
+    {
+      "id": "swe_grad_001_frontend_react",
+      "job": {
+        "title": "Junior Front-End Engineer (New Grad)",
+        "required_skills": [
+          "javascript",
+          "react",
+          "html",
+          "css",
+          "git"
+        ],
+        "must_have_skills": [
+          "javascript",
+          "react"
+        ],
+        "preferred_skills": [
+          "typescript",
+          "rest_api",
+          "testing",
+          "communication"
+        ],
+        "min_years": 0,
+        "min_education": "bachelors_in_progress_or_completed"
+      },
+      "resume_text": "Computer Science B.S. candidate (graduating May 2026, GPA 3.6) at a state university. Built a course-scheduling web app used by ~400 classmates: React front end with reusable component library, Redux for state, and a Node/Express REST backend; deployed on Vercel. Completed a summer internship at a 30-person startup where I shipped three React features behind feature flags and wrote Jest unit tests that raised coverage on my module from 40% to 78%. Comfortable with Git/GitHub pull-request workflow and reviewed teammates' code in two class projects. Strong on semantic HTML and responsive CSS (Flexbox/Grid); picked up TypeScript on the internship and converted one feature to it. Looking for a front-end role where I can keep growing toward full-stack.",
+      "human": {
+        "label": "strong",
+        "score": 86,
+        "rationale": "Real React depth shown through a shipped app plus internship features and testing; directly on-target for the role with good trajectory."
+      }
+    },
+    {
+      "id": "swe_grad_002_backend_implicit",
+      "job": {
+        "title": "Backend Software Engineer I (New Grad)",
+        "required_skills": [
+          "python",
+          "sql",
+          "rest_api",
+          "git"
+        ],
+        "must_have_skills": [
+          "python",
+          "sql"
+        ],
+        "preferred_skills": [
+          "aws",
+          "docker",
+          "postgresql",
+          "communication"
+        ],
+        "min_years": 0,
+        "min_education": "bachelors"
+      },
+      "resume_text": "B.S. in Computer Science, 2025. Senior capstone: built a transit-delay prediction service in Python (FastAPI) backed by a relational store; designed the schema, wrote the queries that joined live feed data against historical trips, and added indexes that cut the slowest endpoint from 1.2s to 180ms. Containerized the service and ran it on a free-tier cloud VM with a small CI pipeline on GitHub Actions. Tutored 20+ students in data structures and algorithms for two years. Hackathon winner (best use of data) for a Python ETL tool that ingested CSVs into a Postgres database and exposed an HTTP API. Interested in backend and data-infrastructure work.",
+      "human": {
+        "label": "strong",
+        "score": 82,
+        "rationale": "Tricky for keyword matchers: never writes 'aws' or 'docker' literally but clearly demonstrates SQL depth, containerization, cloud deploy, and CI through projects."
+      }
+    },
+    {
+      "id": "swe_grad_003_career_changer_overqual",
+      "job": {
+        "title": "Software Engineer I, Web Platform (New Grad / Early Career)",
+        "required_skills": [
+          "javascript",
+          "react",
+          "html",
+          "css",
+          "git"
+        ],
+        "must_have_skills": [
+          "javascript",
+          "react"
+        ],
+        "preferred_skills": [
+          "node",
+          "sql",
+          "communication",
+          "agile"
+        ],
+        "min_years": 0,
+        "min_education": "bachelors"
+      },
+      "resume_text": "Former mechanical engineer (B.S. Mechanical Engineering, 8 years in automotive manufacturing) who completed a full-time coding bootcamp in 2025 and is now seeking an early-career web engineering role. Capstone: a full-stack inventory dashboard in React + Node/Express with a PostgreSQL backend and role-based auth, built solo over six weeks. Led cross-functional teams of 6-10 people in my prior career and ran Agile-style stand-ups for plant-automation projects. Two freelance projects since the bootcamp: a small business booking site (React, Stripe) and a marketing landing page. Self-taught SQL well before the bootcamp for production-line analytics dashboards. Comfortable with ambiguity and known for unblocking teammates; deliberately taking a junior-level role to build software depth.",
+      "human": {
+        "label": "ok",
+        "score": 68,
+        "rationale": "Strong maturity, communication, and a real full-stack capstone, but only months of coding experience and thin React depth versus CS-grad peers; promising hire, not top-tier yet."
+      }
+    },
+    {
+      "id": "swe_grad_004_weak_mismatch",
+      "job": {
+        "title": "Junior Full-Stack Web Developer (New Grad)",
+        "required_skills": [
+          "javascript",
+          "react",
+          "node",
+          "sql",
+          "git"
+        ],
+        "must_have_skills": [
+          "javascript",
+          "react",
+          "node"
+        ],
+        "preferred_skills": [
+          "typescript",
+          "rest_api",
+          "aws",
+          "communication"
+        ],
+        "min_years": 0,
+        "min_education": "bachelors"
+      },
+      "resume_text": "B.S. in Information Technology, 2025, GPA 3.1. Coursework covered intro programming in Java and C++, computer networks, and a database fundamentals class. Built one academic project: a static personal portfolio site using HTML and CSS with a small amount of jQuery for a dropdown menu. Listed 'familiar with JavaScript and React' on profile but no projects, internships, or coursework demonstrate either. Strong interest in IT support and network administration; held a help-desk job for one year handling ticket triage and Windows troubleshooting. Resume mentions 'web development' as an interest area. No GitHub repositories beyond the portfolio site.",
+      "human": {
+        "label": "weak",
+        "score": 28,
+        "rationale": "Keyword scanner would flag 'javascript/react' but there's zero demonstrated front-end or full-stack work; background and interests point to IT/networking, not web engineering."
+      }
+    },
+    {
+      "id": "ds_newgrad_001",
+      "job": {
+        "title": "Junior Data Analyst",
+        "required_skills": [
+          "sql",
+          "excel",
+          "python",
+          "data_visualization",
+          "communication"
+        ],
+        "must_have_skills": [
+          "sql",
+          "excel"
+        ],
+        "preferred_skills": [
+          "tableau",
+          "statistics",
+          "a_b_testing"
+        ],
+        "min_years": 0,
+        "min_education": "bachelors"
+      },
+      "resume_text": "Recent B.S. graduate in Statistics from a state university (GPA 3.6). Completed a senior capstone analyzing student retention data for 12,000 records using Python (pandas) and SQL, presenting findings to faculty stakeholders. Interned for one summer at a regional credit union where I built weekly performance dashboards in Tableau and automated a manual Excel reporting process that saved roughly 5 hours per week. Comfortable writing intermediate SQL joins, window functions, and CTEs against a Postgres database. Coursework in regression, experimental design, and probability. Strong written communication; wrote the internship's monthly analytics summary read by the branch managers.",
+      "human": {
+        "label": "strong",
+        "score": 84,
+        "rationale": "Directly relevant internship plus capstone hit every must-have with real depth and stakeholder communication, ideal for a new-grad analyst seat."
+      }
+    },
+    {
+      "id": "ds_newgrad_002",
+      "job": {
+        "title": "Associate Data Scientist",
+        "required_skills": [
+          "python",
+          "sql",
+          "machine_learning",
+          "statistics",
+          "communication"
+        ],
+        "must_have_skills": [
+          "python",
+          "machine_learning"
+        ],
+        "preferred_skills": [
+          "aws",
+          "spark",
+          "deep_learning"
+        ],
+        "min_years": 0,
+        "min_education": "bachelors"
+      },
+      "resume_text": "Computer Science senior graduating this spring. Built a personal project that scrapes and forecasts local apartment rental prices: I engineered features from listing text, trained gradient-boosted trees and a linear baseline in scikit-learn, and evaluated them with cross-validated RMSE, deploying the model behind a small Flask API. For a hackathon I fine-tuned an image classifier on a custom dataset and wrote up the precision/recall tradeoffs. Most of my data wrangling is in pandas; I pull from a SQLite database for the rental project. I have not held a formal data role yet but maintain a GitHub with documented notebooks. Active in the campus AI club where I run beginner workshops on model evaluation.",
+      "human": {
+        "label": "ok",
+        "score": 71,
+        "rationale": "Genuine self-driven ML depth and evaluation rigor, but all unpaid/academic with thin SQL at scale, so promising rather than proven."
+      }
+    },
+    {
+      "id": "ds_newgrad_003",
+      "job": {
+        "title": "Business Intelligence Analyst (Entry-Level)",
+        "required_skills": [
+          "sql",
+          "tableau",
+          "excel",
+          "data_visualization",
+          "communication"
+        ],
+        "must_have_skills": [
+          "sql",
+          "data_visualization"
+        ],
+        "preferred_skills": [
+          "python",
+          "statistics",
+          "stakeholder_management"
+        ],
+        "min_years": 1,
+        "min_education": "bachelors"
+      },
+      "resume_text": "After my marketing degree I spent two years as an operations coordinator at an e-commerce startup. I owned the company's weekly sales and inventory reporting, which meant pulling raw order data straight from our warehouse with queries I taught myself and turning it into interactive dashboards leadership reviewed every Monday. I redesigned how we visualize sell-through so non-technical managers could spot stockouts at a glance, which cut emergency reorders noticeably. I also ran the quarterly cohort breakdowns of customer repeat-purchase behavior. I'm now looking to move formally into an analytics role. I recently finished an online program covering Python and statistical inference to round out my skill set.",
+      "human": {
+        "label": "strong",
+        "score": 80,
+        "rationale": "Tricky case: never names SQL or Tableau as keywords but clearly does both daily with real business impact, a keyword matcher would wrongly downrank this strong fit."
+      }
+    },
+    {
+      "id": "ds_newgrad_004",
+      "job": {
+        "title": "Data Analyst, Product Analytics",
+        "required_skills": [
+          "sql",
+          "python",
+          "statistics",
+          "a_b_testing",
+          "communication"
+        ],
+        "must_have_skills": [
+          "sql",
+          "statistics"
+        ],
+        "preferred_skills": [
+          "tableau",
+          "excel",
+          "experimentation"
+        ],
+        "min_years": 0,
+        "min_education": "bachelors"
+      },
+      "resume_text": "Mechanical engineering graduate currently working as a manufacturing process engineer for three years. My day-to-day is heavy on Excel spreadsheets and SAP reports for tracking line throughput and defect rates. I list Python, SQL, Tableau, machine learning, AWS, and Spark in my skills section. In practice my analysis is mostly pivot tables and the occasional control chart; I took one online SQL course last year but have not used it on the job, and my Python exposure is a single intro MOOC. I am very interested in transitioning into data analytics and am a fast learner. I have not run any experiments or A/B tests.",
+      "human": {
+        "label": "weak",
+        "score": 38,
+        "rationale": "Keyword-stuffed skills line inflates the match, but the actual experience is spreadsheet reporting with no demonstrated SQL, stats, or experimentation depth for a product-analytics role."
+      }
+    },
+    {
+      "id": "bfa_001",
+      "job": {
+        "title": "Junior Financial Analyst (FP&A)",
+        "required_skills": [
+          "excel",
+          "financial_modeling",
+          "powerpoint",
+          "communication"
+        ],
+        "must_have_skills": [
+          "excel",
+          "financial_modeling"
+        ],
+        "preferred_skills": [
+          "sql",
+          "tableau",
+          "python"
+        ],
+        "min_years": 0,
+        "min_education": "bachelors_finance_or_accounting"
+      },
+      "resume_text": "Recent B.Com (Finance) graduate, GPA 3.7, seeking an FP&A analyst role. Completed a 10-week finance internship at a mid-size manufacturing firm where I built monthly budget-vs-actual variance reports in Excel and rebuilt a three-statement model that the controller now uses for quarterly forecasting. Comfortable with advanced Excel (INDEX/MATCH, nested IFs, pivot tables, basic VBA macros) and prepared management-deck slides in PowerPoint summarizing the variance drivers. Led a student investment club where I presented DCF valuations to ~40 members. Took electives in corporate finance and managerial accounting. Looking to grow into a forecasting and modeling role.",
+      "human": {
+        "label": "strong",
+        "score": 86,
+        "rationale": "Clean fit: real modeling output a controller actually used, strong Excel depth, and presentation experience exactly matching an entry-level FP&A profile."
+      }
+    },
+    {
+      "id": "bfa_002",
+      "job": {
+        "title": "Data-Driven Financial Analyst (Reporting & Analytics)",
+        "required_skills": [
+          "sql",
+          "excel",
+          "tableau",
+          "communication"
+        ],
+        "must_have_skills": [
+          "sql",
+          "excel"
+        ],
+        "preferred_skills": [
+          "python",
+          "financial_modeling",
+          "powerpoint"
+        ],
+        "min_years": 0,
+        "min_education": "bachelors_any_quant"
+      },
+      "resume_text": "Economics major (minor in Statistics) graduating this spring. For my senior capstone I pulled 2 million rows of transaction records from a Postgres database, wrote queries with joins and window functions to compute monthly cohort retention and average revenue per customer, and built an interactive dashboard so the business school's career office could track placement spend by program. I automated a weekly refresh in Python (pandas) that replaced a manual spreadsheet process. Tutored intro accounting for two years. I have not held a formal finance job yet but treat data as the core of every analysis I do. Strong written communicator — my capstone write-up won a departmental award.",
+      "human": {
+        "label": "strong",
+        "score": 82,
+        "rationale": "Tricky: never writes 'Tableau' or labels it 'finance experience,' yet clearly demonstrates SQL, dashboarding, and Python automation that beat keyword-light candidates."
+      }
+    },
+    {
+      "id": "bfa_003",
+      "job": {
+        "title": "Staff Accountant (Entry Level)",
+        "required_skills": [
+          "accounting",
+          "excel",
+          "gaap",
+          "attention_to_detail"
+        ],
+        "must_have_skills": [
+          "accounting",
+          "excel"
+        ],
+        "preferred_skills": [
+          "quickbooks",
+          "erp_systems",
+          "audit"
+        ],
+        "min_years": 0,
+        "min_education": "bachelors_accounting"
+      },
+      "resume_text": "Marketing graduate with three years running social media campaigns for two consumer brands, now pivoting into accounting. I recently completed an online bookkeeping certificate and the first section of the CPA exam (FAR). I manage the books for my family's small restaurant in QuickBooks — reconciling accounts, categorizing expenses, and preparing the monthly P&L. I am detail-oriented and deadline-driven from agency work. I have not worked in a corporate accounting department and my Excel is intermediate (formulas and pivots, no advanced modeling). Eager to start at the bottom and learn audit procedures on the job.",
+      "human": {
+        "label": "ok",
+        "score": 58,
+        "rationale": "Career-changer with real but informal bookkeeping plus a passed CPA section signals commitment, but no formal accounting degree or department experience makes it a learn-on-the-job bet."
+      }
+    },
+    {
+      "id": "bfa_004",
+      "job": {
+        "title": "Financial Operations Analyst (New Grad)",
+        "required_skills": [
+          "excel",
+          "financial_analysis",
+          "sql",
+          "communication"
+        ],
+        "must_have_skills": [
+          "excel",
+          "financial_analysis"
+        ],
+        "preferred_skills": [
+          "tableau",
+          "python",
+          "accounting"
+        ],
+        "min_years": 0,
+        "min_education": "bachelors_finance_or_business"
+      },
+      "resume_text": "Computer Science PhD dropout (ABD) with five years building distributed data systems at a large tech company, now seeking an entry-level financial operations analyst role for a career change into finance. Expert in Python, SQL, and large-scale data pipelines; I once optimized a query layer that saved the team 40 hours of manual reporting a month. I have read several finance textbooks and built a personal options-pricing simulator. I have never worked in finance, accounting, or FP&A, do not know GAAP, and have limited spreadsheet experience since I always coded instead. I am willing to take a junior title to break in.",
+      "human": {
+        "label": "ok",
+        "score": 54,
+        "rationale": "Tricky overqualified case: dominant SQL/Python would top a keyword matcher, but zero finance/Excel grounding and likely flight risk at a junior title temper an otherwise impressive technical profile."
+      }
+    },
+    {
+      "id": "mktg_001_social_coordinator",
+      "job": {
+        "title": "Social Media Marketing Coordinator (New Grad)",
+        "required_skills": [
+          "social_media_marketing",
+          "content_creation",
+          "communication",
+          "canva"
+        ],
+        "must_have_skills": [
+          "social_media_marketing",
+          "communication"
+        ],
+        "preferred_skills": [
+          "google_analytics",
+          "instagram",
+          "tiktok",
+          "copywriting"
+        ],
+        "min_years": 0,
+        "min_education": "bachelors"
+      },
+      "resume_text": "Recent BA in Communications graduate with a passion for digital storytelling. Ran the official Instagram and TikTok accounts for my university's student government, growing the follower base from 1,200 to 9,000 over two semesters by posting daily Reels and event recaps. Designed all graphics in Canva and wrote post copy that consistently doubled engagement on event announcements. Interned one summer at a local boutique where I planned a month-long content calendar and A/B tested caption styles. Comfortable reading Instagram Insights to decide what to post next. Looking to bring this hands-on social experience to a full-time marketing team.",
+      "human": {
+        "label": "strong",
+        "score": 84,
+        "rationale": "Real audience growth, multi-platform ownership, and analytics-driven iteration far exceed what a new grad typically shows for this role."
+      }
+    },
+    {
+      "id": "mktg_002_sdr_naive_mismatch",
+      "job": {
+        "title": "Sales Development Representative (Entry-Level, B2B SaaS)",
+        "required_skills": [
+          "sales",
+          "crm",
+          "salesforce",
+          "communication",
+          "cold_outreach"
+        ],
+        "must_have_skills": [
+          "communication",
+          "sales"
+        ],
+        "preferred_skills": [
+          "salesforce",
+          "lead_generation",
+          "negotiation"
+        ],
+        "min_years": 0,
+        "min_education": "bachelors"
+      },
+      "resume_text": "Business Administration graduate who spent three years working part-time at a high-volume cellular phone kiosk while in school. Personally hit or exceeded monthly quota in 10 of my last 12 months by approaching foot traffic, qualifying needs, and closing two-year contract upgrades. Logged every prospect interaction and follow-up in our store's HubSpot pipeline and managed a callback list of 200+ warm leads. Trained four new hires on objection handling and our follow-up cadence. I am energized by daily outreach targets and rejection does not slow me down. Seeking to move into a tech sales career.",
+      "human": {
+        "label": "strong",
+        "score": 80,
+        "rationale": "Quota-carrying closing record plus CRM pipeline discipline screams great SDR even though resume says HubSpot not Salesforce and never writes the phrase cold outreach."
+      }
+    },
+    {
+      "id": "mktg_003_overqualified_career_changer",
+      "job": {
+        "title": "Junior Marketing Analyst (New Grad)",
+        "required_skills": [
+          "excel",
+          "data_analysis",
+          "marketing",
+          "communication"
+        ],
+        "must_have_skills": [
+          "excel",
+          "data_analysis"
+        ],
+        "preferred_skills": [
+          "sql",
+          "tableau",
+          "google_analytics",
+          "a_b_testing"
+        ],
+        "min_years": 0,
+        "min_education": "bachelors"
+      },
+      "resume_text": "Mechanical engineer with 9 years of experience transitioning into marketing after completing a part-time digital marketing certificate. In my engineering roles I built large Excel models, ran regression analyses on production data, and presented findings to senior leadership weekly. My capstone marketing project analyzed a DTC brand's funnel data in SQL and Tableau and recommended a budget reallocation that I modeled to lift ROAS by an estimated 18%. I am comfortable with statistics and experiment design from my engineering background. I am intentionally seeking an entry-level analyst seat to build domain depth and am committed to staying in marketing long term.",
+      "human": {
+        "label": "ok",
+        "score": 67,
+        "rationale": "Analytical horsepower clearly clears the bar, but limited real marketing context plus overqualification raises genuine retention and fit risk for a junior seat."
+      }
+    },
+    {
+      "id": "mktg_004_keyword_stuffed_weak",
+      "job": {
+        "title": "Marketing Associate (New Grad, Demand Gen)",
+        "required_skills": [
+          "marketing",
+          "email_marketing",
+          "google_analytics",
+          "communication",
+          "content_creation"
+        ],
+        "must_have_skills": [
+          "marketing",
+          "communication"
+        ],
+        "preferred_skills": [
+          "hubspot",
+          "seo",
+          "copywriting",
+          "a_b_testing"
+        ],
+        "min_years": 0,
+        "min_education": "bachelors"
+      },
+      "resume_text": "Marketing graduate proficient in marketing, email marketing, SEO, Google Analytics, HubSpot, copywriting, content creation, and communication. Took coursework in Principles of Marketing, Consumer Behavior, and Digital Marketing where I earned strong grades. Familiar with marketing concepts and eager to apply them. Completed group projects that involved creating sample marketing plans. Skilled communicator and fast learner who is passionate about marketing. Available to start immediately.",
+      "human": {
+        "label": "weak",
+        "score": 38,
+        "rationale": "Long tool list is purely coursework-level with zero applied results or ownership, so the keyword density masks an empty track record."
+      }
+    },
+    {
+      "id": "hls_clindata_01",
+      "job": {
+        "title": "Clinical Data Analyst (New Grad)",
+        "required_skills": [
+          "sql",
+          "excel",
+          "communication"
+        ],
+        "must_have_skills": [
+          "sql",
+          "excel"
+        ],
+        "preferred_skills": [
+          "python",
+          "tableau",
+          "r",
+          "clinical_trials"
+        ],
+        "min_years": 0,
+        "min_education": "bachelors"
+      },
+      "resume_text": "B.S. in Public Health, State University, May 2025, GPA 3.6. Senior capstone analyzed de-identified EHR records from a county diabetes program: wrote SQL queries against a Postgres database to pull 12,000 patient encounters, cleaned and pivoted the data in Excel, and built a dashboard in Tableau showing A1C trends by clinic. Completed a summer internship at a regional hospital where I reconciled lab result discrepancies and produced weekly QA reports for the nursing leadership team. Coursework included biostatistics and epidemiology. Comfortable presenting findings to non-technical stakeholders; presented capstone results to the program director and two physicians. Familiar with HIPAA handling of protected health information.",
+      "human": {
+        "label": "strong",
+        "score": 84,
+        "rationale": "Hits every must-have through real hands-on work (SQL, Excel, Tableau) plus healthcare domain context and stakeholder communication — textbook fit for an entry-level clinical data role."
+      }
+    },
+    {
+      "id": "hls_regaffairs_02",
+      "job": {
+        "title": "Regulatory Affairs Associate (Entry-Level)",
+        "required_skills": [
+          "communication",
+          "documentation",
+          "excel"
+        ],
+        "must_have_skills": [
+          "communication",
+          "documentation"
+        ],
+        "preferred_skills": [
+          "quality_systems",
+          "fda_regulations",
+          "project_management"
+        ],
+        "min_years": 0,
+        "min_education": "bachelors"
+      },
+      "resume_text": "B.S. in Biology, Midwest College, 2024. Worked two years as a research assistant in a university immunology lab, where I maintained detailed lab notebooks, drafted and revised standard operating procedures, and prepared documentation packages for the Institutional Review Board across three studies. Coordinated submission timelines between four investigators and the IRB office, tracking deliverables in a shared spreadsheet and chasing approvals to keep studies on schedule. Co-authored two posters and handled all the protocol amendment paperwork when our reagents changed mid-study. I enjoy the meticulous, rules-driven side of science more than bench work.",
+      "human": {
+        "label": "strong",
+        "score": 80,
+        "rationale": "Never says 'regulatory affairs' or 'FDA', but IRB submissions, SOP authoring, and protocol amendments are exactly the compliance/documentation muscle the role needs — a keyword matcher would underrate this."
+      }
+    },
+    {
+      "id": "hls_bioinfo_03",
+      "job": {
+        "title": "Bioinformatics Analyst I",
+        "required_skills": [
+          "python",
+          "r",
+          "statistics"
+        ],
+        "must_have_skills": [
+          "python",
+          "statistics"
+        ],
+        "preferred_skills": [
+          "sql",
+          "genomics",
+          "linux",
+          "machine_learning"
+        ],
+        "min_years": 0,
+        "min_education": "masters"
+      },
+      "resume_text": "M.S. in Marketing Analytics, 2023. Three years as a growth analyst at a B2C e-commerce company building churn-prediction models in Python (scikit-learn, pandas) and running A/B tests with rigorous statistical analysis. Strong with SQL and dashboarding. I'm now trying to move into healthcare because I find consumer retention work unfulfilling and want to do something more meaningful. No formal biology background since high school, but I took a Coursera genomics course last month and am a fast learner.",
+      "human": {
+        "label": "weak",
+        "score": 42,
+        "rationale": "Genuinely strong Python and stats, but zero domain grounding in genomics/biology and no wet-lab or life-sciences exposure — the technical keywords match yet the actual fit for a bioinformatics seat is thin."
+      }
+    },
+    {
+      "id": "hls_qc_lab_04",
+      "job": {
+        "title": "Quality Control Lab Technician (New Grad)",
+        "required_skills": [
+          "lab_techniques",
+          "documentation",
+          "communication",
+          "gmp"
+        ],
+        "must_have_skills": [
+          "lab_techniques",
+          "gmp"
+        ],
+        "preferred_skills": [
+          "hplc",
+          "excel",
+          "data_analysis",
+          "chemistry"
+        ],
+        "min_years": 0,
+        "min_education": "associates"
+      },
+      "resume_text": "A.S. in Chemistry, Community College, 2025. Completed a one-semester co-op at a small contract pharmaceutical manufacturer where I ran routine assays, including operating and calibrating HPLC instruments, and recorded all results in controlled batch records following good manufacturing practice. Trained on aseptic technique and gowning procedures for the cleanroom. Flagged an out-of-spec result that turned out to be a real contamination issue, which my supervisor escalated. Detail-oriented and comfortable with repetitive precision work; maintained a 100% on-time documentation record during the co-op.",
+      "human": {
+        "label": "strong",
+        "score": 78,
+        "rationale": "Hands-on HPLC, GMP batch records, and a real OOS catch demonstrate genuine QC competence and judgment well beyond what an associate's-degree new grad usually shows."
+      }
+    },
+    {
+      "id": "devops_grad_01",
+      "job": {
+        "title": "Junior DevOps Engineer (New Grad)",
+        "required_skills": [
+          "linux",
+          "docker",
+          "ci_cd",
+          "python",
+          "git"
+        ],
+        "must_have_skills": [
+          "linux",
+          "git"
+        ],
+        "preferred_skills": [
+          "kubernetes",
+          "aws",
+          "terraform",
+          "bash"
+        ],
+        "min_years": 0,
+        "min_education": "bachelors_cs_or_related"
+      },
+      "resume_text": "Recent B.S. in Computer Science (May 2026) with a strong systems focus. Built a personal homelab on three Raspberry Pis running Ubuntu Server, where I containerized a Django app with Docker and set up a GitHub Actions pipeline that runs tests and auto-deploys on every push to main. Wrote a 200-line Python script to scrape and back up my own data nightly via cron, with logging and Slack alerts on failure. Comfortable in the Linux shell daily, manage all my projects with Git including rebasing and resolving merge conflicts. Completed a capstone where our four-person team deployed a Flask microservice fronted by Nginx. Eager to learn Kubernetes and infrastructure-as-code on the job.",
+      "human": {
+        "label": "strong",
+        "score": 84,
+        "rationale": "Hits every must-have and most required skills with genuine hands-on depth and a self-driven CI/CD pipeline that mirrors real DevOps work; ideal new-grad trajectory."
+      }
+    },
+    {
+      "id": "devops_grad_02",
+      "job": {
+        "title": "Cloud Support / Junior Cloud Engineer",
+        "required_skills": [
+          "aws",
+          "linux",
+          "networking",
+          "python",
+          "communication"
+        ],
+        "must_have_skills": [
+          "aws",
+          "communication"
+        ],
+        "preferred_skills": [
+          "terraform",
+          "docker",
+          "monitoring",
+          "sql"
+        ],
+        "min_years": 0,
+        "min_education": "associates_or_bachelors"
+      },
+      "resume_text": "Computer Information Systems graduate (Dec 2025) transitioning from a four-year career as an IT help desk technician at a mid-size logistics firm. Spent the last two years as the escalation point for 40+ users, troubleshooting Windows and Linux servers, DNS, VPN, and firewall issues, and documenting every fix into a knowledge base that cut repeat tickets by 30%. Earned the AWS Certified Cloud Practitioner credential and built a small portfolio site hosted on S3 with CloudFront. Praised in three consecutive reviews for de-escalating frustrated users and writing clear runbooks. Some scripting in PowerShell and basic Python for log parsing. Looking to move from break-fix support into a cloud engineering track.",
+      "human": {
+        "label": "ok",
+        "score": 67,
+        "rationale": "Exceptional communication and real troubleshooting maturity plus a foundational AWS cert, but cloud depth is still thin (one static site, entry-level cert) so a solid but not standout fit."
+      }
+    },
+    {
+      "id": "devops_grad_03",
+      "job": {
+        "title": "Junior Site Reliability / Platform Engineer",
+        "required_skills": [
+          "kubernetes",
+          "docker",
+          "ci_cd",
+          "monitoring",
+          "go",
+          "linux"
+        ],
+        "must_have_skills": [
+          "docker",
+          "linux"
+        ],
+        "preferred_skills": [
+          "prometheus",
+          "terraform",
+          "aws",
+          "python"
+        ],
+        "min_years": 1,
+        "min_education": "bachelors_cs_or_related"
+      },
+      "resume_text": "Final-year Software Engineering student and active open-source contributor. For the past 18 months I have maintained a self-hosted GitLab runner fleet for my university's robotics club, packaging services as containers and orchestrating them across a three-node cluster using k3s, with rolling updates and liveness probes. Stood up dashboards and alerting so the team gets paged before storage fills up, and wrote the on-call cheat sheet. Most of my tooling is written in a statically typed, compiled language I picked up specifically because it produces small single-binary CLIs ideal for ops glue. Reduced our mean time to recovery on failed deploys from roughly 40 minutes to under 10 by automating rollbacks. I have never held a formal full-time title but have effectively run platform ops for a 25-person team.",
+      "human": {
+        "label": "strong",
+        "score": 81,
+        "rationale": "Tricky case: never writes 'kubernetes', 'prometheus', or 'go' yet clearly demonstrates k8s (k3s), metrics/alerting, and Go via projects, with real SRE outcomes (MTTR cut) — a keyword matcher would underrate this."
+      }
+    },
+    {
+      "id": "devops_grad_04",
+      "job": {
+        "title": "Entry-Level DevOps Engineer",
+        "required_skills": [
+          "docker",
+          "kubernetes",
+          "ci_cd",
+          "aws",
+          "terraform",
+          "python"
+        ],
+        "must_have_skills": [
+          "docker",
+          "aws"
+        ],
+        "preferred_skills": [
+          "jenkins",
+          "ansible",
+          "monitoring",
+          "bash"
+        ],
+        "min_years": 0,
+        "min_education": "bachelors"
+      },
+      "resume_text": "Senior Cloud Architect with 12 years of experience seeking an entry-level DevOps role after relocating and taking a two-year career break. Led migration of a 200-microservice estate to Kubernetes on AWS EKS, authored hundreds of Terraform modules, and owned multi-region disaster recovery for a Fortune 500 retailer. Deep expertise in Docker, Jenkins, Ansible, Prometheus, and Python automation at scale. Mentored teams of 15+ engineers and set organization-wide CI/CD standards. Holds AWS Solutions Architect Professional and CKA certifications. Open to a junior title to re-enter the workforce and willing to relocate.",
+      "human": {
+        "label": "ok",
+        "score": 58,
+        "rationale": "Tricky case: technically dwarfs every requirement, so a keyword matcher would score it near-perfect, but for a new-grad req this is a serious overqualification/retention and comp-mismatch risk — likely to leave fast or be miscast in the role."
+      }
+    }
+  ]
+}
