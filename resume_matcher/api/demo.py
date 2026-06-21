@@ -23,7 +23,7 @@ from dataclasses import dataclass, field
 
 from ..antigaming.injection import scan_injection
 from ..antigaming.keyword_stuffing import scan_keyword_stuffing
-from ..ingestion.job_posting import build_job_spec, skill_options
+from ..ingestion.job_posting import build_job_spec, detect_job_skills, skill_options
 from ..ingestion.parser import (
     ParseError,
     SUPPORTED_EXTS,
@@ -238,6 +238,13 @@ def run_demo(
     if not (job_text or "").strip() and not (required_skills or preferred_skills):
         raise DemoError("Paste a job posting or provide at least one required skill.")
 
+    # If no explicit skills were tagged, auto-detect them from the pasted posting (so skipping the
+    # "Detect skills" step still yields a meaningful match) and infer the minimum education.
+    if not required_skills and not preferred_skills and (job_text or "").strip():
+        required_skills = detect_job_skills(job_text)
+        if min_education is None:
+            min_education = infer_education_level(job_text)
+
     job = build_job_spec(
         job_id="DEMO_JOB",
         title=title,
@@ -247,6 +254,15 @@ def run_demo(
         preferred_skills=preferred_skills,
         min_education=min_education,
     )
+
+    # Without any job skills, every resume scores 0 — that's not a useful result. Refuse with a clear
+    # message instead of silently returning zeros (this is what produced the confusing 0/grade-D).
+    if not job.required_skills and not job.preferred_skills:
+        raise DemoError(
+            "No job skills to match against — every resume would score 0. Paste the job posting and "
+            "click 'Detect skills', or add at least one required skill. (If the posting doesn't "
+            "mention skills our matcher recognizes, add them manually.)"
+        )
 
     # Assign a candidate id + display label per upload up front.
     items: list[tuple[str, str, str, bytes]] = []

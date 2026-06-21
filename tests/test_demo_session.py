@@ -82,6 +82,29 @@ def test_run_demo_writes_nothing_to_disk():
     assert after == before, f"demo wrote files to disk: {sorted(after - before)}"
 
 
+def test_autodetects_job_skills_from_posting():
+    # No explicit skills tagged — they should be auto-detected from the pasted posting.
+    store = SessionStore(ttl_seconds=600)
+    sess = run_demo(
+        store=store,
+        job_text="We need a developer with Python, SQL and Docker. Bachelor required.",
+        files=[("a.txt", b"Python and SQL and Docker developer. " * 5)],
+    )
+    assert sess.job["required_skills"]  # auto-detected, non-empty
+    assert sess.results[0]["fit_score"] > 0
+
+
+def test_no_job_skills_refused_not_zero():
+    # A posting with no recognizable skills (and none tagged) must error clearly, not score everyone 0.
+    store = SessionStore(ttl_seconds=600)
+    with pytest.raises(DemoError):
+        run_demo(
+            store=store,
+            job_text="We are a great company with a fun culture and free snacks.",
+            files=[("a.txt", b"Python developer. " * 5)],
+        )
+
+
 def test_too_many_resumes_rejected():
     store = SessionStore()
     with pytest.raises(DemoError):
