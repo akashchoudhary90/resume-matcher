@@ -1,0 +1,8411 @@
+{
+  "3d_printing": {
+    "aliases": [
+      "additive manufacturing",
+      "fdm",
+      "sla printing"
+    ],
+    "name": "3D Printing"
+  },
+  "ab_testing": {
+    "aliases": [
+      "a-b testing",
+      "a/b test",
+      "ab testing",
+      "split testing"
+    ],
+    "name": "A/B Testing"
+  },
+  "abap": {
+    "aliases": [
+      "sap abap"
+    ],
+    "name": "ABAP"
+  },
+  "abaqus": {
+    "aliases": [
+      "simulia abaqus"
+    ],
+    "name": "Abaqus"
+  },
+  "abstract": {
+    "aliases": [],
+    "name": "Abstract"
+  },
+  "acceptance_testing": {
+    "aliases": [
+      "uat",
+      "user acceptance testing"
+    ],
+    "name": "Acceptance Testing"
+  },
+  "accessibility_design": {
+    "aliases": [
+      "a11y",
+      "accessible design",
+      "wcag"
+    ],
+    "name": "Accessibility Design"
+  },
+  "accessibility_testing": {
+    "aliases": [
+      "a11y testing"
+    ],
+    "name": "Accessibility Testing"
+  },
+  "account_based_marketing": {
+    "aliases": [
+      "abm",
+      "account based marketing"
+    ],
+    "name": "Account-Based Marketing (ABM)"
+  },
+  "accountability": {
+    "aliases": [
+      "ownership",
+      "taking ownership"
+    ],
+    "name": "Accountability"
+  },
+  "accounts_payable": {
+    "aliases": [
+      "a/p",
+      "ap"
+    ],
+    "name": "Accounts Payable"
+  },
+  "accounts_receivable": {
+    "aliases": [
+      "a/r",
+      "ar"
+    ],
+    "name": "Accounts Receivable"
+  },
+  "accounts_reconciliation": {
+    "aliases": [
+      "balance sheet reconciliations"
+    ],
+    "name": "Balance Sheet Reconciliation"
+  },
+  "accrual_accounting": {
+    "aliases": [
+      "accruals"
+    ],
+    "name": "Accrual Accounting"
+  },
+  "acid_transactions": {
+    "aliases": [
+      "acid"
+    ],
+    "name": "ACID Transactions"
+  },
+  "active_directory": {
+    "aliases": [
+      "ad",
+      "microsoft active directory"
+    ],
+    "name": "Active Directory"
+  },
+  "active_listening": {
+    "aliases": [
+      "listening skills"
+    ],
+    "name": "Active Listening"
+  },
+  "active_record": {
+    "aliases": [
+      "activerecord"
+    ],
+    "name": "Active Record"
+  },
+  "actix_web": {
+    "aliases": [
+      "actix"
+    ],
+    "name": "Actix Web"
+  },
+  "adaptability": {
+    "aliases": [
+      "adaptable",
+      "flexibility"
+    ],
+    "name": "Adaptability"
+  },
+  "adobe_acrobat": {
+    "aliases": [
+      "acrobat pro",
+      "adobe acrobat pro"
+    ],
+    "name": "Adobe Acrobat"
+  },
+  "adobe_after_effects": {
+    "aliases": [
+      "after effects",
+      "aftereffects"
+    ],
+    "name": "Adobe After Effects"
+  },
+  "adobe_creative_cloud": {
+    "aliases": [
+      "adobe cc",
+      "adobe creative suite",
+      "creative cloud",
+      "creative suite"
+    ],
+    "name": "Adobe Creative Cloud"
+  },
+  "adobe_creative_suite": {
+    "aliases": [
+      "adobe creative cloud",
+      "creative cloud"
+    ],
+    "name": "Adobe Creative Suite"
+  },
+  "adobe_firefly": {
+    "aliases": [
+      "firefly"
+    ],
+    "name": "Adobe Firefly"
+  },
+  "adobe_illustrator": {
+    "aliases": [
+      "adobe ai",
+      "illustrator"
+    ],
+    "name": "Adobe Illustrator"
+  },
+  "adobe_indesign": {
+    "aliases": [
+      "indesign"
+    ],
+    "name": "Adobe InDesign"
+  },
+  "adobe_lightroom": {
+    "aliases": [
+      "lightroom"
+    ],
+    "name": "Adobe Lightroom"
+  },
+  "adobe_photoshop": {
+    "aliases": [
+      "adobe ps",
+      "photoshop"
+    ],
+    "name": "Adobe Photoshop"
+  },
+  "adobe_premiere_pro": {
+    "aliases": [
+      "premiere",
+      "premiere pro"
+    ],
+    "name": "Adobe Premiere Pro"
+  },
+  "adobe_xd": {
+    "aliases": [
+      "adobe experience design",
+      "xd"
+    ],
+    "name": "Adobe XD"
+  },
+  "adverse_event_reporting": {
+    "aliases": [
+      "adverse events",
+      "ae reporting",
+      "sae reporting",
+      "serious adverse event reporting"
+    ],
+    "name": "Adverse Event Reporting"
+  },
+  "aes": {
+    "aliases": [
+      "advanced encryption standard"
+    ],
+    "name": "AES"
+  },
+  "affiliate_marketing": {
+    "aliases": [],
+    "name": "Affiliate Marketing"
+  },
+  "affinity_designer": {
+    "aliases": [],
+    "name": "Affinity Designer"
+  },
+  "agile": {
+    "aliases": [
+      "agile development",
+      "agile methodology"
+    ],
+    "name": "Agile"
+  },
+  "ahrefs": {
+    "aliases": [],
+    "name": "Ahrefs"
+  },
+  "airbyte": {
+    "aliases": [],
+    "name": "Airbyte"
+  },
+  "airflow": {
+    "aliases": [
+      "apache airflow"
+    ],
+    "name": "Apache Airflow"
+  },
+  "airtable": {
+    "aliases": [],
+    "name": "Airtable"
+  },
+  "aks": {
+    "aliases": [
+      "aks"
+    ],
+    "name": "Azure Kubernetes Service"
+  },
+  "alamofire": {
+    "aliases": [],
+    "name": "Alamofire"
+  },
+  "allen_bradley": {
+    "aliases": [
+      "allen bradley",
+      "rockwell automation",
+      "rslogix",
+      "studio 5000"
+    ],
+    "name": "Allen-Bradley"
+  },
+  "alpine_js": {
+    "aliases": [
+      "alpinejs"
+    ],
+    "name": "Alpine.js"
+  },
+  "alteryx": {
+    "aliases": [],
+    "name": "Alteryx"
+  },
+  "altium_designer": {
+    "aliases": [
+      "altium"
+    ],
+    "name": "Altium Designer"
+  },
+  "amazon_aurora": {
+    "aliases": [
+      "aurora",
+      "aws aurora"
+    ],
+    "name": "Amazon Aurora"
+  },
+  "amazon_rds": {
+    "aliases": [
+      "aws rds",
+      "rds"
+    ],
+    "name": "Amazon RDS"
+  },
+  "amazon_redshift": {
+    "aliases": [
+      "aws redshift",
+      "redshift"
+    ],
+    "name": "Amazon Redshift"
+  },
+  "amazon_s3": {
+    "aliases": [
+      "s3",
+      "simple storage service"
+    ],
+    "name": "Amazon S3"
+  },
+  "amazon_sagemaker": {
+    "aliases": [
+      "aws sagemaker",
+      "sagemaker"
+    ],
+    "name": "Amazon SageMaker"
+  },
+  "amplitude": {
+    "aliases": [],
+    "name": "Amplitude"
+  },
+  "analytical_thinking": {
+    "aliases": [
+      "analytical reasoning",
+      "analytical skills"
+    ],
+    "name": "Analytical Thinking"
+  },
+  "anaplan": {
+    "aliases": [],
+    "name": "Anaplan"
+  },
+  "ancova": {
+    "aliases": [
+      "analysis of covariance"
+    ],
+    "name": "ANCOVA"
+  },
+  "android_development": {
+    "aliases": [
+      "android app development",
+      "android dev"
+    ],
+    "name": "Android Development"
+  },
+  "android_jetpack": {
+    "aliases": [
+      "jetpack"
+    ],
+    "name": "Android Jetpack"
+  },
+  "android_sdk": {
+    "aliases": [],
+    "name": "Android SDK"
+  },
+  "android_studio": {
+    "aliases": [],
+    "name": "Android Studio"
+  },
+  "angular": {
+    "aliases": [
+      "angular 2+",
+      "angularjs"
+    ],
+    "name": "Angular"
+  },
+  "anova": {
+    "aliases": [
+      "analysis of variance",
+      "one-way anova",
+      "two-way anova"
+    ],
+    "name": "ANOVA"
+  },
+  "ansible": {
+    "aliases": [
+      "ansible playbooks"
+    ],
+    "name": "Ansible"
+  },
+  "ansys": {
+    "aliases": [
+      "ansys fluent",
+      "ansys mechanical",
+      "ansys workbench"
+    ],
+    "name": "ANSYS"
+  },
+  "ant_design": {
+    "aliases": [
+      "antd"
+    ],
+    "name": "Ant Design"
+  },
+  "apache_airflow": {
+    "aliases": [
+      "airflow"
+    ],
+    "name": "Apache Airflow"
+  },
+  "apache_avro": {
+    "aliases": [
+      "avro"
+    ],
+    "name": "Apache Avro"
+  },
+  "apache_beam": {
+    "aliases": [
+      "beam"
+    ],
+    "name": "Apache Beam"
+  },
+  "apache_cassandra": {
+    "aliases": [
+      "cassandra"
+    ],
+    "name": "Apache Cassandra"
+  },
+  "apache_flink": {
+    "aliases": [
+      "flink"
+    ],
+    "name": "Apache Flink"
+  },
+  "apache_hbase": {
+    "aliases": [
+      "hbase"
+    ],
+    "name": "Apache HBase"
+  },
+  "apache_hive": {
+    "aliases": [
+      "hive",
+      "hiveql"
+    ],
+    "name": "Apache Hive"
+  },
+  "apache_http_server": {
+    "aliases": [
+      "apache",
+      "apache2",
+      "httpd"
+    ],
+    "name": "Apache HTTP Server"
+  },
+  "apache_hudi": {
+    "aliases": [
+      "hudi"
+    ],
+    "name": "Apache Hudi"
+  },
+  "apache_iceberg": {
+    "aliases": [
+      "iceberg"
+    ],
+    "name": "Apache Iceberg"
+  },
+  "apache_kafka": {
+    "aliases": [
+      "kafka"
+    ],
+    "name": "Apache Kafka"
+  },
+  "apache_nifi": {
+    "aliases": [
+      "nifi"
+    ],
+    "name": "Apache NiFi"
+  },
+  "apache_oozie": {
+    "aliases": [
+      "oozie"
+    ],
+    "name": "Apache Oozie"
+  },
+  "apache_parquet": {
+    "aliases": [
+      "parquet"
+    ],
+    "name": "Apache Parquet"
+  },
+  "apache_pig": {
+    "aliases": [
+      "pig",
+      "pig latin"
+    ],
+    "name": "Apache Pig"
+  },
+  "apache_solr": {
+    "aliases": [
+      "solr"
+    ],
+    "name": "Apache Solr"
+  },
+  "apache_spark": {
+    "aliases": [
+      "pyspark",
+      "spark",
+      "spark sql"
+    ],
+    "name": "Apache Spark"
+  },
+  "apache_spark_sql": {
+    "aliases": [
+      "apache spark sql"
+    ],
+    "name": "Spark SQL"
+  },
+  "apache_sqoop": {
+    "aliases": [
+      "sqoop"
+    ],
+    "name": "Apache Sqoop"
+  },
+  "apache_storm": {
+    "aliases": [
+      "storm"
+    ],
+    "name": "Apache Storm"
+  },
+  "apache_superset": {
+    "aliases": [
+      "superset"
+    ],
+    "name": "Apache Superset"
+  },
+  "apache_zookeeper": {
+    "aliases": [
+      "zookeeper"
+    ],
+    "name": "Apache ZooKeeper"
+  },
+  "apex": {
+    "aliases": [
+      "salesforce apex"
+    ],
+    "name": "Apex"
+  },
+  "api_authentication": {
+    "aliases": [
+      "api auth",
+      "api keys",
+      "bearer token"
+    ],
+    "name": "API Authentication"
+  },
+  "api_gateway": {
+    "aliases": [
+      "aws api gateway"
+    ],
+    "name": "Amazon API Gateway"
+  },
+  "api_testing": {
+    "aliases": [],
+    "name": "API Testing"
+  },
+  "apollo_client": {
+    "aliases": [
+      "apollo",
+      "apollo graphql"
+    ],
+    "name": "Apollo Client"
+  },
+  "app_store_connect": {
+    "aliases": [
+      "app store submission",
+      "itunes connect"
+    ],
+    "name": "App Store Connect"
+  },
+  "appium": {
+    "aliases": [],
+    "name": "Appium"
+  },
+  "apple_keynote": {
+    "aliases": [
+      "apple keynote"
+    ],
+    "name": "Keynote"
+  },
+  "apple_numbers": {
+    "aliases": [
+      "apple numbers"
+    ],
+    "name": "Numbers"
+  },
+  "apple_pages": {
+    "aliases": [
+      "apple pages"
+    ],
+    "name": "Pages"
+  },
+  "arcore": {
+    "aliases": [],
+    "name": "ARCore"
+  },
+  "arduino": {
+    "aliases": [],
+    "name": "Arduino"
+  },
+  "argocd": {
+    "aliases": [
+      "argocd"
+    ],
+    "name": "Argo CD"
+  },
+  "arima": {
+    "aliases": [
+      "arimax",
+      "autoregressive integrated moving average",
+      "sarima"
+    ],
+    "name": "ARIMA"
+  },
+  "arkit": {
+    "aliases": [],
+    "name": "ARKit"
+  },
+  "asana": {
+    "aliases": [],
+    "name": "Asana"
+  },
+  "asp_net": {
+    "aliases": [
+      "asp dot net",
+      "aspnet"
+    ],
+    "name": "ASP.NET"
+  },
+  "asp_net_core": {
+    "aliases": [
+      "aspnet core"
+    ],
+    "name": "ASP.NET Core"
+  },
+  "asp_net_mvc": {
+    "aliases": [],
+    "name": "ASP.NET MVC"
+  },
+  "assembly": {
+    "aliases": [
+      "arm assembly",
+      "asm",
+      "assembler",
+      "x86 assembly"
+    ],
+    "name": "Assembly"
+  },
+  "astro": {
+    "aliases": [],
+    "name": "Astro"
+  },
+  "athena": {
+    "aliases": [
+      "athena"
+    ],
+    "name": "Amazon Athena"
+  },
+  "atomic_design": {
+    "aliases": [],
+    "name": "Atomic Design"
+  },
+  "attention_to_detail": {
+    "aliases": [
+      "detail oriented",
+      "detail-oriented"
+    ],
+    "name": "Attention to Detail"
+  },
+  "auditing": {
+    "aliases": [
+      "audit",
+      "external audit",
+      "internal audit"
+    ],
+    "name": "Auditing"
+  },
+  "auto_layout": {
+    "aliases": [
+      "autolayout"
+    ],
+    "name": "Auto Layout"
+  },
+  "autocad": {
+    "aliases": [
+      "auto cad",
+      "auto-cad"
+    ],
+    "name": "AutoCAD"
+  },
+  "autocad_electrical": {
+    "aliases": [],
+    "name": "AutoCAD Electrical"
+  },
+  "autodesk_revit_mep": {
+    "aliases": [
+      "mep design"
+    ],
+    "name": "Revit MEP"
+  },
+  "awk": {
+    "aliases": [
+      "awk command",
+      "gawk"
+    ],
+    "name": "AWK"
+  },
+  "aws": {
+    "aliases": [
+      "amazon web services",
+      "aws"
+    ],
+    "name": "AWS"
+  },
+  "aws_aurora": {
+    "aliases": [
+      "aurora"
+    ],
+    "name": "Amazon Aurora"
+  },
+  "aws_cdk": {
+    "aliases": [
+      "cdk",
+      "cloud development kit"
+    ],
+    "name": "AWS CDK"
+  },
+  "aws_emr": {
+    "aliases": [
+      "elastic mapreduce",
+      "emr"
+    ],
+    "name": "Amazon EMR"
+  },
+  "aws_fargate": {
+    "aliases": [
+      "fargate"
+    ],
+    "name": "AWS Fargate"
+  },
+  "aws_glue": {
+    "aliases": [
+      "glue"
+    ],
+    "name": "AWS Glue"
+  },
+  "aws_iam": {
+    "aliases": [
+      "iam",
+      "identity and access management"
+    ],
+    "name": "AWS IAM"
+  },
+  "aws_kinesis": {
+    "aliases": [
+      "kinesis"
+    ],
+    "name": "Amazon Kinesis"
+  },
+  "aws_lambda": {
+    "aliases": [
+      "lambda functions"
+    ],
+    "name": "AWS Lambda"
+  },
+  "aws_security": {
+    "aliases": [
+      "aws guardduty",
+      "aws iam",
+      "aws security hub"
+    ],
+    "name": "AWS Security"
+  },
+  "aws_step_functions": {
+    "aliases": [
+      "step functions"
+    ],
+    "name": "AWS Step Functions"
+  },
+  "axios": {
+    "aliases": [],
+    "name": "Axios"
+  },
+  "axum": {
+    "aliases": [],
+    "name": "Axum"
+  },
+  "axure_rp": {
+    "aliases": [
+      "axure"
+    ],
+    "name": "Axure RP"
+  },
+  "azure": {
+    "aliases": [
+      "azure"
+    ],
+    "name": "Azure"
+  },
+  "azure_active_directory": {
+    "aliases": [
+      "aad",
+      "azure active directory",
+      "azure ad",
+      "entra id"
+    ],
+    "name": "Microsoft Entra ID"
+  },
+  "azure_app_service": {
+    "aliases": [
+      "app service"
+    ],
+    "name": "Azure App Service"
+  },
+  "azure_blob_storage": {
+    "aliases": [
+      "blob storage"
+    ],
+    "name": "Azure Blob Storage"
+  },
+  "azure_data_factory": {
+    "aliases": [
+      "adf"
+    ],
+    "name": "Azure Data Factory"
+  },
+  "azure_databricks": {
+    "aliases": [],
+    "name": "Azure Databricks"
+  },
+  "azure_devops": {
+    "aliases": [
+      "azdo",
+      "azure boards",
+      "azure pipelines",
+      "tfs",
+      "vsts"
+    ],
+    "name": "Azure DevOps"
+  },
+  "azure_functions": {
+    "aliases": [],
+    "name": "Azure Functions"
+  },
+  "azure_machine_learning": {
+    "aliases": [
+      "azure ml"
+    ],
+    "name": "Azure Machine Learning"
+  },
+  "azure_sql_database": {
+    "aliases": [
+      "azure sql"
+    ],
+    "name": "Azure SQL Database"
+  },
+  "azure_synapse": {
+    "aliases": [
+      "azure synapse",
+      "synapse"
+    ],
+    "name": "Azure Synapse Analytics"
+  },
+  "azure_vm": {
+    "aliases": [
+      "azure vms"
+    ],
+    "name": "Azure Virtual Machines"
+  },
+  "babel": {
+    "aliases": [
+      "babeljs"
+    ],
+    "name": "Babel"
+  },
+  "backbone_js": {
+    "aliases": [
+      "backbone",
+      "backbonejs"
+    ],
+    "name": "Backbone.js"
+  },
+  "backlog_grooming": {
+    "aliases": [
+      "backlog refinement",
+      "product backlog refinement"
+    ],
+    "name": "Backlog Grooming"
+  },
+  "balsamiq": {
+    "aliases": [
+      "balsamiq mockups"
+    ],
+    "name": "Balsamiq"
+  },
+  "bamboo": {
+    "aliases": [
+      "atlassian bamboo"
+    ],
+    "name": "Bamboo"
+  },
+  "bank_reconciliation": {
+    "aliases": [
+      "account reconciliation",
+      "reconciliations"
+    ],
+    "name": "Bank Reconciliation"
+  },
+  "basecamp": {
+    "aliases": [],
+    "name": "Basecamp"
+  },
+  "bash": {
+    "aliases": [
+      "bash scripting",
+      "bash shell",
+      "sh",
+      "shell script",
+      "shell scripting"
+    ],
+    "name": "Bash"
+  },
+  "bash_scripting": {
+    "aliases": [
+      "bash",
+      "shell script",
+      "shell scripting"
+    ],
+    "name": "Bash Scripting"
+  },
+  "bayesian_ab_testing": {
+    "aliases": [
+      "bayesian experimentation"
+    ],
+    "name": "Bayesian A/B Testing"
+  },
+  "bayesian_inference": {
+    "aliases": [
+      "bayesian analysis",
+      "bayesian statistics"
+    ],
+    "name": "Bayesian Inference"
+  },
+  "bdd": {
+    "aliases": [
+      "bdd"
+    ],
+    "name": "Behavior-Driven Development"
+  },
+  "behave": {
+    "aliases": [],
+    "name": "Behave"
+  },
+  "bert": {
+    "aliases": [],
+    "name": "BERT"
+  },
+  "bigquery": {
+    "aliases": [
+      "big query",
+      "bq",
+      "gbq",
+      "google bigquery"
+    ],
+    "name": "BigQuery"
+  },
+  "bim": {
+    "aliases": [
+      "bim"
+    ],
+    "name": "Building Information Modeling"
+  },
+  "biostatistics": {
+    "aliases": [
+      "biostatistical analysis"
+    ],
+    "name": "Biostatistics"
+  },
+  "bitbucket": {
+    "aliases": [
+      "bit bucket"
+    ],
+    "name": "Bitbucket"
+  },
+  "ble": {
+    "aliases": [
+      "bluetooth le",
+      "core bluetooth"
+    ],
+    "name": "Bluetooth Low Energy"
+  },
+  "blender": {
+    "aliases": [
+      "blender 3d"
+    ],
+    "name": "Blender"
+  },
+  "bloc": {
+    "aliases": [
+      "bloc pattern"
+    ],
+    "name": "BLoC"
+  },
+  "bloomberg_terminal": {
+    "aliases": [
+      "bbg",
+      "bloomberg",
+      "bloomberg professional"
+    ],
+    "name": "Bloomberg Terminal"
+  },
+  "bootstrap": {
+    "aliases": [],
+    "name": "Bootstrap"
+  },
+  "bootstrapping": {
+    "aliases": [
+      "bootstrap method",
+      "bootstrap resampling"
+    ],
+    "name": "Bootstrapping"
+  },
+  "box": {
+    "aliases": [
+      "box.com"
+    ],
+    "name": "Box"
+  },
+  "brainstorming": {
+    "aliases": [
+      "ideation"
+    ],
+    "name": "Brainstorming"
+  },
+  "brand_management": {
+    "aliases": [
+      "brand strategy",
+      "branding"
+    ],
+    "name": "Brand Management"
+  },
+  "branding": {
+    "aliases": [
+      "brand design",
+      "brand identity"
+    ],
+    "name": "Branding"
+  },
+  "browserstack": {
+    "aliases": [],
+    "name": "BrowserStack"
+  },
+  "bsl2": {
+    "aliases": [
+      "aseptic technique",
+      "biosafety",
+      "bsl-2"
+    ],
+    "name": "Biosafety Level 2 (BSL-2)"
+  },
+  "budget_management": {
+    "aliases": [
+      "cost management"
+    ],
+    "name": "Budget Management"
+  },
+  "budgeting": {
+    "aliases": [
+      "budget management",
+      "budget planning"
+    ],
+    "name": "Budgeting"
+  },
+  "buffer": {
+    "aliases": [],
+    "name": "Buffer"
+  },
+  "burndown_chart": {
+    "aliases": [
+      "burn-down chart",
+      "burndown"
+    ],
+    "name": "Burndown Chart"
+  },
+  "burnup_chart": {
+    "aliases": [
+      "burn-up chart"
+    ],
+    "name": "Burnup Chart"
+  },
+  "burp_suite": {
+    "aliases": [
+      "burp",
+      "burpsuite"
+    ],
+    "name": "Burp Suite"
+  },
+  "business_acumen": {
+    "aliases": [
+      "commercial awareness"
+    ],
+    "name": "Business Acumen"
+  },
+  "c": {
+    "aliases": [
+      "ansi c",
+      "c language",
+      "c11",
+      "c99"
+    ],
+    "name": "C"
+  },
+  "cadence": {
+    "aliases": [
+      "cadence allegro",
+      "cadence virtuoso"
+    ],
+    "name": "Cadence"
+  },
+  "calendly": {
+    "aliases": [],
+    "name": "Calendly"
+  },
+  "cam_software": {
+    "aliases": [
+      "computer aided manufacturing",
+      "computer-aided manufacturing",
+      "mastercam"
+    ],
+    "name": "CAM"
+  },
+  "canva": {
+    "aliases": [],
+    "name": "Canva"
+  },
+  "capa": {
+    "aliases": [
+      "corrective and preventive action",
+      "corrective and preventive actions"
+    ],
+    "name": "CAPA"
+  },
+  "capital_iq": {
+    "aliases": [
+      "capiq",
+      "s&p capital iq"
+    ],
+    "name": "Capital IQ"
+  },
+  "capm": {
+    "aliases": [
+      "certified associate in project management"
+    ],
+    "name": "CAPM"
+  },
+  "card_sorting": {
+    "aliases": [],
+    "name": "Card Sorting"
+  },
+  "carthage": {
+    "aliases": [],
+    "name": "Carthage"
+  },
+  "case_report_form": {
+    "aliases": [
+      "crf",
+      "ecrf",
+      "electronic case report form"
+    ],
+    "name": "Case Report Form (CRF)"
+  },
+  "cash_flow_management": {
+    "aliases": [
+      "cash flow analysis",
+      "cash management"
+    ],
+    "name": "Cash Flow Management"
+  },
+  "cassandra": {
+    "aliases": [
+      "cassandra",
+      "cql"
+    ],
+    "name": "Apache Cassandra"
+  },
+  "catboost": {
+    "aliases": [
+      "cat boost"
+    ],
+    "name": "CatBoost"
+  },
+  "catia": {
+    "aliases": [
+      "catia v5",
+      "catia v6"
+    ],
+    "name": "CATIA"
+  },
+  "causal_inference": {
+    "aliases": [
+      "causal analysis"
+    ],
+    "name": "Causal Inference"
+  },
+  "cdisc": {
+    "aliases": [
+      "adam",
+      "cdisc",
+      "sdtm"
+    ],
+    "name": "CDISC Standards"
+  },
+  "ceh": {
+    "aliases": [
+      "ceh"
+    ],
+    "name": "Certified Ethical Hacker"
+  },
+  "celery": {
+    "aliases": [],
+    "name": "Celery"
+  },
+  "cell_culture": {
+    "aliases": [
+      "aseptic cell culture",
+      "mammalian cell culture",
+      "tissue culture"
+    ],
+    "name": "Cell Culture"
+  },
+  "centos": {
+    "aliases": [
+      "cent os"
+    ],
+    "name": "CentOS"
+  },
+  "cerner": {
+    "aliases": [
+      "cerner millennium",
+      "oracle cerner",
+      "powerchart"
+    ],
+    "name": "Cerner (EHR)"
+  },
+  "certified_scrum_master": {
+    "aliases": [
+      "csm",
+      "scrum master certification"
+    ],
+    "name": "Certified ScrumMaster"
+  },
+  "cfa": {
+    "aliases": [
+      "cfa"
+    ],
+    "name": "Chartered Financial Analyst"
+  },
+  "chai": {
+    "aliases": [
+      "chai.js"
+    ],
+    "name": "Chai"
+  },
+  "chakra_ui": {
+    "aliases": [
+      "chakra"
+    ],
+    "name": "Chakra UI"
+  },
+  "change_data_capture": {
+    "aliases": [
+      "cdc"
+    ],
+    "name": "Change Data Capture"
+  },
+  "change_management": {
+    "aliases": [
+      "managing change"
+    ],
+    "name": "Change Management"
+  },
+  "chef": {
+    "aliases": [
+      "chef infra"
+    ],
+    "name": "Chef"
+  },
+  "chi_squared_test": {
+    "aliases": [
+      "chi-square test",
+      "chi-squared goodness of fit",
+      "chi2 test"
+    ],
+    "name": "Chi-Squared Test"
+  },
+  "ci_cd": {
+    "aliases": [
+      "ci/cd",
+      "cicd",
+      "continuous delivery",
+      "continuous deployment",
+      "continuous integration"
+    ],
+    "name": "CI/CD"
+  },
+  "ci_cd_mobile": {
+    "aliases": [
+      "bitrise",
+      "ci/cd",
+      "continuous integration"
+    ],
+    "name": "Mobile CI/CD"
+  },
+  "circleci": {
+    "aliases": [
+      "circle ci"
+    ],
+    "name": "CircleCI"
+  },
+  "circuit_design": {
+    "aliases": [
+      "analog circuit design",
+      "circuit analysis"
+    ],
+    "name": "Circuit Design"
+  },
+  "cissp": {
+    "aliases": [
+      "certified information systems security professional"
+    ],
+    "name": "CISSP"
+  },
+  "civil_3d": {
+    "aliases": [
+      "autocad civil 3d",
+      "civil3d"
+    ],
+    "name": "Civil 3D"
+  },
+  "clean_architecture": {
+    "aliases": [],
+    "name": "Clean Architecture"
+  },
+  "clia": {
+    "aliases": [
+      "clia",
+      "clinical laboratory improvement amendments"
+    ],
+    "name": "CLIA Compliance"
+  },
+  "clickhouse": {
+    "aliases": [
+      "click house"
+    ],
+    "name": "ClickHouse"
+  },
+  "clickup": {
+    "aliases": [],
+    "name": "ClickUp"
+  },
+  "clinical_data_management": {
+    "aliases": [
+      "cdm",
+      "data management"
+    ],
+    "name": "Clinical Data Management"
+  },
+  "clinical_trial_management": {
+    "aliases": [
+      "clinical trial coordination",
+      "clinical trials",
+      "trial management"
+    ],
+    "name": "Clinical Trial Management"
+  },
+  "clojure": {
+    "aliases": [
+      "clojure lang"
+    ],
+    "name": "Clojure"
+  },
+  "cloud_functions": {
+    "aliases": [
+      "cloud functions"
+    ],
+    "name": "Google Cloud Functions"
+  },
+  "cloud_run": {
+    "aliases": [
+      "cloud run"
+    ],
+    "name": "Google Cloud Run"
+  },
+  "cloud_security": {
+    "aliases": [
+      "cloud security posture"
+    ],
+    "name": "Cloud Security"
+  },
+  "cloud_spanner": {
+    "aliases": [
+      "cloud spanner",
+      "spanner"
+    ],
+    "name": "Google Cloud Spanner"
+  },
+  "cloudflare": {
+    "aliases": [],
+    "name": "Cloudflare"
+  },
+  "cloudformation": {
+    "aliases": [
+      "cfn",
+      "cloudformation"
+    ],
+    "name": "AWS CloudFormation"
+  },
+  "cloudfront": {
+    "aliases": [
+      "cloudfront"
+    ],
+    "name": "Amazon CloudFront"
+  },
+  "cloudwatch": {
+    "aliases": [
+      "cloudwatch"
+    ],
+    "name": "Amazon CloudWatch"
+  },
+  "cluster_analysis": {
+    "aliases": [
+      "clustering analysis",
+      "hierarchical clustering",
+      "k-means clustering"
+    ],
+    "name": "Cluster Analysis"
+  },
+  "clustering": {
+    "aliases": [
+      "k means clustering",
+      "k-means",
+      "kmeans"
+    ],
+    "name": "Clustering"
+  },
+  "cnc_machining": {
+    "aliases": [
+      "cnc",
+      "cnc programming",
+      "computer numerical control"
+    ],
+    "name": "CNC Machining"
+  },
+  "coaching": {
+    "aliases": [
+      "coaching skills"
+    ],
+    "name": "Coaching"
+  },
+  "cobol": {
+    "aliases": [
+      "cobol language"
+    ],
+    "name": "COBOL"
+  },
+  "cockroachdb": {
+    "aliases": [
+      "cockroach db"
+    ],
+    "name": "CockroachDB"
+  },
+  "cocoapods": {
+    "aliases": [
+      "cocoa pods",
+      "pods"
+    ],
+    "name": "CocoaPods"
+  },
+  "code_coverage": {
+    "aliases": [
+      "test coverage"
+    ],
+    "name": "Code Coverage"
+  },
+  "codeigniter": {
+    "aliases": [
+      "code igniter"
+    ],
+    "name": "CodeIgniter"
+  },
+  "cognito": {
+    "aliases": [
+      "cognito"
+    ],
+    "name": "Amazon Cognito"
+  },
+  "cohort_analysis": {
+    "aliases": [],
+    "name": "Cohort Analysis"
+  },
+  "cold_calling": {
+    "aliases": [],
+    "name": "Cold Calling"
+  },
+  "cold_emailing": {
+    "aliases": [
+      "cold email",
+      "cold outreach"
+    ],
+    "name": "Cold Emailing"
+  },
+  "collaboration": {
+    "aliases": [
+      "collaborative working",
+      "cross-functional collaboration"
+    ],
+    "name": "Collaboration"
+  },
+  "color_theory": {
+    "aliases": [],
+    "name": "Color Theory"
+  },
+  "combine": {
+    "aliases": [
+      "combine framework"
+    ],
+    "name": "Combine"
+  },
+  "communication": {
+    "aliases": [],
+    "name": "Communication"
+  },
+  "comparable_company_analysis": {
+    "aliases": [
+      "comparable companies",
+      "comps",
+      "trading comps"
+    ],
+    "name": "Comparable Company Analysis"
+  },
+  "comptia_security_plus": {
+    "aliases": [
+      "comptia security plus",
+      "sec+",
+      "security+"
+    ],
+    "name": "CompTIA Security+"
+  },
+  "computational_fluid_dynamics": {
+    "aliases": [
+      "cfd"
+    ],
+    "name": "Computational Fluid Dynamics"
+  },
+  "compute_engine": {
+    "aliases": [
+      "compute engine",
+      "gce"
+    ],
+    "name": "Google Compute Engine"
+  },
+  "computer_vision": {
+    "aliases": [
+      "cv"
+    ],
+    "name": "Computer Vision"
+  },
+  "comsol": {
+    "aliases": [
+      "comsol"
+    ],
+    "name": "COMSOL Multiphysics"
+  },
+  "concur": {
+    "aliases": [
+      "concur",
+      "concur expense"
+    ],
+    "name": "SAP Concur"
+  },
+  "confidence_intervals": {
+    "aliases": [
+      "ci",
+      "interval estimation"
+    ],
+    "name": "Confidence Intervals"
+  },
+  "conflict_resolution": {
+    "aliases": [
+      "conflict management",
+      "resolving conflict"
+    ],
+    "name": "Conflict Resolution"
+  },
+  "confluence": {
+    "aliases": [
+      "atlassian confluence"
+    ],
+    "name": "Confluence"
+  },
+  "confluent": {
+    "aliases": [
+      "confluent platform"
+    ],
+    "name": "Confluent"
+  },
+  "connection_pooling": {
+    "aliases": [
+      "db connection pool"
+    ],
+    "name": "Connection Pooling"
+  },
+  "consolidation": {
+    "aliases": [
+      "consolidations",
+      "intercompany consolidation"
+    ],
+    "name": "Financial Consolidation"
+  },
+  "constant_contact": {
+    "aliases": [],
+    "name": "Constant Contact"
+  },
+  "consul": {
+    "aliases": [
+      "hashicorp consul"
+    ],
+    "name": "Consul"
+  },
+  "container_security": {
+    "aliases": [
+      "docker security",
+      "k8s security",
+      "kubernetes security"
+    ],
+    "name": "Container Security"
+  },
+  "containerd": {
+    "aliases": [],
+    "name": "containerd"
+  },
+  "content_marketing": {
+    "aliases": [
+      "content creation",
+      "content strategy"
+    ],
+    "name": "Content Marketing"
+  },
+  "continuous_integration": {
+    "aliases": [
+      "ci",
+      "ci/cd"
+    ],
+    "name": "Continuous Integration"
+  },
+  "continuous_learning": {
+    "aliases": [
+      "lifelong learning",
+      "willingness to learn"
+    ],
+    "name": "Continuous Learning"
+  },
+  "contract_testing": {
+    "aliases": [],
+    "name": "Contract Testing"
+  },
+  "control_systems": {
+    "aliases": [
+      "control systems engineering",
+      "feedback control"
+    ],
+    "name": "Control Systems"
+  },
+  "conversion_rate_optimization": {
+    "aliases": [
+      "conversion optimization",
+      "cro"
+    ],
+    "name": "Conversion Rate Optimization (CRO)"
+  },
+  "convex_optimization": {
+    "aliases": [
+      "convex programming"
+    ],
+    "name": "Convex Optimization"
+  },
+  "convolutional_neural_networks": {
+    "aliases": [
+      "cnn",
+      "cnns",
+      "convnets"
+    ],
+    "name": "Convolutional Neural Networks"
+  },
+  "copywriting": {
+    "aliases": [
+      "ad copywriting",
+      "marketing copywriting"
+    ],
+    "name": "Copywriting"
+  },
+  "cordova": {
+    "aliases": [
+      "cordova",
+      "phonegap"
+    ],
+    "name": "Apache Cordova"
+  },
+  "core_animation": {
+    "aliases": [],
+    "name": "Core Animation"
+  },
+  "core_data": {
+    "aliases": [
+      "coredata"
+    ],
+    "name": "Core Data"
+  },
+  "coreldraw": {
+    "aliases": [
+      "corel draw"
+    ],
+    "name": "CorelDRAW"
+  },
+  "correlation_analysis": {
+    "aliases": [
+      "pearson correlation",
+      "spearman correlation"
+    ],
+    "name": "Correlation Analysis"
+  },
+  "cosmos_db": {
+    "aliases": [
+      "cosmos db",
+      "cosmosdb"
+    ],
+    "name": "Azure Cosmos DB"
+  },
+  "cost_accounting": {
+    "aliases": [
+      "costing",
+      "managerial accounting"
+    ],
+    "name": "Cost Accounting"
+  },
+  "cost_benefit_analysis": {
+    "aliases": [
+      "cost benefit analysis"
+    ],
+    "name": "Cost-Benefit Analysis"
+  },
+  "couchbase": {
+    "aliases": [],
+    "name": "Couchbase"
+  },
+  "couchdb": {
+    "aliases": [
+      "couchdb"
+    ],
+    "name": "Apache CouchDB"
+  },
+  "cpa": {
+    "aliases": [
+      "cpa"
+    ],
+    "name": "Certified Public Accountant"
+  },
+  "cpp": {
+    "aliases": [
+      "c plus plus",
+      "c++",
+      "c++11",
+      "c++14",
+      "c++17",
+      "c++20",
+      "cplusplus",
+      "cpp",
+      "modern c++"
+    ],
+    "name": "C++"
+  },
+  "cpr_certification": {
+    "aliases": [
+      "basic life support",
+      "bls",
+      "cpr",
+      "cpr certified"
+    ],
+    "name": "CPR/BLS Certification"
+  },
+  "creativity": {
+    "aliases": [
+      "creative thinking"
+    ],
+    "name": "Creativity"
+  },
+  "credit_analysis": {
+    "aliases": [
+      "credit risk analysis",
+      "credit underwriting"
+    ],
+    "name": "Credit Analysis"
+  },
+  "creo": {
+    "aliases": [
+      "creo parametric",
+      "pro engineer",
+      "pro/e",
+      "pro/engineer",
+      "proe"
+    ],
+    "name": "Creo"
+  },
+  "critical_path_method": {
+    "aliases": [
+      "cpm"
+    ],
+    "name": "Critical Path Method"
+  },
+  "critical_thinking": {
+    "aliases": [
+      "critical analysis"
+    ],
+    "name": "Critical Thinking"
+  },
+  "crm": {
+    "aliases": [
+      "crm"
+    ],
+    "name": "Customer Relationship Management (CRM)"
+  },
+  "cron": {
+    "aliases": [
+      "cron jobs",
+      "crontab"
+    ],
+    "name": "Cron"
+  },
+  "cross_cultural_communication": {
+    "aliases": [
+      "intercultural communication"
+    ],
+    "name": "Cross-Cultural Communication"
+  },
+  "cross_validation": {
+    "aliases": [
+      "cross validation",
+      "k-fold cross-validation"
+    ],
+    "name": "Cross-Validation"
+  },
+  "crowdstrike": {
+    "aliases": [
+      "crowdstrike falcon",
+      "falcon"
+    ],
+    "name": "CrowdStrike"
+  },
+  "cryptography": {
+    "aliases": [
+      "crypto",
+      "encryption"
+    ],
+    "name": "Cryptography"
+  },
+  "csharp": {
+    "aliases": [
+      "c sharp",
+      "c#",
+      "c-sharp",
+      "csharp"
+    ],
+    "name": "C#"
+  },
+  "css": {
+    "aliases": [
+      "cascading style sheets",
+      "css3"
+    ],
+    "name": "CSS"
+  },
+  "css_modules": {
+    "aliases": [],
+    "name": "CSS Modules"
+  },
+  "ctms": {
+    "aliases": [
+      "ctms"
+    ],
+    "name": "Clinical Trial Management System (CTMS)"
+  },
+  "cucumber": {
+    "aliases": [
+      "cucumberjs"
+    ],
+    "name": "Cucumber"
+  },
+  "cultural_awareness": {
+    "aliases": [
+      "cultural sensitivity"
+    ],
+    "name": "Cultural Awareness"
+  },
+  "curl": {
+    "aliases": [
+      "curl command"
+    ],
+    "name": "cURL"
+  },
+  "customer_service": {
+    "aliases": [
+      "client service",
+      "customer support"
+    ],
+    "name": "Customer Service"
+  },
+  "cypress": {
+    "aliases": [
+      "cypress.io"
+    ],
+    "name": "Cypress"
+  },
+  "d3_js": {
+    "aliases": [
+      "d3",
+      "d3js"
+    ],
+    "name": "D3.js"
+  },
+  "dagger_hilt": {
+    "aliases": [
+      "dagger",
+      "hilt"
+    ],
+    "name": "Dagger Hilt"
+  },
+  "dagster": {
+    "aliases": [],
+    "name": "Dagster"
+  },
+  "daily_standup": {
+    "aliases": [
+      "daily scrum",
+      "stand-up",
+      "standup meeting"
+    ],
+    "name": "Daily Standup"
+  },
+  "dart": {
+    "aliases": [
+      "dart lang"
+    ],
+    "name": "Dart"
+  },
+  "dashboard_design": {
+    "aliases": [
+      "dashboard development",
+      "dashboarding"
+    ],
+    "name": "Dashboard Design"
+  },
+  "data_analysis": {
+    "aliases": [],
+    "name": "Data Analysis"
+  },
+  "data_cleaning": {
+    "aliases": [
+      "data cleansing",
+      "data wrangling"
+    ],
+    "name": "Data Cleaning"
+  },
+  "data_driven_decision_making": {
+    "aliases": [
+      "data-driven decisions"
+    ],
+    "name": "Data-Driven Decision Making"
+  },
+  "data_governance": {
+    "aliases": [],
+    "name": "Data Governance"
+  },
+  "data_lake": {
+    "aliases": [],
+    "name": "Data Lake"
+  },
+  "data_lakehouse": {
+    "aliases": [
+      "lakehouse"
+    ],
+    "name": "Data Lakehouse"
+  },
+  "data_mart": {
+    "aliases": [],
+    "name": "Data Mart"
+  },
+  "data_modeling": {
+    "aliases": [
+      "database design",
+      "dimensional modeling",
+      "schema design",
+      "star schema"
+    ],
+    "name": "Data Modeling"
+  },
+  "data_pipeline": {
+    "aliases": [
+      "data pipeline",
+      "pipeline orchestration"
+    ],
+    "name": "Data Pipelines"
+  },
+  "data_quality": {
+    "aliases": [
+      "data validation"
+    ],
+    "name": "Data Quality"
+  },
+  "data_query_resolution": {
+    "aliases": [
+      "data cleaning",
+      "discrepancy management",
+      "query management"
+    ],
+    "name": "Data Query Resolution"
+  },
+  "data_visualization": {
+    "aliases": [
+      "data viz",
+      "dataviz"
+    ],
+    "name": "Data Visualization"
+  },
+  "data_warehousing": {
+    "aliases": [
+      "data warehouse",
+      "dwh"
+    ],
+    "name": "Data Warehousing"
+  },
+  "database_administration": {
+    "aliases": [
+      "database admin",
+      "dba"
+    ],
+    "name": "Database Administration"
+  },
+  "database_backup_recovery": {
+    "aliases": [
+      "backup and recovery",
+      "disaster recovery"
+    ],
+    "name": "Database Backup and Recovery"
+  },
+  "database_indexing": {
+    "aliases": [
+      "index tuning",
+      "indexing"
+    ],
+    "name": "Database Indexing"
+  },
+  "database_normalization": {
+    "aliases": [
+      "3nf",
+      "normalization",
+      "third normal form"
+    ],
+    "name": "Database Normalization"
+  },
+  "database_replication": {
+    "aliases": [
+      "replication"
+    ],
+    "name": "Database Replication"
+  },
+  "database_sharding": {
+    "aliases": [
+      "sharding"
+    ],
+    "name": "Database Sharding"
+  },
+  "databricks": {
+    "aliases": [
+      "databricks lakehouse"
+    ],
+    "name": "Databricks"
+  },
+  "datadog": {
+    "aliases": [
+      "data dog"
+    ],
+    "name": "Datadog"
+  },
+  "dataflow": {
+    "aliases": [
+      "dataflow"
+    ],
+    "name": "Google Cloud Dataflow"
+  },
+  "dataproc": {
+    "aliases": [
+      "dataproc"
+    ],
+    "name": "Google Cloud Dataproc"
+  },
+  "dax": {
+    "aliases": [
+      "data analysis expressions"
+    ],
+    "name": "DAX"
+  },
+  "db2": {
+    "aliases": [
+      "db2"
+    ],
+    "name": "IBM Db2"
+  },
+  "dbeaver": {
+    "aliases": [
+      "db beaver"
+    ],
+    "name": "DBeaver"
+  },
+  "dbt": {
+    "aliases": [
+      "data build tool",
+      "dbt cloud",
+      "dbt core"
+    ],
+    "name": "dbt"
+  },
+  "dcf_analysis": {
+    "aliases": [
+      "dcf",
+      "dcf modeling",
+      "discounted cash flow"
+    ],
+    "name": "Discounted Cash Flow Analysis"
+  },
+  "debezium": {
+    "aliases": [],
+    "name": "Debezium"
+  },
+  "debian": {
+    "aliases": [
+      "debian linux"
+    ],
+    "name": "Debian"
+  },
+  "decision_making": {
+    "aliases": [
+      "decision-making",
+      "sound judgment"
+    ],
+    "name": "Decision Making"
+  },
+  "deep_learning": {
+    "aliases": [
+      "dl"
+    ],
+    "name": "Deep Learning"
+  },
+  "deep_linking": {
+    "aliases": [
+      "app links",
+      "universal links"
+    ],
+    "name": "Deep Linking"
+  },
+  "defect_tracking": {
+    "aliases": [
+      "bug tracking"
+    ],
+    "name": "Defect Tracking"
+  },
+  "definition_of_done": {
+    "aliases": [
+      "dod"
+    ],
+    "name": "Definition of Done"
+  },
+  "delegation": {
+    "aliases": [
+      "delegating tasks"
+    ],
+    "name": "Delegation"
+  },
+  "delta_lake": {
+    "aliases": [
+      "delta"
+    ],
+    "name": "Delta Lake"
+  },
+  "dependability": {
+    "aliases": [
+      "reliability",
+      "reliable"
+    ],
+    "name": "Dependability"
+  },
+  "descriptive_statistics": {
+    "aliases": [
+      "summary statistics"
+    ],
+    "name": "Descriptive Statistics"
+  },
+  "design_handoff": {
+    "aliases": [
+      "dev handoff",
+      "developer handoff"
+    ],
+    "name": "Design Handoff"
+  },
+  "design_systems": {
+    "aliases": [
+      "design system"
+    ],
+    "name": "Design Systems"
+  },
+  "design_thinking": {
+    "aliases": [],
+    "name": "Design Thinking"
+  },
+  "design_tokens": {
+    "aliases": [],
+    "name": "Design Tokens"
+  },
+  "detox": {
+    "aliases": [],
+    "name": "Detox"
+  },
+  "dfm": {
+    "aliases": [
+      "design for manufacturability",
+      "dfm",
+      "dfma"
+    ],
+    "name": "Design for Manufacturing"
+  },
+  "dhcp": {
+    "aliases": [
+      "dynamic host configuration protocol"
+    ],
+    "name": "DHCP"
+  },
+  "difference_in_differences": {
+    "aliases": [
+      "did",
+      "diff-in-diff",
+      "difference in differences"
+    ],
+    "name": "Difference-in-Differences"
+  },
+  "dig": {
+    "aliases": [
+      "dig command",
+      "dns lookup"
+    ],
+    "name": "dig"
+  },
+  "digital_forensics": {
+    "aliases": [
+      "computer forensics",
+      "dfir",
+      "forensics"
+    ],
+    "name": "Digital Forensics"
+  },
+  "dimensionality_reduction": {
+    "aliases": [
+      "pca",
+      "principal component analysis"
+    ],
+    "name": "Dimensionality Reduction"
+  },
+  "disciplined_agile": {
+    "aliases": [
+      "dad",
+      "disciplined agile delivery"
+    ],
+    "name": "Disciplined Agile"
+  },
+  "display_advertising": {
+    "aliases": [
+      "banner advertising",
+      "display ads"
+    ],
+    "name": "Display Advertising"
+  },
+  "diversity_and_inclusion": {
+    "aliases": [
+      "dei",
+      "diversity equity and inclusion"
+    ],
+    "name": "Diversity and Inclusion"
+  },
+  "django": {
+    "aliases": [
+      "django framework"
+    ],
+    "name": "Django"
+  },
+  "django_orm": {
+    "aliases": [],
+    "name": "Django ORM"
+  },
+  "django_rest_framework": {
+    "aliases": [
+      "django rest",
+      "drf"
+    ],
+    "name": "Django REST Framework"
+  },
+  "dlp": {
+    "aliases": [
+      "dlp"
+    ],
+    "name": "Data Loss Prevention"
+  },
+  "dna_extraction": {
+    "aliases": [
+      "dna isolation",
+      "nucleic acid extraction"
+    ],
+    "name": "DNA Extraction"
+  },
+  "dns": {
+    "aliases": [
+      "domain name system"
+    ],
+    "name": "DNS"
+  },
+  "docker": {
+    "aliases": [
+      "docker engine",
+      "dockerize",
+      "dockerized"
+    ],
+    "name": "Docker"
+  },
+  "docker_compose": {
+    "aliases": [
+      "docker-compose"
+    ],
+    "name": "Docker Compose"
+  },
+  "docker_swarm": {
+    "aliases": [
+      "swarm mode"
+    ],
+    "name": "Docker Swarm"
+  },
+  "docusign": {
+    "aliases": [],
+    "name": "DocuSign"
+  },
+  "domo": {
+    "aliases": [],
+    "name": "Domo"
+  },
+  "dot_net": {
+    "aliases": [
+      ".net core",
+      "dotnet",
+      "dotnet core"
+    ],
+    "name": ".NET"
+  },
+  "dotnet": {
+    "aliases": [
+      ".net",
+      ".net core",
+      ".net framework",
+      "asp.net",
+      "dot net",
+      "dotnet"
+    ],
+    "name": ".NET"
+  },
+  "dplyr": {
+    "aliases": [],
+    "name": "dplyr"
+  },
+  "dropbox": {
+    "aliases": [
+      "dropbox business"
+    ],
+    "name": "Dropbox"
+  },
+  "drug_administration": {
+    "aliases": [
+      "drug administration",
+      "iv administration"
+    ],
+    "name": "Medication Administration"
+  },
+  "dynamodb": {
+    "aliases": [
+      "aws dynamodb",
+      "dynamodb"
+    ],
+    "name": "Amazon DynamoDB"
+  },
+  "eagle_cad": {
+    "aliases": [
+      "autodesk eagle",
+      "eagle cad"
+    ],
+    "name": "Eagle"
+  },
+  "ec2": {
+    "aliases": [
+      "ec2",
+      "elastic compute cloud"
+    ],
+    "name": "Amazon EC2"
+  },
+  "ecg": {
+    "aliases": [
+      "ecg",
+      "ekg",
+      "electrocardiogram"
+    ],
+    "name": "Electrocardiography (ECG)"
+  },
+  "echo": {
+    "aliases": [
+      "echo framework"
+    ],
+    "name": "Echo"
+  },
+  "ecs": {
+    "aliases": [
+      "ecs",
+      "elastic container service"
+    ],
+    "name": "Amazon ECS"
+  },
+  "edr": {
+    "aliases": [
+      "edr",
+      "xdr"
+    ],
+    "name": "Endpoint Detection and Response"
+  },
+  "eks": {
+    "aliases": [
+      "eks",
+      "elastic kubernetes service"
+    ],
+    "name": "Amazon EKS"
+  },
+  "elastic_beanstalk": {
+    "aliases": [
+      "beanstalk",
+      "elastic beanstalk"
+    ],
+    "name": "AWS Elastic Beanstalk"
+  },
+  "elastic_net": {
+    "aliases": [
+      "elastic net regression"
+    ],
+    "name": "Elastic Net"
+  },
+  "elastic_siem": {
+    "aliases": [
+      "elastic security",
+      "elasticsearch logstash kibana",
+      "elk",
+      "elk stack"
+    ],
+    "name": "Elastic SIEM"
+  },
+  "elasticache": {
+    "aliases": [
+      "elasticache"
+    ],
+    "name": "Amazon ElastiCache"
+  },
+  "elasticsearch": {
+    "aliases": [
+      "elastic search",
+      "elk stack",
+      "es"
+    ],
+    "name": "Elasticsearch"
+  },
+  "electronic_data_capture": {
+    "aliases": [
+      "edc"
+    ],
+    "name": "Electronic Data Capture (EDC)"
+  },
+  "electronic_health_records": {
+    "aliases": [
+      "ehr",
+      "electronic medical records",
+      "emr"
+    ],
+    "name": "Electronic Health Records (EHR)"
+  },
+  "elisa": {
+    "aliases": [
+      "enzyme linked immunosorbent assay",
+      "enzyme-linked immunosorbent assay"
+    ],
+    "name": "ELISA"
+  },
+  "elixir": {
+    "aliases": [
+      "elixir lang"
+    ],
+    "name": "Elixir"
+  },
+  "elk_stack": {
+    "aliases": [
+      "elastic stack",
+      "elk"
+    ],
+    "name": "ELK Stack"
+  },
+  "eloquent": {
+    "aliases": [
+      "eloquent"
+    ],
+    "name": "Eloquent ORM"
+  },
+  "elt": {
+    "aliases": [
+      "extract load transform"
+    ],
+    "name": "ELT"
+  },
+  "email_marketing": {
+    "aliases": [
+      "email automation",
+      "email campaigns"
+    ],
+    "name": "Email Marketing"
+  },
+  "embedded_systems": {
+    "aliases": [
+      "embedded c",
+      "embedded programming"
+    ],
+    "name": "Embedded Systems"
+  },
+  "ember_js": {
+    "aliases": [
+      "ember",
+      "emberjs"
+    ],
+    "name": "Ember.js"
+  },
+  "emotion": {
+    "aliases": [],
+    "name": "Emotion"
+  },
+  "emotional_intelligence": {
+    "aliases": [
+      "emotional quotient",
+      "eq"
+    ],
+    "name": "Emotional Intelligence"
+  },
+  "empathy": {
+    "aliases": [
+      "empathetic"
+    ],
+    "name": "Empathy"
+  },
+  "emr": {
+    "aliases": [
+      "elastic mapreduce",
+      "emr"
+    ],
+    "name": "Amazon EMR"
+  },
+  "end_to_end_testing": {
+    "aliases": [
+      "e2e testing",
+      "e2e tests"
+    ],
+    "name": "End-to-End Testing"
+  },
+  "endpoint_security": {
+    "aliases": [
+      "endpoint protection"
+    ],
+    "name": "Endpoint Security"
+  },
+  "entity_framework": {
+    "aliases": [
+      "ef core",
+      "entity framework core"
+    ],
+    "name": "Entity Framework"
+  },
+  "entity_relationship_diagram": {
+    "aliases": [
+      "entity relationship modeling",
+      "er diagram",
+      "erd"
+    ],
+    "name": "Entity-Relationship Diagram"
+  },
+  "envoy": {
+    "aliases": [
+      "envoy"
+    ],
+    "name": "Envoy Proxy"
+  },
+  "enzyme": {
+    "aliases": [],
+    "name": "Enzyme"
+  },
+  "epic_emr": {
+    "aliases": [
+      "epic ehr",
+      "epic systems",
+      "epiccare"
+    ],
+    "name": "Epic (EHR)"
+  },
+  "epics": {
+    "aliases": [
+      "epic"
+    ],
+    "name": "Epics"
+  },
+  "epidemiology": {
+    "aliases": [
+      "epidemiological analysis"
+    ],
+    "name": "Epidemiology"
+  },
+  "erlang": {
+    "aliases": [
+      "erlang lang"
+    ],
+    "name": "Erlang"
+  },
+  "esbuild": {
+    "aliases": [],
+    "name": "esbuild"
+  },
+  "espresso": {
+    "aliases": [
+      "android espresso"
+    ],
+    "name": "Espresso"
+  },
+  "estimation": {
+    "aliases": [
+      "planning poker"
+    ],
+    "name": "Agile Estimation"
+  },
+  "etabs": {
+    "aliases": [
+      "csi etabs"
+    ],
+    "name": "ETABS"
+  },
+  "etap": {
+    "aliases": [
+      "electrical transient analyzer program"
+    ],
+    "name": "ETAP"
+  },
+  "etl": {
+    "aliases": [
+      "elt",
+      "etl pipelines",
+      "extract transform load"
+    ],
+    "name": "ETL"
+  },
+  "event_marketing": {
+    "aliases": [
+      "events marketing",
+      "trade show marketing"
+    ],
+    "name": "Event Marketing"
+  },
+  "eventbridge": {
+    "aliases": [
+      "eventbridge"
+    ],
+    "name": "Amazon EventBridge"
+  },
+  "evernote": {
+    "aliases": [],
+    "name": "Evernote"
+  },
+  "excel": {
+    "aliases": [
+      "excel spreadsheets",
+      "ms excel"
+    ],
+    "name": "Excel"
+  },
+  "excel_macros_vba": {
+    "aliases": [
+      "excel macros",
+      "excel vba",
+      "vba macros"
+    ],
+    "name": "Excel Macros (VBA)"
+  },
+  "excel_pivot_tables": {
+    "aliases": [
+      "excel pivot tables",
+      "pivot table",
+      "pivot tables",
+      "pivottable",
+      "pivottables"
+    ],
+    "name": "Excel Pivot Tables"
+  },
+  "excel_vba": {
+    "aliases": [
+      "excel macros",
+      "vba",
+      "visual basic for applications"
+    ],
+    "name": "Excel VBA"
+  },
+  "excel_vlookup": {
+    "aliases": [
+      "hlookup",
+      "vlookup",
+      "xlookup"
+    ],
+    "name": "Excel VLOOKUP"
+  },
+  "experimental_design": {
+    "aliases": [
+      "doe",
+      "experimental design"
+    ],
+    "name": "Design of Experiments"
+  },
+  "exploratory_testing": {
+    "aliases": [],
+    "name": "Exploratory Testing"
+  },
+  "expo": {
+    "aliases": [],
+    "name": "Expo"
+  },
+  "exponential_smoothing": {
+    "aliases": [
+      "ets",
+      "holt-winters",
+      "holt-winters method"
+    ],
+    "name": "Exponential Smoothing"
+  },
+  "express": {
+    "aliases": [
+      "express",
+      "expressjs"
+    ],
+    "name": "Express.js"
+  },
+  "extreme_programming": {
+    "aliases": [
+      "xp"
+    ],
+    "name": "Extreme Programming"
+  },
+  "f_sharp": {
+    "aliases": [
+      "f sharp",
+      "fsharp"
+    ],
+    "name": "F#"
+  },
+  "facebook_ads": {
+    "aliases": [
+      "facebook ads manager",
+      "meta ads",
+      "meta ads manager",
+      "meta business suite"
+    ],
+    "name": "Facebook Ads"
+  },
+  "facilitation": {
+    "aliases": [
+      "meeting facilitation",
+      "workshop facilitation"
+    ],
+    "name": "Facilitation"
+  },
+  "factor_analysis": {
+    "aliases": [
+      "confirmatory factor analysis",
+      "efa",
+      "exploratory factor analysis"
+    ],
+    "name": "Factor Analysis"
+  },
+  "factset": {
+    "aliases": [],
+    "name": "FactSet"
+  },
+  "fastapi": {
+    "aliases": [
+      "fast api"
+    ],
+    "name": "FastAPI"
+  },
+  "fastlane": {
+    "aliases": [],
+    "name": "Fastlane"
+  },
+  "fda_regulations": {
+    "aliases": [
+      "21 cfr",
+      "fda compliance",
+      "title 21 cfr"
+    ],
+    "name": "FDA Regulations"
+  },
+  "feature_engineering": {
+    "aliases": [],
+    "name": "Feature Engineering"
+  },
+  "fiber": {
+    "aliases": [
+      "gofiber"
+    ],
+    "name": "Fiber"
+  },
+  "figma": {
+    "aliases": [
+      "figma design"
+    ],
+    "name": "Figma"
+  },
+  "file_permissions": {
+    "aliases": [
+      "chmod",
+      "chown",
+      "unix permissions"
+    ],
+    "name": "File Permissions"
+  },
+  "financial_modeling": {
+    "aliases": [
+      "fin modeling",
+      "financial models"
+    ],
+    "name": "Financial Modeling"
+  },
+  "financial_reporting": {
+    "aliases": [
+      "external reporting",
+      "statutory reporting"
+    ],
+    "name": "Financial Reporting"
+  },
+  "financial_statement_analysis": {
+    "aliases": [
+      "financial statements analysis",
+      "fsa"
+    ],
+    "name": "Financial Statement Analysis"
+  },
+  "fine_tuning": {
+    "aliases": [
+      "fine tuning",
+      "finetuning"
+    ],
+    "name": "Fine-Tuning"
+  },
+  "finite_element_analysis": {
+    "aliases": [
+      "fea",
+      "fem",
+      "finite element method"
+    ],
+    "name": "Finite Element Analysis"
+  },
+  "firebase": {
+    "aliases": [],
+    "name": "Firebase"
+  },
+  "firebase_cloud_messaging": {
+    "aliases": [
+      "fcm"
+    ],
+    "name": "Firebase Cloud Messaging"
+  },
+  "firebase_crashlytics": {
+    "aliases": [
+      "crashlytics"
+    ],
+    "name": "Firebase Crashlytics"
+  },
+  "firebase_firestore": {
+    "aliases": [
+      "firebase firestore",
+      "firestore"
+    ],
+    "name": "Cloud Firestore"
+  },
+  "firestore": {
+    "aliases": [
+      "firestore"
+    ],
+    "name": "Cloud Firestore"
+  },
+  "firewall": {
+    "aliases": [
+      "firewall configuration",
+      "firewalls",
+      "network firewall"
+    ],
+    "name": "Firewall"
+  },
+  "fivetran": {
+    "aliases": [],
+    "name": "Fivetran"
+  },
+  "fixed_assets": {
+    "aliases": [
+      "asset accounting",
+      "depreciation",
+      "fixed assets"
+    ],
+    "name": "Fixed Asset Accounting"
+  },
+  "flask": {
+    "aliases": [],
+    "name": "Flask"
+  },
+  "flow_cytometry": {
+    "aliases": [
+      "facs",
+      "fluorescence-activated cell sorting"
+    ],
+    "name": "Flow Cytometry"
+  },
+  "fluentd": {
+    "aliases": [],
+    "name": "Fluentd"
+  },
+  "fluid_mechanics": {
+    "aliases": [
+      "fluid dynamics"
+    ],
+    "name": "Fluid Mechanics"
+  },
+  "flutter": {
+    "aliases": [],
+    "name": "Flutter"
+  },
+  "flux_cd": {
+    "aliases": [
+      "flux v2",
+      "fluxcd"
+    ],
+    "name": "Flux CD"
+  },
+  "flyway": {
+    "aliases": [
+      "flyway migrations"
+    ],
+    "name": "Flyway"
+  },
+  "fmea": {
+    "aliases": [
+      "failure mode and effects analysis",
+      "failure modes and effects analysis"
+    ],
+    "name": "FMEA"
+  },
+  "forecasting": {
+    "aliases": [
+      "demand forecasting",
+      "forecasting",
+      "revenue forecasting",
+      "time series forecasting"
+    ],
+    "name": "Financial Forecasting"
+  },
+  "formik": {
+    "aliases": [],
+    "name": "Formik"
+  },
+  "fortran": {
+    "aliases": [
+      "fortran 77",
+      "fortran 90"
+    ],
+    "name": "Fortran"
+  },
+  "fpa": {
+    "aliases": [
+      "financial planning and analysis",
+      "fp&a"
+    ],
+    "name": "Financial Planning & Analysis"
+  },
+  "fpga": {
+    "aliases": [
+      "field programmable gate array",
+      "field-programmable gate array"
+    ],
+    "name": "FPGA"
+  },
+  "framer": {
+    "aliases": [
+      "framer x"
+    ],
+    "name": "Framer"
+  },
+  "framer_motion": {
+    "aliases": [],
+    "name": "Framer Motion"
+  },
+  "ftp": {
+    "aliases": [
+      "file transfer protocol"
+    ],
+    "name": "FTP"
+  },
+  "functional_testing": {
+    "aliases": [],
+    "name": "Functional Testing"
+  },
+  "fusion_360": {
+    "aliases": [
+      "autodesk fusion",
+      "autodesk fusion 360",
+      "fusion360"
+    ],
+    "name": "Fusion 360"
+  },
+  "g_code": {
+    "aliases": [
+      "g code",
+      "gcode"
+    ],
+    "name": "G-code"
+  },
+  "gaap": {
+    "aliases": [
+      "generally accepted accounting principles",
+      "us gaap"
+    ],
+    "name": "GAAP"
+  },
+  "gantt_charts": {
+    "aliases": [
+      "gantt",
+      "gantt chart"
+    ],
+    "name": "Gantt Charts"
+  },
+  "garch": {
+    "aliases": [
+      "garch models",
+      "volatility modeling"
+    ],
+    "name": "GARCH"
+  },
+  "gatling": {
+    "aliases": [],
+    "name": "Gatling"
+  },
+  "gatsby": {
+    "aliases": [
+      "gatsbyjs"
+    ],
+    "name": "Gatsby"
+  },
+  "gcp": {
+    "aliases": [
+      "gcp",
+      "google cloud",
+      "google cloud platform"
+    ],
+    "name": "GCP"
+  },
+  "gd_and_t": {
+    "aliases": [
+      "gd&t",
+      "gdt",
+      "geometric dimensioning & tolerancing"
+    ],
+    "name": "Geometric Dimensioning and Tolerancing"
+  },
+  "gdpr": {
+    "aliases": [
+      "general data protection regulation"
+    ],
+    "name": "GDPR"
+  },
+  "gel_electrophoresis": {
+    "aliases": [
+      "agarose gel electrophoresis",
+      "sds-page"
+    ],
+    "name": "Gel Electrophoresis"
+  },
+  "general_ledger": {
+    "aliases": [
+      "g/l",
+      "gl"
+    ],
+    "name": "General Ledger"
+  },
+  "generalized_linear_models": {
+    "aliases": [
+      "glm",
+      "glms"
+    ],
+    "name": "Generalized Linear Models"
+  },
+  "generative_ai": {
+    "aliases": [
+      "gen ai",
+      "genai"
+    ],
+    "name": "Generative AI"
+  },
+  "gensim": {
+    "aliases": [],
+    "name": "Gensim"
+  },
+  "ggplot2": {
+    "aliases": [
+      "ggplot"
+    ],
+    "name": "ggplot2"
+  },
+  "gherkin": {
+    "aliases": [],
+    "name": "Gherkin"
+  },
+  "gin": {
+    "aliases": [
+      "gin gonic",
+      "gin-gonic"
+    ],
+    "name": "Gin"
+  },
+  "gis": {
+    "aliases": [
+      "arcgis",
+      "geographic information systems",
+      "qgis"
+    ],
+    "name": "GIS"
+  },
+  "git": {
+    "aliases": [
+      "git version control"
+    ],
+    "name": "Git"
+  },
+  "github": {
+    "aliases": [
+      "git hub"
+    ],
+    "name": "GitHub"
+  },
+  "github_actions": {
+    "aliases": [
+      "gh actions",
+      "github workflows"
+    ],
+    "name": "GitHub Actions"
+  },
+  "gitlab": {
+    "aliases": [
+      "git lab"
+    ],
+    "name": "GitLab"
+  },
+  "gitlab_ci": {
+    "aliases": [
+      "gitlab ci",
+      "gitlab pipelines",
+      "gitlab-ci.yml"
+    ],
+    "name": "GitLab CI/CD"
+  },
+  "gitops": {
+    "aliases": [
+      "git ops"
+    ],
+    "name": "GitOps"
+  },
+  "giving_feedback": {
+    "aliases": [
+      "constructive feedback",
+      "providing feedback"
+    ],
+    "name": "Giving Feedback"
+  },
+  "gke": {
+    "aliases": [
+      "gke"
+    ],
+    "name": "Google Kubernetes Engine"
+  },
+  "gmail": {
+    "aliases": [
+      "google mail"
+    ],
+    "name": "Gmail"
+  },
+  "go_net_http": {
+    "aliases": [
+      "net/http"
+    ],
+    "name": "Go net/http"
+  },
+  "go_to_market": {
+    "aliases": [
+      "go-to-market",
+      "gtm"
+    ],
+    "name": "Go-to-Market (GTM)"
+  },
+  "goal_setting": {
+    "aliases": [
+      "objective setting",
+      "setting goals"
+    ],
+    "name": "Goal Setting"
+  },
+  "golang": {
+    "aliases": [
+      "go lang"
+    ],
+    "name": "Golang"
+  },
+  "good_clinical_practice": {
+    "aliases": [
+      "gcp",
+      "ich e6",
+      "ich gcp",
+      "ich-gcp"
+    ],
+    "name": "Good Clinical Practice (GCP)"
+  },
+  "good_documentation_practice": {
+    "aliases": [
+      "gdocp",
+      "good documentation practices"
+    ],
+    "name": "Good Documentation Practice (GDP)"
+  },
+  "good_laboratory_practice": {
+    "aliases": [
+      "glp"
+    ],
+    "name": "Good Laboratory Practice (GLP)"
+  },
+  "good_manufacturing_practice": {
+    "aliases": [
+      "cgmp",
+      "current good manufacturing practice",
+      "gmp"
+    ],
+    "name": "Good Manufacturing Practice (GMP)"
+  },
+  "google_ad_manager": {
+    "aliases": [
+      "dfp",
+      "doubleclick for publishers",
+      "gam"
+    ],
+    "name": "Google Ad Manager"
+  },
+  "google_ads": {
+    "aliases": [
+      "adwords",
+      "google adwords"
+    ],
+    "name": "Google Ads"
+  },
+  "google_analytics": {
+    "aliases": [
+      "ga",
+      "ga4",
+      "google analytics 4",
+      "universal analytics"
+    ],
+    "name": "Google Analytics"
+  },
+  "google_analytics_360": {
+    "aliases": [
+      "ga360"
+    ],
+    "name": "Google Analytics 360"
+  },
+  "google_apps_script": {
+    "aliases": [
+      "apps script",
+      "gas"
+    ],
+    "name": "Google Apps Script"
+  },
+  "google_bigquery": {
+    "aliases": [
+      "bigquery",
+      "bq"
+    ],
+    "name": "Google BigQuery"
+  },
+  "google_calendar": {
+    "aliases": [
+      "gcal"
+    ],
+    "name": "Google Calendar"
+  },
+  "google_cloud_storage": {
+    "aliases": [
+      "cloud storage",
+      "gcs"
+    ],
+    "name": "Google Cloud Storage"
+  },
+  "google_data_studio": {
+    "aliases": [
+      "data studio",
+      "google data studio"
+    ],
+    "name": "Looker Studio"
+  },
+  "google_dataflow": {
+    "aliases": [
+      "dataflow"
+    ],
+    "name": "Google Cloud Dataflow"
+  },
+  "google_dataproc": {
+    "aliases": [
+      "dataproc"
+    ],
+    "name": "Google Cloud Dataproc"
+  },
+  "google_display_network": {
+    "aliases": [
+      "gdn"
+    ],
+    "name": "Google Display Network"
+  },
+  "google_docs": {
+    "aliases": [
+      "gdocs"
+    ],
+    "name": "Google Docs"
+  },
+  "google_drive": {
+    "aliases": [
+      "gdrive"
+    ],
+    "name": "Google Drive"
+  },
+  "google_forms": {
+    "aliases": [],
+    "name": "Google Forms"
+  },
+  "google_keyword_planner": {
+    "aliases": [
+      "keyword planner"
+    ],
+    "name": "Google Keyword Planner"
+  },
+  "google_meet": {
+    "aliases": [
+      "gmeet"
+    ],
+    "name": "Google Meet"
+  },
+  "google_merchant_center": {
+    "aliases": [
+      "merchant center"
+    ],
+    "name": "Google Merchant Center"
+  },
+  "google_optimize": {
+    "aliases": [],
+    "name": "Google Optimize"
+  },
+  "google_play_console": {
+    "aliases": [
+      "google play store",
+      "play console"
+    ],
+    "name": "Google Play Console"
+  },
+  "google_pubsub": {
+    "aliases": [
+      "pub/sub"
+    ],
+    "name": "Google Cloud Pub/Sub"
+  },
+  "google_search_console": {
+    "aliases": [
+      "gsc",
+      "search console",
+      "webmaster tools"
+    ],
+    "name": "Google Search Console"
+  },
+  "google_sheets": {
+    "aliases": [
+      "gsheets"
+    ],
+    "name": "Google Sheets"
+  },
+  "google_slides": {
+    "aliases": [],
+    "name": "Google Slides"
+  },
+  "google_tag_manager": {
+    "aliases": [
+      "gtm",
+      "tag manager"
+    ],
+    "name": "Google Tag Manager"
+  },
+  "google_workspace": {
+    "aliases": [
+      "g suite",
+      "google apps",
+      "gsuite"
+    ],
+    "name": "Google Workspace"
+  },
+  "gpt": {
+    "aliases": [
+      "generative pretrained transformer"
+    ],
+    "name": "GPT"
+  },
+  "gradient_boosting": {
+    "aliases": [
+      "gbm",
+      "gradient boosted trees"
+    ],
+    "name": "Gradient Boosting"
+  },
+  "gradient_descent": {
+    "aliases": [
+      "sgd",
+      "stochastic gradient descent"
+    ],
+    "name": "Gradient Descent"
+  },
+  "gradle": {
+    "aliases": [],
+    "name": "Gradle"
+  },
+  "grafana": {
+    "aliases": [],
+    "name": "Grafana"
+  },
+  "graphpad_prism": {
+    "aliases": [
+      "graphpad",
+      "prism"
+    ],
+    "name": "GraphPad Prism"
+  },
+  "graphql": {
+    "aliases": [
+      "graph ql"
+    ],
+    "name": "GraphQL"
+  },
+  "grc": {
+    "aliases": [
+      "governance risk and compliance",
+      "grc"
+    ],
+    "name": "Governance, Risk, and Compliance"
+  },
+  "great_expectations": {
+    "aliases": [],
+    "name": "Great Expectations"
+  },
+  "grep": {
+    "aliases": [
+      "grep command"
+    ],
+    "name": "grep"
+  },
+  "groovy": {
+    "aliases": [
+      "apache groovy"
+    ],
+    "name": "Groovy"
+  },
+  "growth_marketing": {
+    "aliases": [
+      "growth hacking"
+    ],
+    "name": "Growth Marketing"
+  },
+  "growth_mindset": {
+    "aliases": [],
+    "name": "Growth Mindset"
+  },
+  "grpc": {
+    "aliases": [
+      "g-rpc",
+      "grpc protocol"
+    ],
+    "name": "gRPC"
+  },
+  "gunicorn": {
+    "aliases": [],
+    "name": "Gunicorn"
+  },
+  "hadoop": {
+    "aliases": [
+      "apache hadoop",
+      "hadoop",
+      "hdfs"
+    ],
+    "name": "Hadoop"
+  },
+  "harbor": {
+    "aliases": [
+      "harbor registry"
+    ],
+    "name": "Harbor"
+  },
+  "haskell": {
+    "aliases": [
+      "haskell lang"
+    ],
+    "name": "Haskell"
+  },
+  "hbase": {
+    "aliases": [
+      "hbase"
+    ],
+    "name": "Apache HBase"
+  },
+  "heat_transfer": {
+    "aliases": [],
+    "name": "Heat Transfer"
+  },
+  "helm": {
+    "aliases": [
+      "helm charts"
+    ],
+    "name": "Helm"
+  },
+  "heroku": {
+    "aliases": [],
+    "name": "Heroku"
+  },
+  "heuristic_evaluation": {
+    "aliases": [],
+    "name": "Heuristic Evaluation"
+  },
+  "hibernate": {
+    "aliases": [
+      "hibernate orm"
+    ],
+    "name": "Hibernate"
+  },
+  "hipaa": {
+    "aliases": [
+      "health insurance portability and accountability act",
+      "hipaa"
+    ],
+    "name": "HIPAA"
+  },
+  "histology": {
+    "aliases": [
+      "histopathology",
+      "tissue sectioning"
+    ],
+    "name": "Histology"
+  },
+  "hmi": {
+    "aliases": [
+      "human machine interface",
+      "human-machine interface"
+    ],
+    "name": "HMI"
+  },
+  "hootsuite": {
+    "aliases": [],
+    "name": "Hootsuite"
+  },
+  "hotjar": {
+    "aliases": [],
+    "name": "Hotjar"
+  },
+  "hplc": {
+    "aliases": [
+      "high performance liquid chromatography",
+      "high-performance liquid chromatography"
+    ],
+    "name": "HPLC"
+  },
+  "html": {
+    "aliases": [
+      "html5",
+      "hypertext markup language"
+    ],
+    "name": "HTML"
+  },
+  "html_css": {
+    "aliases": [
+      "html and css"
+    ],
+    "name": "HTML/CSS"
+  },
+  "htmx": {
+    "aliases": [],
+    "name": "htmx"
+  },
+  "http": {
+    "aliases": [
+      "http protocol"
+    ],
+    "name": "HTTP"
+  },
+  "https": {
+    "aliases": [
+      "http over tls",
+      "http secure"
+    ],
+    "name": "HTTPS"
+  },
+  "hubspot": {
+    "aliases": [
+      "hubspot crm"
+    ],
+    "name": "HubSpot"
+  },
+  "hugging_face_transformers": {
+    "aliases": [
+      "hf transformers",
+      "huggingface transformers",
+      "transformers library"
+    ],
+    "name": "Hugging Face Transformers"
+  },
+  "hvac_design": {
+    "aliases": [
+      "heating ventilation and air conditioning",
+      "hvac"
+    ],
+    "name": "HVAC Design"
+  },
+  "hyperion": {
+    "aliases": [
+      "hfm",
+      "hyperion",
+      "hyperion financial management"
+    ],
+    "name": "Oracle Hyperion"
+  },
+  "hypermesh": {
+    "aliases": [
+      "altair hypermesh",
+      "hyperworks"
+    ],
+    "name": "HyperMesh"
+  },
+  "hypothesis_testing": {
+    "aliases": [
+      "anova",
+      "significance testing",
+      "statistical hypothesis testing",
+      "statistical significance testing",
+      "t-test"
+    ],
+    "name": "Hypothesis Testing"
+  },
+  "iam": {
+    "aliases": [
+      "iam"
+    ],
+    "name": "Identity and Access Management"
+  },
+  "ibm_cognos": {
+    "aliases": [
+      "cognos",
+      "cognos analytics"
+    ],
+    "name": "IBM Cognos"
+  },
+  "iconography": {
+    "aliases": [
+      "icon design"
+    ],
+    "name": "Iconography"
+  },
+  "ids_ips": {
+    "aliases": [
+      "ids",
+      "intrusion detection system",
+      "intrusion prevention system",
+      "ips"
+    ],
+    "name": "IDS/IPS"
+  },
+  "ifrs": {
+    "aliases": [
+      "international financial reporting standards"
+    ],
+    "name": "IFRS"
+  },
+  "immunoassay": {
+    "aliases": [
+      "immunoassays"
+    ],
+    "name": "Immunoassay"
+  },
+  "immunohistochemistry": {
+    "aliases": [
+      "ihc",
+      "immunostaining"
+    ],
+    "name": "Immunohistochemistry (IHC)"
+  },
+  "in_app_purchases": {
+    "aliases": [
+      "iap",
+      "storekit"
+    ],
+    "name": "In-App Purchases"
+  },
+  "incident_response": {
+    "aliases": [
+      "incident handling",
+      "incident management",
+      "ir"
+    ],
+    "name": "Incident Response"
+  },
+  "influencer_marketing": {
+    "aliases": [],
+    "name": "Influencer Marketing"
+  },
+  "influxdb": {
+    "aliases": [
+      "influx db"
+    ],
+    "name": "InfluxDB"
+  },
+  "informatica": {
+    "aliases": [
+      "informatica powercenter"
+    ],
+    "name": "Informatica"
+  },
+  "information_architecture": {
+    "aliases": [],
+    "name": "Information Architecture"
+  },
+  "informed_consent": {
+    "aliases": [
+      "icf",
+      "informed consent form",
+      "informed consent process"
+    ],
+    "name": "Informed Consent"
+  },
+  "infrastructure_as_code": {
+    "aliases": [
+      "iac"
+    ],
+    "name": "Infrastructure as Code"
+  },
+  "initiative": {
+    "aliases": [
+      "proactive",
+      "taking initiative"
+    ],
+    "name": "Initiative"
+  },
+  "innovation": {
+    "aliases": [
+      "innovative thinking"
+    ],
+    "name": "Innovation"
+  },
+  "institutional_review_board": {
+    "aliases": [
+      "ethics committee",
+      "iec",
+      "irb"
+    ],
+    "name": "Institutional Review Board (IRB)"
+  },
+  "instrumental_variables": {
+    "aliases": [
+      "instrumental variable analysis",
+      "iv regression"
+    ],
+    "name": "Instrumental Variables"
+  },
+  "integer_programming": {
+    "aliases": [
+      "integer optimization",
+      "mip",
+      "mixed-integer programming"
+    ],
+    "name": "Integer Programming"
+  },
+  "integration_testing": {
+    "aliases": [
+      "integration tests"
+    ],
+    "name": "Integration Testing"
+  },
+  "interaction_design": {
+    "aliases": [
+      "ixd"
+    ],
+    "name": "Interaction Design"
+  },
+  "internal_controls": {
+    "aliases": [
+      "financial controls"
+    ],
+    "name": "Internal Controls"
+  },
+  "interpersonal_skills": {
+    "aliases": [
+      "interpersonal communication",
+      "people skills"
+    ],
+    "name": "Interpersonal Skills"
+  },
+  "interviewing": {
+    "aliases": [
+      "conducting interviews"
+    ],
+    "name": "Interviewing"
+  },
+  "inventor": {
+    "aliases": [],
+    "name": "Autodesk Inventor"
+  },
+  "invision": {
+    "aliases": [
+      "invision app"
+    ],
+    "name": "InVision"
+  },
+  "ionic": {
+    "aliases": [
+      "ionic framework"
+    ],
+    "name": "Ionic"
+  },
+  "ios_development": {
+    "aliases": [
+      "ios app development",
+      "ios dev"
+    ],
+    "name": "iOS Development"
+  },
+  "iptables": {
+    "aliases": [
+      "ip tables"
+    ],
+    "name": "iptables"
+  },
+  "iso_27001": {
+    "aliases": [
+      "iso/iec 27001",
+      "iso27001"
+    ],
+    "name": "ISO 27001"
+  },
+  "istio": {
+    "aliases": [
+      "istio service mesh"
+    ],
+    "name": "Istio"
+  },
+  "jasmine": {
+    "aliases": [],
+    "name": "Jasmine"
+  },
+  "java": {
+    "aliases": [
+      "core java",
+      "java se",
+      "jdk"
+    ],
+    "name": "Java"
+  },
+  "javascript": {
+    "aliases": [
+      "ecmascript",
+      "es6",
+      "js",
+      "vanilla js"
+    ],
+    "name": "JavaScript"
+  },
+  "jax": {
+    "aliases": [],
+    "name": "JAX"
+  },
+  "jdbc": {
+    "aliases": [
+      "java database connectivity"
+    ],
+    "name": "JDBC"
+  },
+  "jenkins": {
+    "aliases": [
+      "jenkins pipeline",
+      "jenkinsfile"
+    ],
+    "name": "Jenkins"
+  },
+  "jest": {
+    "aliases": [
+      "jest.js"
+    ],
+    "name": "Jest"
+  },
+  "jetpack_compose": {
+    "aliases": [
+      "android compose",
+      "compose"
+    ],
+    "name": "Jetpack Compose"
+  },
+  "jfrog_artifactory": {
+    "aliases": [
+      "artifactory"
+    ],
+    "name": "JFrog Artifactory"
+  },
+  "jira": {
+    "aliases": [
+      "atlassian jira"
+    ],
+    "name": "Jira"
+  },
+  "jmeter": {
+    "aliases": [
+      "jmeter"
+    ],
+    "name": "Apache JMeter"
+  },
+  "jotai": {
+    "aliases": [],
+    "name": "Jotai"
+  },
+  "journal_entries": {
+    "aliases": [
+      "je",
+      "journal entry"
+    ],
+    "name": "Journal Entries"
+  },
+  "jpa": {
+    "aliases": [
+      "java persistence api"
+    ],
+    "name": "JPA"
+  },
+  "jquery": {
+    "aliases": [],
+    "name": "jQuery"
+  },
+  "julia": {
+    "aliases": [
+      "julia lang",
+      "julialang"
+    ],
+    "name": "Julia"
+  },
+  "junit": {
+    "aliases": [
+      "j unit",
+      "junit 4",
+      "junit 5",
+      "junit5",
+      "jupiter"
+    ],
+    "name": "JUnit"
+  },
+  "jupyter": {
+    "aliases": [
+      "jupyter notebook",
+      "jupyter notebooks"
+    ],
+    "name": "Jupyter"
+  },
+  "jupyter_notebook": {
+    "aliases": [
+      "ipython notebook",
+      "jupyter"
+    ],
+    "name": "Jupyter Notebook"
+  },
+  "jvm": {
+    "aliases": [
+      "java virtual machine"
+    ],
+    "name": "JVM"
+  },
+  "jwt": {
+    "aliases": [
+      "json web token",
+      "json web tokens"
+    ],
+    "name": "JWT"
+  },
+  "k6": {
+    "aliases": [
+      "grafana k6"
+    ],
+    "name": "k6"
+  },
+  "kafka": {
+    "aliases": [
+      "apache kafka",
+      "kafka"
+    ],
+    "name": "Apache Kafka"
+  },
+  "kafka_connect": {
+    "aliases": [],
+    "name": "Kafka Connect"
+  },
+  "kafka_streams": {
+    "aliases": [],
+    "name": "Kafka Streams"
+  },
+  "kali_linux": {
+    "aliases": [
+      "kali"
+    ],
+    "name": "Kali Linux"
+  },
+  "kanban": {
+    "aliases": [],
+    "name": "Kanban"
+  },
+  "kanban_board": {
+    "aliases": [],
+    "name": "Kanban Board"
+  },
+  "karate": {
+    "aliases": [
+      "karate dsl"
+    ],
+    "name": "Karate"
+  },
+  "karma": {
+    "aliases": [],
+    "name": "Karma"
+  },
+  "keras": {
+    "aliases": [],
+    "name": "Keras"
+  },
+  "keyword_research": {
+    "aliases": [
+      "keyword analysis"
+    ],
+    "name": "Keyword Research"
+  },
+  "kibana": {
+    "aliases": [],
+    "name": "Kibana"
+  },
+  "kicad": {
+    "aliases": [
+      "ki cad"
+    ],
+    "name": "KiCad"
+  },
+  "kinesis": {
+    "aliases": [
+      "kinesis"
+    ],
+    "name": "Amazon Kinesis"
+  },
+  "klaviyo": {
+    "aliases": [],
+    "name": "Klaviyo"
+  },
+  "knime": {
+    "aliases": [],
+    "name": "KNIME"
+  },
+  "kolmogorov_smirnov_test": {
+    "aliases": [
+      "k-s test",
+      "ks test"
+    ],
+    "name": "Kolmogorov-Smirnov Test"
+  },
+  "kotlin": {
+    "aliases": [
+      "kotlin lang",
+      "kt"
+    ],
+    "name": "Kotlin"
+  },
+  "kotlin_coroutines": {
+    "aliases": [
+      "coroutines"
+    ],
+    "name": "Kotlin Coroutines"
+  },
+  "kotlin_flow": {
+    "aliases": [
+      "flow"
+    ],
+    "name": "Kotlin Flow"
+  },
+  "kotlin_multiplatform": {
+    "aliases": [
+      "kmm",
+      "kmp",
+      "kotlin multiplatform mobile"
+    ],
+    "name": "Kotlin Multiplatform"
+  },
+  "kpi_reporting": {
+    "aliases": [
+      "key performance indicators",
+      "kpi dashboards",
+      "kpi tracking"
+    ],
+    "name": "KPI Reporting"
+  },
+  "kpi_tracking": {
+    "aliases": [
+      "key performance indicators"
+    ],
+    "name": "KPI Tracking"
+  },
+  "ktor": {
+    "aliases": [],
+    "name": "Ktor"
+  },
+  "kubeflow": {
+    "aliases": [],
+    "name": "Kubeflow"
+  },
+  "kubernetes": {
+    "aliases": [
+      "k8",
+      "k8s",
+      "kube"
+    ],
+    "name": "Kubernetes"
+  },
+  "kustomize": {
+    "aliases": [],
+    "name": "Kustomize"
+  },
+  "laboratory_information_management_system": {
+    "aliases": [
+      "lims"
+    ],
+    "name": "Laboratory Information Management System (LIMS)"
+  },
+  "labview": {
+    "aliases": [
+      "lab view",
+      "labwindows"
+    ],
+    "name": "LabVIEW"
+  },
+  "ladder_logic": {
+    "aliases": [
+      "ladder diagram",
+      "ladder programming"
+    ],
+    "name": "Ladder Logic"
+  },
+  "lambdatest": {
+    "aliases": [],
+    "name": "LambdaTest"
+  },
+  "langchain": {
+    "aliases": [
+      "lang chain"
+    ],
+    "name": "LangChain"
+  },
+  "laravel": {
+    "aliases": [],
+    "name": "Laravel"
+  },
+  "large_language_models": {
+    "aliases": [
+      "llm",
+      "llms"
+    ],
+    "name": "Large Language Models"
+  },
+  "lasso_regression": {
+    "aliases": [
+      "l1 regularization",
+      "lasso"
+    ],
+    "name": "Lasso Regression"
+  },
+  "lbo_modeling": {
+    "aliases": [
+      "lbo",
+      "lbo model",
+      "leveraged buyout analysis"
+    ],
+    "name": "Leveraged Buyout Modeling"
+  },
+  "lead_generation": {
+    "aliases": [
+      "demand generation",
+      "lead gen"
+    ],
+    "name": "Lead Generation"
+  },
+  "leadership": {
+    "aliases": [
+      "leading teams",
+      "team leadership"
+    ],
+    "name": "Leadership"
+  },
+  "lean": {
+    "aliases": [
+      "lean methodology"
+    ],
+    "name": "Lean"
+  },
+  "lean_manufacturing": {
+    "aliases": [
+      "lean",
+      "lean six sigma"
+    ],
+    "name": "Lean Manufacturing"
+  },
+  "less": {
+    "aliases": [
+      "large scale scrum"
+    ],
+    "name": "Less"
+  },
+  "libreoffice": {
+    "aliases": [
+      "libre office"
+    ],
+    "name": "LibreOffice"
+  },
+  "lightgbm": {
+    "aliases": [
+      "light gbm"
+    ],
+    "name": "LightGBM"
+  },
+  "linear": {
+    "aliases": [],
+    "name": "Linear"
+  },
+  "linear_programming": {
+    "aliases": [
+      "linear optimization",
+      "lp"
+    ],
+    "name": "Linear Programming"
+  },
+  "linear_regression": {
+    "aliases": [
+      "least squares regression",
+      "ols",
+      "ordinary least squares"
+    ],
+    "name": "Linear Regression"
+  },
+  "link_building": {
+    "aliases": [
+      "backlink building",
+      "off-page seo"
+    ],
+    "name": "Link Building"
+  },
+  "linkedin_ads": {
+    "aliases": [
+      "linkedin campaign manager",
+      "linkedin marketing solutions"
+    ],
+    "name": "LinkedIn Ads"
+  },
+  "linkedin_sales_navigator": {
+    "aliases": [
+      "sales navigator"
+    ],
+    "name": "LinkedIn Sales Navigator"
+  },
+  "linkerd": {
+    "aliases": [],
+    "name": "Linkerd"
+  },
+  "linux": {
+    "aliases": [
+      "gnu/linux"
+    ],
+    "name": "Linux"
+  },
+  "linux_administration": {
+    "aliases": [
+      "linux admin",
+      "linux sysadmin",
+      "linux system administration"
+    ],
+    "name": "Linux Administration"
+  },
+  "liquibase": {
+    "aliases": [],
+    "name": "Liquibase"
+  },
+  "lit": {
+    "aliases": [
+      "lit-html",
+      "litelement"
+    ],
+    "name": "Lit"
+  },
+  "llamaindex": {
+    "aliases": [
+      "gpt index",
+      "llama index"
+    ],
+    "name": "LlamaIndex"
+  },
+  "load_balancing": {
+    "aliases": [
+      "load balancer"
+    ],
+    "name": "Load Balancing"
+  },
+  "load_testing": {
+    "aliases": [],
+    "name": "Load Testing"
+  },
+  "loadrunner": {
+    "aliases": [
+      "hp loadrunner",
+      "micro focus loadrunner"
+    ],
+    "name": "LoadRunner"
+  },
+  "locust": {
+    "aliases": [],
+    "name": "Locust"
+  },
+  "logistic_regression": {
+    "aliases": [
+      "logit model",
+      "logit regression"
+    ],
+    "name": "Logistic Regression"
+  },
+  "logo_design": {
+    "aliases": [],
+    "name": "Logo Design"
+  },
+  "looker": {
+    "aliases": [
+      "google looker"
+    ],
+    "name": "Looker"
+  },
+  "looker_studio": {
+    "aliases": [
+      "data studio",
+      "google data studio"
+    ],
+    "name": "Looker Studio"
+  },
+  "lookml": {
+    "aliases": [],
+    "name": "LookML"
+  },
+  "ls_dyna": {
+    "aliases": [
+      "ls dyna",
+      "lsdyna"
+    ],
+    "name": "LS-DYNA"
+  },
+  "lstm": {
+    "aliases": [
+      "long short-term memory"
+    ],
+    "name": "LSTM"
+  },
+  "lua": {
+    "aliases": [
+      "lua lang"
+    ],
+    "name": "Lua"
+  },
+  "lucidchart": {
+    "aliases": [],
+    "name": "Lucidchart"
+  },
+  "luigi": {
+    "aliases": [],
+    "name": "Luigi"
+  },
+  "lvm": {
+    "aliases": [
+      "logical volume manager"
+    ],
+    "name": "LVM"
+  },
+  "machine_learning": {
+    "aliases": [
+      "ml",
+      "scikit-learn",
+      "sklearn"
+    ],
+    "name": "Machine Learning"
+  },
+  "macos": {
+    "aliases": [
+      "mac os",
+      "os x"
+    ],
+    "name": "macOS"
+  },
+  "mailchimp": {
+    "aliases": [],
+    "name": "Mailchimp"
+  },
+  "malware_analysis": {
+    "aliases": [
+      "malware reverse engineering",
+      "reverse engineering malware"
+    ],
+    "name": "Malware Analysis"
+  },
+  "man_pages": {
+    "aliases": [
+      "man command"
+    ],
+    "name": "Man Pages"
+  },
+  "management_reporting": {
+    "aliases": [
+      "internal reporting",
+      "managerial reporting"
+    ],
+    "name": "Management Reporting"
+  },
+  "mann_whitney_u_test": {
+    "aliases": [
+      "mann-whitney test",
+      "wilcoxon rank-sum test"
+    ],
+    "name": "Mann-Whitney U Test"
+  },
+  "manual_testing": {
+    "aliases": [],
+    "name": "Manual Testing"
+  },
+  "mapreduce": {
+    "aliases": [
+      "map reduce"
+    ],
+    "name": "MapReduce"
+  },
+  "mariadb": {
+    "aliases": [],
+    "name": "MariaDB"
+  },
+  "marketing_analytics": {
+    "aliases": [
+      "digital marketing analytics"
+    ],
+    "name": "Marketing Analytics"
+  },
+  "marketing_automation": {
+    "aliases": [
+      "marketing automation platforms"
+    ],
+    "name": "Marketing Automation"
+  },
+  "marketing_funnel_analysis": {
+    "aliases": [
+      "attribution modeling",
+      "multi-touch attribution"
+    ],
+    "name": "Marketing Attribution"
+  },
+  "marketing_strategy": {
+    "aliases": [
+      "go-to-market strategy",
+      "gtm strategy"
+    ],
+    "name": "Marketing Strategy"
+  },
+  "marketo": {
+    "aliases": [
+      "adobe marketo",
+      "marketo engage"
+    ],
+    "name": "Marketo"
+  },
+  "marvel": {
+    "aliases": [
+      "marvel app"
+    ],
+    "name": "Marvel"
+  },
+  "mass_spectrometry": {
+    "aliases": [
+      "lc-ms",
+      "lc-ms/ms",
+      "mass spec"
+    ],
+    "name": "Mass Spectrometry"
+  },
+  "material_design": {
+    "aliases": [
+      "material 3",
+      "material design 3",
+      "material ui"
+    ],
+    "name": "Material Design"
+  },
+  "material_ui": {
+    "aliases": [
+      "material-ui",
+      "mui"
+    ],
+    "name": "Material UI"
+  },
+  "matlab": {
+    "aliases": [
+      "mat lab"
+    ],
+    "name": "MATLAB"
+  },
+  "matplotlib": {
+    "aliases": [],
+    "name": "Matplotlib"
+  },
+  "maven": {
+    "aliases": [
+      "apache maven"
+    ],
+    "name": "Maven"
+  },
+  "maximum_likelihood_estimation": {
+    "aliases": [
+      "mle"
+    ],
+    "name": "Maximum Likelihood Estimation"
+  },
+  "maze": {
+    "aliases": [],
+    "name": "Maze"
+  },
+  "mcmc": {
+    "aliases": [
+      "gibbs sampling",
+      "mcmc",
+      "metropolis-hastings"
+    ],
+    "name": "Markov Chain Monte Carlo"
+  },
+  "medical_coding": {
+    "aliases": [
+      "cpt",
+      "cpt coding",
+      "icd-10",
+      "icd-10 coding"
+    ],
+    "name": "Medical Coding"
+  },
+  "medical_terminology": {
+    "aliases": [],
+    "name": "Medical Terminology"
+  },
+  "medidata_rave": {
+    "aliases": [
+      "medidata",
+      "rave edc"
+    ],
+    "name": "Medidata Rave"
+  },
+  "meditech": {
+    "aliases": [
+      "meditech ehr"
+    ],
+    "name": "MEDITECH"
+  },
+  "memcached": {
+    "aliases": [],
+    "name": "Memcached"
+  },
+  "mentoring": {
+    "aliases": [
+      "mentoring junior staff",
+      "mentorship"
+    ],
+    "name": "Mentoring"
+  },
+  "merger_acquisition_modeling": {
+    "aliases": [
+      "accretion dilution analysis",
+      "m&a analysis",
+      "merger model"
+    ],
+    "name": "M&A Modeling"
+  },
+  "metabase": {
+    "aliases": [],
+    "name": "Metabase"
+  },
+  "metasploit": {
+    "aliases": [
+      "metasploit framework",
+      "msf"
+    ],
+    "name": "Metasploit"
+  },
+  "mfa": {
+    "aliases": [
+      "2fa",
+      "mfa",
+      "two-factor authentication"
+    ],
+    "name": "Multi-Factor Authentication"
+  },
+  "microcontrollers": {
+    "aliases": [
+      "mcu",
+      "microcontroller programming"
+    ],
+    "name": "Microcontrollers"
+  },
+  "micronaut": {
+    "aliases": [],
+    "name": "Micronaut"
+  },
+  "microscopy": {
+    "aliases": [
+      "confocal microscopy",
+      "fluorescence microscopy",
+      "light microscopy"
+    ],
+    "name": "Microscopy"
+  },
+  "microservices": {
+    "aliases": [
+      "micro services",
+      "microservice architecture"
+    ],
+    "name": "Microservices"
+  },
+  "microsoft_365": {
+    "aliases": [
+      "m365",
+      "ms office",
+      "o365",
+      "office 365"
+    ],
+    "name": "Microsoft 365"
+  },
+  "microsoft_access": {
+    "aliases": [
+      "access database",
+      "ms access"
+    ],
+    "name": "Microsoft Access"
+  },
+  "microsoft_defender": {
+    "aliases": [
+      "defender for endpoint",
+      "mde",
+      "windows defender"
+    ],
+    "name": "Microsoft Defender"
+  },
+  "microsoft_dynamics": {
+    "aliases": [
+      "dynamics 365",
+      "dynamics gp",
+      "ms dynamics"
+    ],
+    "name": "Microsoft Dynamics"
+  },
+  "microsoft_dynamics_365": {
+    "aliases": [
+      "dynamics 365",
+      "dynamics crm",
+      "ms dynamics"
+    ],
+    "name": "Microsoft Dynamics 365"
+  },
+  "microsoft_excel": {
+    "aliases": [
+      "advanced excel",
+      "excel",
+      "excel spreadsheets",
+      "ms excel"
+    ],
+    "name": "Microsoft Excel"
+  },
+  "microsoft_forms": {
+    "aliases": [
+      "ms forms"
+    ],
+    "name": "Microsoft Forms"
+  },
+  "microsoft_onenote": {
+    "aliases": [
+      "onenote"
+    ],
+    "name": "Microsoft OneNote"
+  },
+  "microsoft_outlook": {
+    "aliases": [
+      "ms outlook",
+      "outlook"
+    ],
+    "name": "Microsoft Outlook"
+  },
+  "microsoft_planner": {
+    "aliases": [
+      "ms planner"
+    ],
+    "name": "Microsoft Planner"
+  },
+  "microsoft_powerpoint": {
+    "aliases": [
+      "ms powerpoint",
+      "powerpoint",
+      "ppt"
+    ],
+    "name": "Microsoft PowerPoint"
+  },
+  "microsoft_project": {
+    "aliases": [
+      "ms project",
+      "msp",
+      "msproject"
+    ],
+    "name": "Microsoft Project"
+  },
+  "microsoft_publisher": {
+    "aliases": [
+      "ms publisher"
+    ],
+    "name": "Microsoft Publisher"
+  },
+  "microsoft_sentinel": {
+    "aliases": [
+      "azure sentinel",
+      "sentinel"
+    ],
+    "name": "Microsoft Sentinel"
+  },
+  "microsoft_sql_server": {
+    "aliases": [
+      "ms sql",
+      "mssql",
+      "sql server",
+      "sql server db"
+    ],
+    "name": "Microsoft SQL Server"
+  },
+  "microsoft_teams": {
+    "aliases": [
+      "ms teams",
+      "msteams",
+      "teams"
+    ],
+    "name": "Microsoft Teams"
+  },
+  "microsoft_visio": {
+    "aliases": [
+      "ms visio",
+      "visio"
+    ],
+    "name": "Microsoft Visio"
+  },
+  "microsoft_word": {
+    "aliases": [
+      "ms word",
+      "word"
+    ],
+    "name": "Microsoft Word"
+  },
+  "microstrategy": {
+    "aliases": [
+      "mstr"
+    ],
+    "name": "MicroStrategy"
+  },
+  "miro": {
+    "aliases": [],
+    "name": "Miro"
+  },
+  "mitre_attack": {
+    "aliases": [
+      "att&ck framework",
+      "attck",
+      "mitre attack"
+    ],
+    "name": "MITRE ATT&CK"
+  },
+  "mixed_effects_models": {
+    "aliases": [
+      "hierarchical linear models",
+      "hlm",
+      "multilevel models",
+      "random effects models"
+    ],
+    "name": "Mixed-Effects Models"
+  },
+  "mixpanel": {
+    "aliases": [],
+    "name": "Mixpanel"
+  },
+  "mlflow": {
+    "aliases": [
+      "ml flow"
+    ],
+    "name": "MLflow"
+  },
+  "mlops": {
+    "aliases": [
+      "ml ops"
+    ],
+    "name": "MLOps"
+  },
+  "mobx": {
+    "aliases": [],
+    "name": "MobX"
+  },
+  "mocha": {
+    "aliases": [
+      "mocha.js"
+    ],
+    "name": "Mocha"
+  },
+  "mocking": {
+    "aliases": [
+      "mocks",
+      "stubbing",
+      "test doubles"
+    ],
+    "name": "Mocking"
+  },
+  "mockito": {
+    "aliases": [],
+    "name": "Mockito"
+  },
+  "mockups": {
+    "aliases": [
+      "mock-ups"
+    ],
+    "name": "Mockups"
+  },
+  "mode_analytics": {
+    "aliases": [
+      "mode analytics"
+    ],
+    "name": "Mode"
+  },
+  "model_deployment": {
+    "aliases": [],
+    "name": "Model Deployment"
+  },
+  "monday_com": {
+    "aliases": [
+      "monday",
+      "monday work management"
+    ],
+    "name": "Monday.com"
+  },
+  "mongodb": {
+    "aliases": [
+      "mongo",
+      "mongo db"
+    ],
+    "name": "MongoDB"
+  },
+  "mongodb_atlas": {
+    "aliases": [
+      "atlas"
+    ],
+    "name": "MongoDB Atlas"
+  },
+  "mongoose": {
+    "aliases": [
+      "mongoose odm"
+    ],
+    "name": "Mongoose"
+  },
+  "monitoring_visits": {
+    "aliases": [
+      "monitoring visits",
+      "sdv",
+      "site monitoring",
+      "source data verification"
+    ],
+    "name": "Clinical Monitoring"
+  },
+  "monte_carlo_simulation": {
+    "aliases": [
+      "mc simulation",
+      "monte carlo methods"
+    ],
+    "name": "Monte Carlo Simulation"
+  },
+  "month_end_close": {
+    "aliases": [
+      "close process",
+      "month end close",
+      "period-end close"
+    ],
+    "name": "Month-End Close"
+  },
+  "motion_design": {
+    "aliases": [
+      "motion graphics",
+      "ui animation"
+    ],
+    "name": "Motion Design"
+  },
+  "moz": {
+    "aliases": [
+      "moz pro"
+    ],
+    "name": "Moz"
+  },
+  "ms_access": {
+    "aliases": [
+      "ms access"
+    ],
+    "name": "Microsoft Access"
+  },
+  "ms_project": {
+    "aliases": [
+      "ms project",
+      "msproject"
+    ],
+    "name": "Microsoft Project"
+  },
+  "multicollinearity_diagnostics": {
+    "aliases": [
+      "variance inflation factor",
+      "vif"
+    ],
+    "name": "Multicollinearity Diagnostics"
+  },
+  "multiple_comparisons_correction": {
+    "aliases": [
+      "benjamini-hochberg",
+      "bonferroni correction",
+      "fdr correction",
+      "multiple testing correction"
+    ],
+    "name": "Multiple Comparisons Correction"
+  },
+  "multiple_regression": {
+    "aliases": [
+      "multiple linear regression",
+      "multivariate regression"
+    ],
+    "name": "Multiple Regression"
+  },
+  "multitasking": {
+    "aliases": [
+      "managing multiple tasks",
+      "multi-tasking"
+    ],
+    "name": "Multitasking"
+  },
+  "multivariate_testing": {
+    "aliases": [
+      "multi-variate testing",
+      "mvt"
+    ],
+    "name": "Multivariate Testing"
+  },
+  "mural": {
+    "aliases": [],
+    "name": "Mural"
+  },
+  "mvc": {
+    "aliases": [
+      "model view controller"
+    ],
+    "name": "MVC"
+  },
+  "mvi": {
+    "aliases": [
+      "model-view-intent"
+    ],
+    "name": "MVI"
+  },
+  "mvvm": {
+    "aliases": [
+      "model-view-viewmodel"
+    ],
+    "name": "MVVM"
+  },
+  "mysql": {
+    "aliases": [
+      "my sql"
+    ],
+    "name": "MySQL"
+  },
+  "mysql_workbench": {
+    "aliases": [],
+    "name": "MySQL Workbench"
+  },
+  "natural_language_processing": {
+    "aliases": [
+      "nlp"
+    ],
+    "name": "Natural Language Processing"
+  },
+  "negotiation": {
+    "aliases": [
+      "negotiating",
+      "negotiation skills"
+    ],
+    "name": "Negotiation"
+  },
+  "neo4j": {
+    "aliases": [
+      "neo4j graph database"
+    ],
+    "name": "Neo4j"
+  },
+  "nessus": {
+    "aliases": [
+      "tenable nessus"
+    ],
+    "name": "Nessus"
+  },
+  "nestjs": {
+    "aliases": [
+      "nest js",
+      "nest.js"
+    ],
+    "name": "NestJS"
+  },
+  "netcat": {
+    "aliases": [
+      "ncat"
+    ],
+    "name": "Netcat"
+  },
+  "netstat": {
+    "aliases": [
+      "net stat"
+    ],
+    "name": "netstat"
+  },
+  "network_security": {
+    "aliases": [
+      "netsec"
+    ],
+    "name": "Network Security"
+  },
+  "network_troubleshooting": {
+    "aliases": [
+      "network diagnostics"
+    ],
+    "name": "Network Troubleshooting"
+  },
+  "networking": {
+    "aliases": [
+      "professional networking"
+    ],
+    "name": "Networking"
+  },
+  "new_relic": {
+    "aliases": [
+      "newrelic"
+    ],
+    "name": "New Relic"
+  },
+  "next_generation_sequencing": {
+    "aliases": [
+      "high-throughput sequencing",
+      "illumina sequencing",
+      "ngs"
+    ],
+    "name": "Next-Generation Sequencing (NGS)"
+  },
+  "next_js": {
+    "aliases": [
+      "next",
+      "nextjs"
+    ],
+    "name": "Next.js"
+  },
+  "nextjs": {
+    "aliases": [
+      "next.js"
+    ],
+    "name": "Next.js"
+  },
+  "nexus": {
+    "aliases": [
+      "nexus repo",
+      "nexus repository"
+    ],
+    "name": "Sonatype Nexus"
+  },
+  "nginx": {
+    "aliases": [
+      "nginx ingress",
+      "nginx web server"
+    ],
+    "name": "Nginx"
+  },
+  "ngrx": {
+    "aliases": [],
+    "name": "NgRx"
+  },
+  "nist_csf": {
+    "aliases": [
+      "nist csf"
+    ],
+    "name": "NIST Cybersecurity Framework"
+  },
+  "nlp": {
+    "aliases": [
+      "natural language processing"
+    ],
+    "name": "NLP"
+  },
+  "nltk": {
+    "aliases": [
+      "natural language toolkit"
+    ],
+    "name": "NLTK"
+  },
+  "nmap": {
+    "aliases": [
+      "network mapper"
+    ],
+    "name": "Nmap"
+  },
+  "node_js": {
+    "aliases": [
+      "node",
+      "node.js",
+      "nodejs"
+    ],
+    "name": "Node.js"
+  },
+  "nomad": {
+    "aliases": [
+      "hashicorp nomad"
+    ],
+    "name": "Nomad"
+  },
+  "nosql": {
+    "aliases": [
+      "no sql",
+      "non-relational database"
+    ],
+    "name": "NoSQL"
+  },
+  "notion": {
+    "aliases": [],
+    "name": "Notion"
+  },
+  "numpy": {
+    "aliases": [
+      "numerical python"
+    ],
+    "name": "NumPy"
+  },
+  "nunit": {
+    "aliases": [],
+    "name": "NUnit"
+  },
+  "nuxt_js": {
+    "aliases": [
+      "nuxt",
+      "nuxtjs"
+    ],
+    "name": "Nuxt.js"
+  },
+  "oauth": {
+    "aliases": [
+      "oauth 2.0",
+      "oauth2"
+    ],
+    "name": "OAuth"
+  },
+  "oauth2": {
+    "aliases": [
+      "oauth",
+      "oauth2.0"
+    ],
+    "name": "OAuth 2.0"
+  },
+  "objective_c": {
+    "aliases": [
+      "obj-c",
+      "objc",
+      "objective c"
+    ],
+    "name": "Objective-C"
+  },
+  "octopus_deploy": {
+    "aliases": [
+      "octopusdeploy"
+    ],
+    "name": "Octopus Deploy"
+  },
+  "odbc": {
+    "aliases": [
+      "open database connectivity"
+    ],
+    "name": "ODBC"
+  },
+  "okhttp": {
+    "aliases": [],
+    "name": "OkHttp"
+  },
+  "okrs": {
+    "aliases": [
+      "objectives and key results",
+      "okr"
+    ],
+    "name": "OKRs"
+  },
+  "okta": {
+    "aliases": [],
+    "name": "Okta"
+  },
+  "olap": {
+    "aliases": [
+      "online analytical processing"
+    ],
+    "name": "OLAP"
+  },
+  "oltp": {
+    "aliases": [
+      "online transaction processing"
+    ],
+    "name": "OLTP"
+  },
+  "onedrive": {
+    "aliases": [
+      "microsoft onedrive",
+      "onedrive for business"
+    ],
+    "name": "OneDrive"
+  },
+  "onnx": {
+    "aliases": [
+      "open neural network exchange"
+    ],
+    "name": "ONNX"
+  },
+  "open_mindedness": {
+    "aliases": [
+      "open minded",
+      "open-minded"
+    ],
+    "name": "Open-Mindedness"
+  },
+  "openai_api": {
+    "aliases": [
+      "gpt api",
+      "openai gpt api"
+    ],
+    "name": "OpenAI API"
+  },
+  "openapi": {
+    "aliases": [
+      "openapi spec",
+      "swagger"
+    ],
+    "name": "OpenAPI"
+  },
+  "opencv": {
+    "aliases": [
+      "cv2",
+      "open cv"
+    ],
+    "name": "OpenCV"
+  },
+  "openoffice": {
+    "aliases": [
+      "open office",
+      "openoffice"
+    ],
+    "name": "Apache OpenOffice"
+  },
+  "openshift": {
+    "aliases": [
+      "ocp",
+      "openshift",
+      "red hat openshift"
+    ],
+    "name": "Red Hat OpenShift"
+  },
+  "opentelemetry": {
+    "aliases": [
+      "otel"
+    ],
+    "name": "OpenTelemetry"
+  },
+  "openvas": {
+    "aliases": [
+      "greenbone"
+    ],
+    "name": "OpenVAS"
+  },
+  "optimal_workshop": {
+    "aliases": [],
+    "name": "Optimal Workshop"
+  },
+  "optimizely": {
+    "aliases": [],
+    "name": "Optimizely"
+  },
+  "oracle_database": {
+    "aliases": [
+      "oracle 19c",
+      "oracle db",
+      "oracle rdbms"
+    ],
+    "name": "Oracle Database"
+  },
+  "oracle_financials": {
+    "aliases": [
+      "oracle e-business suite",
+      "oracle ebs",
+      "oracle erp"
+    ],
+    "name": "Oracle Financials"
+  },
+  "oracle_netsuite": {
+    "aliases": [
+      "netsuite"
+    ],
+    "name": "Oracle NetSuite"
+  },
+  "orc": {
+    "aliases": [
+      "optimized row columnar"
+    ],
+    "name": "ORC"
+  },
+  "orcad": {
+    "aliases": [
+      "cadence orcad",
+      "or cad"
+    ],
+    "name": "OrCAD"
+  },
+  "organization_skills": {
+    "aliases": [
+      "highly organized",
+      "organization skills"
+    ],
+    "name": "Organizational Skills"
+  },
+  "oscilloscope": {
+    "aliases": [
+      "o-scope",
+      "scope measurement"
+    ],
+    "name": "Oscilloscope"
+  },
+  "oscp": {
+    "aliases": [
+      "offensive security certified professional"
+    ],
+    "name": "OSCP"
+  },
+  "osi_model": {
+    "aliases": [
+      "osi layers",
+      "osi reference model"
+    ],
+    "name": "OSI Model"
+  },
+  "outreach_io": {
+    "aliases": [
+      "outreach.io"
+    ],
+    "name": "Outreach"
+  },
+  "owasp_top_10": {
+    "aliases": [
+      "owasp",
+      "owasp top ten"
+    ],
+    "name": "OWASP Top 10"
+  },
+  "owasp_zap": {
+    "aliases": [
+      "zap",
+      "zed attack proxy"
+    ],
+    "name": "OWASP ZAP"
+  },
+  "p_value_analysis": {
+    "aliases": [
+      "p-values",
+      "statistical significance"
+    ],
+    "name": "P-Value Analysis"
+  },
+  "package_management": {
+    "aliases": [
+      "apt",
+      "apt-get",
+      "dnf",
+      "yum"
+    ],
+    "name": "Package Management"
+  },
+  "packer": {
+    "aliases": [
+      "hashicorp packer"
+    ],
+    "name": "Packer"
+  },
+  "pact": {
+    "aliases": [],
+    "name": "Pact"
+  },
+  "page_object_model": {
+    "aliases": [
+      "page objects",
+      "pom"
+    ],
+    "name": "Page Object Model"
+  },
+  "palo_alto_firewall": {
+    "aliases": [
+      "palo alto networks",
+      "pan-os",
+      "panorama"
+    ],
+    "name": "Palo Alto Firewall"
+  },
+  "pandas": {
+    "aliases": [
+      "python pandas"
+    ],
+    "name": "pandas"
+  },
+  "pardot": {
+    "aliases": [
+      "marketing cloud account engagement",
+      "salesforce pardot"
+    ],
+    "name": "Pardot"
+  },
+  "patience": {
+    "aliases": [
+      "patient"
+    ],
+    "name": "Patience"
+  },
+  "patient_recruitment": {
+    "aliases": [
+      "participant recruitment",
+      "patient enrollment",
+      "subject recruitment"
+    ],
+    "name": "Patient Recruitment"
+  },
+  "payroll": {
+    "aliases": [
+      "payroll",
+      "payroll management"
+    ],
+    "name": "Payroll Processing"
+  },
+  "pca": {
+    "aliases": [
+      "pca",
+      "principal components analysis"
+    ],
+    "name": "Principal Component Analysis"
+  },
+  "pcb_design": {
+    "aliases": [
+      "pcb layout",
+      "printed circuit board",
+      "printed circuit board design"
+    ],
+    "name": "PCB Design"
+  },
+  "pci_dss": {
+    "aliases": [
+      "payment card industry data security standard",
+      "pci-dss"
+    ],
+    "name": "PCI DSS"
+  },
+  "pcr": {
+    "aliases": [
+      "polymerase chain reaction"
+    ],
+    "name": "PCR"
+  },
+  "penetration_testing": {
+    "aliases": [
+      "ethical hacking",
+      "pen test",
+      "pen testing",
+      "pentest"
+    ],
+    "name": "Penetration Testing"
+  },
+  "people_management": {
+    "aliases": [
+      "managing people",
+      "staff management"
+    ],
+    "name": "People Management"
+  },
+  "performance_testing": {
+    "aliases": [],
+    "name": "Performance Testing"
+  },
+  "perl": {
+    "aliases": [
+      "perl5"
+    ],
+    "name": "Perl"
+  },
+  "persuasion": {
+    "aliases": [
+      "influence",
+      "influencing"
+    ],
+    "name": "Persuasion"
+  },
+  "pgadmin": {
+    "aliases": [
+      "pg admin"
+    ],
+    "name": "pgAdmin"
+  },
+  "pharmacovigilance": {
+    "aliases": [
+      "drug safety",
+      "pv"
+    ],
+    "name": "Pharmacovigilance"
+  },
+  "phlebotomy": {
+    "aliases": [
+      "blood collection",
+      "blood draw",
+      "venipuncture"
+    ],
+    "name": "Phlebotomy"
+  },
+  "phoenix": {
+    "aliases": [
+      "phoenix framework"
+    ],
+    "name": "Phoenix"
+  },
+  "php": {
+    "aliases": [
+      "php7",
+      "php8"
+    ],
+    "name": "PHP"
+  },
+  "phpunit": {
+    "aliases": [],
+    "name": "PHPUnit"
+  },
+  "pi_planning": {
+    "aliases": [
+      "program increment planning"
+    ],
+    "name": "PI Planning"
+  },
+  "pid_control": {
+    "aliases": [
+      "pid controller",
+      "pid tuning"
+    ],
+    "name": "PID Control"
+  },
+  "ping": {
+    "aliases": [
+      "ping command"
+    ],
+    "name": "Ping"
+  },
+  "pinia": {
+    "aliases": [],
+    "name": "Pinia"
+  },
+  "pipedrive": {
+    "aliases": [],
+    "name": "Pipedrive"
+  },
+  "pipetting": {
+    "aliases": [
+      "pipetting",
+      "serial dilution"
+    ],
+    "name": "Micropipetting"
+  },
+  "pitchbook": {
+    "aliases": [],
+    "name": "PitchBook"
+  },
+  "pivot_tables": {
+    "aliases": [
+      "pivot table",
+      "pivottables"
+    ],
+    "name": "Pivot Tables"
+  },
+  "pki": {
+    "aliases": [
+      "pki"
+    ],
+    "name": "Public Key Infrastructure"
+  },
+  "pl_sql": {
+    "aliases": [
+      "plsql"
+    ],
+    "name": "PL/SQL"
+  },
+  "playwright": {
+    "aliases": [
+      "@playwright/test",
+      "playwright test"
+    ],
+    "name": "Playwright"
+  },
+  "plc_programming": {
+    "aliases": [
+      "plc",
+      "programmable logic controller",
+      "programmable logic controllers"
+    ],
+    "name": "PLC Programming"
+  },
+  "plotly": {
+    "aliases": [],
+    "name": "Plotly"
+  },
+  "plsql": {
+    "aliases": [
+      "plsql"
+    ],
+    "name": "PL/SQL"
+  },
+  "pmp": {
+    "aliases": [
+      "project management professional"
+    ],
+    "name": "PMP"
+  },
+  "podcast_marketing": {
+    "aliases": [],
+    "name": "Podcast Marketing"
+  },
+  "podman": {
+    "aliases": [],
+    "name": "Podman"
+  },
+  "poisson_regression": {
+    "aliases": [
+      "count regression"
+    ],
+    "name": "Poisson Regression"
+  },
+  "positive_attitude": {
+    "aliases": [
+      "positivity"
+    ],
+    "name": "Positive Attitude"
+  },
+  "postgresql": {
+    "aliases": [
+      "postgres",
+      "postgresql db",
+      "psql"
+    ],
+    "name": "PostgreSQL"
+  },
+  "postman": {
+    "aliases": [
+      "postman api"
+    ],
+    "name": "Postman"
+  },
+  "power_analysis": {
+    "aliases": [
+      "sample size calculation",
+      "sample size estimation",
+      "statistical power analysis"
+    ],
+    "name": "Power Analysis"
+  },
+  "power_apps": {
+    "aliases": [
+      "microsoft powerapps",
+      "powerapps"
+    ],
+    "name": "Power Apps"
+  },
+  "power_automate": {
+    "aliases": [
+      "microsoft flow",
+      "ms flow"
+    ],
+    "name": "Power Automate"
+  },
+  "power_bi": {
+    "aliases": [
+      "microsoft power bi",
+      "ms power bi",
+      "power bi",
+      "powerbi"
+    ],
+    "name": "Power BI"
+  },
+  "power_pivot": {
+    "aliases": [
+      "powerpivot"
+    ],
+    "name": "Power Pivot"
+  },
+  "power_query": {
+    "aliases": [
+      "get & transform",
+      "m query",
+      "power query m",
+      "powerquery"
+    ],
+    "name": "Power Query"
+  },
+  "power_systems": {
+    "aliases": [
+      "power distribution",
+      "power system analysis"
+    ],
+    "name": "Power Systems"
+  },
+  "powerpoint": {
+    "aliases": [
+      "power point",
+      "powerpoint"
+    ],
+    "name": "PowerPoint"
+  },
+  "powershell": {
+    "aliases": [
+      "pwsh",
+      "windows powershell"
+    ],
+    "name": "PowerShell"
+  },
+  "ppc": {
+    "aliases": [
+      "paid search advertising",
+      "pay-per-click",
+      "ppc"
+    ],
+    "name": "Pay-Per-Click Advertising (PPC)"
+  },
+  "preact": {
+    "aliases": [],
+    "name": "Preact"
+  },
+  "precedent_transactions": {
+    "aliases": [
+      "precedent transactions",
+      "transaction comps"
+    ],
+    "name": "Precedent Transaction Analysis"
+  },
+  "prefect": {
+    "aliases": [],
+    "name": "Prefect"
+  },
+  "presentation_skills": {
+    "aliases": [
+      "delivering presentations",
+      "presenting"
+    ],
+    "name": "Presentation Skills"
+  },
+  "presto": {
+    "aliases": [
+      "prestodb"
+    ],
+    "name": "Presto"
+  },
+  "primavera_p6": {
+    "aliases": [
+      "oracle primavera",
+      "p6",
+      "primavera"
+    ],
+    "name": "Primavera P6"
+  },
+  "prince2": {
+    "aliases": [
+      "prince 2"
+    ],
+    "name": "PRINCE2"
+  },
+  "principle": {
+    "aliases": [
+      "principle app"
+    ],
+    "name": "Principle"
+  },
+  "prioritization": {
+    "aliases": [
+      "prioritizing",
+      "task prioritization"
+    ],
+    "name": "Prioritization"
+  },
+  "prisma": {
+    "aliases": [
+      "prisma orm"
+    ],
+    "name": "Prisma"
+  },
+  "probability_distributions": {
+    "aliases": [
+      "statistical distributions"
+    ],
+    "name": "Probability Distributions"
+  },
+  "problem_solving": {
+    "aliases": [
+      "problem-solving",
+      "troubleshooting skills"
+    ],
+    "name": "Problem Solving"
+  },
+  "procreate": {
+    "aliases": [],
+    "name": "Procreate"
+  },
+  "product_marketing": {
+    "aliases": [
+      "pmm"
+    ],
+    "name": "Product Marketing"
+  },
+  "product_roadmap": {
+    "aliases": [
+      "roadmap planning",
+      "roadmapping"
+    ],
+    "name": "Product Roadmap"
+  },
+  "professionalism": {
+    "aliases": [
+      "professional conduct"
+    ],
+    "name": "Professionalism"
+  },
+  "programmatic_advertising": {
+    "aliases": [
+      "programmatic ads",
+      "programmatic media buying"
+    ],
+    "name": "Programmatic Advertising"
+  },
+  "project_coordination": {
+    "aliases": [
+      "coordinating projects"
+    ],
+    "name": "Project Coordination"
+  },
+  "project_management": {
+    "aliases": [],
+    "name": "Project Management"
+  },
+  "prometheus": {
+    "aliases": [
+      "promql"
+    ],
+    "name": "Prometheus"
+  },
+  "prompt_engineering": {
+    "aliases": [],
+    "name": "Prompt Engineering"
+  },
+  "propensity_score_matching": {
+    "aliases": [
+      "propensity matching",
+      "psm"
+    ],
+    "name": "Propensity Score Matching"
+  },
+  "prophet": {
+    "aliases": [
+      "facebook prophet",
+      "fbprophet",
+      "meta prophet"
+    ],
+    "name": "Prophet"
+  },
+  "protocol_development": {
+    "aliases": [
+      "clinical protocol writing",
+      "study protocol"
+    ],
+    "name": "Protocol Development"
+  },
+  "protopie": {
+    "aliases": [],
+    "name": "ProtoPie"
+  },
+  "prototyping": {
+    "aliases": [
+      "interactive prototyping",
+      "rapid prototyping"
+    ],
+    "name": "Prototyping"
+  },
+  "provider": {
+    "aliases": [],
+    "name": "Provider"
+  },
+  "proxy_server": {
+    "aliases": [
+      "forward proxy",
+      "reverse proxy"
+    ],
+    "name": "Proxy Server"
+  },
+  "psm": {
+    "aliases": [
+      "psm certification"
+    ],
+    "name": "Professional Scrum Master"
+  },
+  "pub_sub": {
+    "aliases": [
+      "pub/sub",
+      "pubsub"
+    ],
+    "name": "Google Cloud Pub/Sub"
+  },
+  "public_relations": {
+    "aliases": [
+      "media relations",
+      "pr"
+    ],
+    "name": "Public Relations (PR)"
+  },
+  "public_speaking": {
+    "aliases": [
+      "oratory",
+      "speaking in public"
+    ],
+    "name": "Public Speaking"
+  },
+  "pulumi": {
+    "aliases": [],
+    "name": "Pulumi"
+  },
+  "puppet": {
+    "aliases": [],
+    "name": "Puppet"
+  },
+  "puppeteer": {
+    "aliases": [],
+    "name": "Puppeteer"
+  },
+  "push_notifications": {
+    "aliases": [
+      "apns",
+      "apple push notification service"
+    ],
+    "name": "Push Notifications"
+  },
+  "pydantic": {
+    "aliases": [],
+    "name": "Pydantic"
+  },
+  "pymc": {
+    "aliases": [
+      "pymc3"
+    ],
+    "name": "PyMC"
+  },
+  "pytest": {
+    "aliases": [
+      "py test",
+      "py.test"
+    ],
+    "name": "pytest"
+  },
+  "python": {
+    "aliases": [
+      "cpython",
+      "py",
+      "python3"
+    ],
+    "name": "Python"
+  },
+  "python_security_scripting": {
+    "aliases": [
+      "python scripting"
+    ],
+    "name": "Python"
+  },
+  "python_statistics": {
+    "aliases": [
+      "python programming"
+    ],
+    "name": "Python"
+  },
+  "pytorch": {
+    "aliases": [
+      "torch"
+    ],
+    "name": "PyTorch"
+  },
+  "pytorch_lightning": {
+    "aliases": [
+      "lightning"
+    ],
+    "name": "PyTorch Lightning"
+  },
+  "qlik_sense": {
+    "aliases": [
+      "qlik",
+      "qliksense"
+    ],
+    "name": "Qlik Sense"
+  },
+  "qlikview": {
+    "aliases": [],
+    "name": "QlikView"
+  },
+  "qpcr": {
+    "aliases": [
+      "quantitative pcr",
+      "real-time pcr",
+      "rt-qpcr"
+    ],
+    "name": "qPCR"
+  },
+  "qradar": {
+    "aliases": [
+      "qradar"
+    ],
+    "name": "IBM QRadar"
+  },
+  "quality_assurance": {
+    "aliases": [
+      "qa"
+    ],
+    "name": "Quality Assurance (QA)"
+  },
+  "quality_control": {
+    "aliases": [
+      "lab quality control",
+      "qc"
+    ],
+    "name": "Quality Control (QC)"
+  },
+  "qualys": {
+    "aliases": [
+      "qualys vmdr"
+    ],
+    "name": "Qualys"
+  },
+  "quarkus": {
+    "aliases": [],
+    "name": "Quarkus"
+  },
+  "query_optimization": {
+    "aliases": [
+      "performance tuning",
+      "query tuning",
+      "sql tuning"
+    ],
+    "name": "Query Optimization"
+  },
+  "query_window_functions": {
+    "aliases": [
+      "analytic functions",
+      "window functions"
+    ],
+    "name": "SQL Window Functions"
+  },
+  "quickbooks": {
+    "aliases": [
+      "intuit quickbooks",
+      "qbo",
+      "quickbooks online"
+    ],
+    "name": "QuickBooks"
+  },
+  "qwik": {
+    "aliases": [],
+    "name": "Qwik"
+  },
+  "r": {
+    "aliases": [
+      "r lang",
+      "r language",
+      "r programming",
+      "rstats"
+    ],
+    "name": "R"
+  },
+  "r_lang": {
+    "aliases": [
+      "r programming"
+    ],
+    "name": "R"
+  },
+  "r_programming": {
+    "aliases": [
+      "r language",
+      "r programming",
+      "rstudio"
+    ],
+    "name": "R"
+  },
+  "rabbitmq": {
+    "aliases": [
+      "rabbit mq"
+    ],
+    "name": "RabbitMQ"
+  },
+  "raci_matrix": {
+    "aliases": [
+      "raci",
+      "responsibility assignment matrix"
+    ],
+    "name": "RACI Matrix"
+  },
+  "radix_ui": {
+    "aliases": [
+      "radix"
+    ],
+    "name": "Radix UI"
+  },
+  "rails": {
+    "aliases": [
+      "ruby on rails"
+    ],
+    "name": "Ruby on Rails"
+  },
+  "rancher": {
+    "aliases": [],
+    "name": "Rancher"
+  },
+  "random_forest": {
+    "aliases": [
+      "random forests"
+    ],
+    "name": "Random Forest"
+  },
+  "raspberry_pi": {
+    "aliases": [
+      "raspberrypi",
+      "rpi"
+    ],
+    "name": "Raspberry Pi"
+  },
+  "ratio_analysis": {
+    "aliases": [
+      "financial ratios",
+      "ratio analysis"
+    ],
+    "name": "Financial Ratio Analysis"
+  },
+  "rds": {
+    "aliases": [
+      "rds",
+      "relational database service"
+    ],
+    "name": "Amazon RDS"
+  },
+  "react": {
+    "aliases": [
+      "react.js",
+      "reactjs"
+    ],
+    "name": "React"
+  },
+  "react_hook_form": {
+    "aliases": [
+      "rhf"
+    ],
+    "name": "React Hook Form"
+  },
+  "react_hooks": {
+    "aliases": [
+      "hooks"
+    ],
+    "name": "React Hooks"
+  },
+  "react_native": {
+    "aliases": [
+      "rn"
+    ],
+    "name": "React Native"
+  },
+  "react_query": {
+    "aliases": [
+      "tanstack query"
+    ],
+    "name": "React Query"
+  },
+  "react_router": {
+    "aliases": [],
+    "name": "React Router"
+  },
+  "react_testing_library": {
+    "aliases": [
+      "rtl",
+      "testing library"
+    ],
+    "name": "React Testing Library"
+  },
+  "realm": {
+    "aliases": [
+      "realm database"
+    ],
+    "name": "Realm"
+  },
+  "recoil": {
+    "aliases": [],
+    "name": "Recoil"
+  },
+  "recommender_systems": {
+    "aliases": [
+      "recommendation engines",
+      "recommendation systems"
+    ],
+    "name": "Recommender Systems"
+  },
+  "recurrent_neural_networks": {
+    "aliases": [
+      "rnn",
+      "rnns"
+    ],
+    "name": "Recurrent Neural Networks"
+  },
+  "red_hat_enterprise_linux": {
+    "aliases": [
+      "red hat linux",
+      "rhel"
+    ],
+    "name": "Red Hat Enterprise Linux"
+  },
+  "redcap": {
+    "aliases": [
+      "research electronic data capture"
+    ],
+    "name": "REDCap"
+  },
+  "redis": {
+    "aliases": [
+      "remote dictionary server"
+    ],
+    "name": "Redis"
+  },
+  "redshift": {
+    "aliases": [
+      "amazon redshift",
+      "redshift"
+    ],
+    "name": "Amazon Redshift"
+  },
+  "redux": {
+    "aliases": [],
+    "name": "Redux"
+  },
+  "redux_toolkit": {
+    "aliases": [
+      "rtk"
+    ],
+    "name": "Redux Toolkit"
+  },
+  "regex": {
+    "aliases": [
+      "regex",
+      "regexp",
+      "regular expression"
+    ],
+    "name": "Regular Expressions"
+  },
+  "regression_analysis": {
+    "aliases": [
+      "linear regression",
+      "logistic regression",
+      "multivariate regression",
+      "regression modeling"
+    ],
+    "name": "Regression"
+  },
+  "regression_discontinuity": {
+    "aliases": [
+      "rdd",
+      "regression discontinuity design"
+    ],
+    "name": "Regression Discontinuity"
+  },
+  "regression_testing": {
+    "aliases": [
+      "regression tests"
+    ],
+    "name": "Regression Testing"
+  },
+  "regulatory_submissions": {
+    "aliases": [
+      "ind submission",
+      "nda submission",
+      "regulatory affairs"
+    ],
+    "name": "Regulatory Submissions"
+  },
+  "reinforcement_learning": {
+    "aliases": [
+      "rl"
+    ],
+    "name": "Reinforcement Learning"
+  },
+  "relationship_building": {
+    "aliases": [
+      "building relationships",
+      "rapport building"
+    ],
+    "name": "Relationship Building"
+  },
+  "release_planning": {
+    "aliases": [],
+    "name": "Release Planning"
+  },
+  "remix": {
+    "aliases": [
+      "remix.run"
+    ],
+    "name": "Remix"
+  },
+  "remote_collaboration": {
+    "aliases": [
+      "remote teamwork",
+      "virtual collaboration"
+    ],
+    "name": "Remote Collaboration"
+  },
+  "report_writing": {
+    "aliases": [
+      "writing reports"
+    ],
+    "name": "Report Writing"
+  },
+  "research_skills": {
+    "aliases": [
+      "researching"
+    ],
+    "name": "Research Skills"
+  },
+  "resilience": {
+    "aliases": [
+      "resiliency"
+    ],
+    "name": "Resilience"
+  },
+  "resource_allocation": {
+    "aliases": [
+      "capacity planning",
+      "resource planning"
+    ],
+    "name": "Resource Allocation"
+  },
+  "resourcefulness": {
+    "aliases": [
+      "resourceful"
+    ],
+    "name": "Resourcefulness"
+  },
+  "responsive_design": {
+    "aliases": [
+      "responsive web design"
+    ],
+    "name": "Responsive Design"
+  },
+  "rest_api": {
+    "aliases": [
+      "rest",
+      "rest apis",
+      "restful",
+      "restful api"
+    ],
+    "name": "REST APIs"
+  },
+  "rest_assured": {
+    "aliases": [
+      "restassured"
+    ],
+    "name": "REST Assured"
+  },
+  "retargeting": {
+    "aliases": [
+      "remarketing"
+    ],
+    "name": "Retargeting"
+  },
+  "retrieval_augmented_generation": {
+    "aliases": [
+      "rag"
+    ],
+    "name": "Retrieval-Augmented Generation"
+  },
+  "retrofit": {
+    "aliases": [],
+    "name": "Retrofit"
+  },
+  "revenue_recognition": {
+    "aliases": [
+      "asc 606",
+      "rev rec"
+    ],
+    "name": "Revenue Recognition"
+  },
+  "revit": {
+    "aliases": [
+      "autodesk revit"
+    ],
+    "name": "Revit"
+  },
+  "ridge_regression": {
+    "aliases": [
+      "l2 regularization",
+      "tikhonov regularization"
+    ],
+    "name": "Ridge Regression"
+  },
+  "risk_assessment": {
+    "aliases": [
+      "risk management",
+      "security risk assessment"
+    ],
+    "name": "Risk Assessment"
+  },
+  "risk_management": {
+    "aliases": [
+      "risk analysis",
+      "risk management"
+    ],
+    "name": "Risk Management"
+  },
+  "riverpod": {
+    "aliases": [],
+    "name": "Riverpod"
+  },
+  "rna_extraction": {
+    "aliases": [
+      "rna isolation"
+    ],
+    "name": "RNA Extraction"
+  },
+  "robot_framework": {
+    "aliases": [],
+    "name": "Robot Framework"
+  },
+  "rollup": {
+    "aliases": [
+      "rollup.js"
+    ],
+    "name": "Rollup"
+  },
+  "room": {
+    "aliases": [
+      "android room",
+      "room database"
+    ],
+    "name": "Room"
+  },
+  "root_cause_analysis": {
+    "aliases": [
+      "5 whys",
+      "fishbone analysis",
+      "rca"
+    ],
+    "name": "Root Cause Analysis"
+  },
+  "route_53": {
+    "aliases": [
+      "route 53",
+      "route53"
+    ],
+    "name": "Amazon Route 53"
+  },
+  "routing_switching": {
+    "aliases": [
+      "routing",
+      "switching"
+    ],
+    "name": "Routing and Switching"
+  },
+  "rsa": {
+    "aliases": [
+      "rsa"
+    ],
+    "name": "RSA Encryption"
+  },
+  "rspec": {
+    "aliases": [
+      "r spec"
+    ],
+    "name": "RSpec"
+  },
+  "ruby": {
+    "aliases": [
+      "ruby lang"
+    ],
+    "name": "Ruby"
+  },
+  "ruby_on_rails": {
+    "aliases": [
+      "rails",
+      "ror"
+    ],
+    "name": "Ruby on Rails"
+  },
+  "rust": {
+    "aliases": [
+      "rust-lang",
+      "rustlang"
+    ],
+    "name": "Rust"
+  },
+  "rxjava": {
+    "aliases": [],
+    "name": "RxJava"
+  },
+  "rxswift": {
+    "aliases": [],
+    "name": "RxSwift"
+  },
+  "s3": {
+    "aliases": [
+      "s3",
+      "simple storage service"
+    ],
+    "name": "Amazon S3"
+  },
+  "sage": {
+    "aliases": [
+      "sage 50",
+      "sage accounting",
+      "sage intacct"
+    ],
+    "name": "Sage"
+  },
+  "sagemaker": {
+    "aliases": [
+      "sagemaker"
+    ],
+    "name": "Amazon SageMaker"
+  },
+  "sales_funnel": {
+    "aliases": [
+      "funnel management",
+      "sales funnel"
+    ],
+    "name": "Sales Funnel Management"
+  },
+  "salesforce": {
+    "aliases": [
+      "sales cloud",
+      "salesforce crm",
+      "sfdc"
+    ],
+    "name": "Salesforce"
+  },
+  "salesforce_admin": {
+    "aliases": [
+      "salesforce admin",
+      "salesforce administrator"
+    ],
+    "name": "Salesforce Administration"
+  },
+  "salesforce_marketing_cloud": {
+    "aliases": [
+      "exacttarget",
+      "marketing cloud",
+      "sfmc"
+    ],
+    "name": "Salesforce Marketing Cloud"
+  },
+  "salesloft": {
+    "aliases": [],
+    "name": "Salesloft"
+  },
+  "saltstack": {
+    "aliases": [
+      "salt stack"
+    ],
+    "name": "SaltStack"
+  },
+  "saml": {
+    "aliases": [
+      "security assertion markup language"
+    ],
+    "name": "SAML"
+  },
+  "sap": {
+    "aliases": [
+      "sap erp",
+      "sap fico",
+      "sap s/4hana"
+    ],
+    "name": "SAP"
+  },
+  "sap2000": {
+    "aliases": [
+      "csi sap2000",
+      "sap 2000"
+    ],
+    "name": "SAP2000"
+  },
+  "sap_businessobjects": {
+    "aliases": [
+      "business objects",
+      "businessobjects",
+      "sap bo"
+    ],
+    "name": "SAP BusinessObjects"
+  },
+  "sarbanes_oxley": {
+    "aliases": [
+      "sarbanes oxley",
+      "sox",
+      "sox compliance"
+    ],
+    "name": "Sarbanes-Oxley Compliance"
+  },
+  "sas": {
+    "aliases": [
+      "base sas",
+      "sas programming",
+      "statistical analysis system"
+    ],
+    "name": "SAS"
+  },
+  "sass": {
+    "aliases": [
+      "sass/scss",
+      "scss"
+    ],
+    "name": "Sass"
+  },
+  "sauce_labs": {
+    "aliases": [
+      "saucelabs"
+    ],
+    "name": "Sauce Labs"
+  },
+  "scada": {
+    "aliases": [
+      "supervisory control and data acquisition"
+    ],
+    "name": "SCADA"
+  },
+  "scala": {
+    "aliases": [
+      "scala lang"
+    ],
+    "name": "Scala"
+  },
+  "scaled_agile_framework": {
+    "aliases": [
+      "safe",
+      "scaled agile"
+    ],
+    "name": "Scaled Agile Framework"
+  },
+  "schema_registry": {
+    "aliases": [
+      "confluent schema registry"
+    ],
+    "name": "Schema Registry"
+  },
+  "schematic_capture": {
+    "aliases": [
+      "schematic design"
+    ],
+    "name": "Schematic Capture"
+  },
+  "scheme": {
+    "aliases": [
+      "racket"
+    ],
+    "name": "Scheme"
+  },
+  "scikit_learn": {
+    "aliases": [
+      "sci-kit learn",
+      "scikit learn",
+      "sklearn"
+    ],
+    "name": "scikit-learn"
+  },
+  "scipy": {
+    "aliases": [
+      "scipy stats",
+      "scipy.stats"
+    ],
+    "name": "SciPy"
+  },
+  "scope_management": {
+    "aliases": [
+      "scope control"
+    ],
+    "name": "Scope Management"
+  },
+  "scp": {
+    "aliases": [
+      "secure copy"
+    ],
+    "name": "SCP"
+  },
+  "screaming_frog": {
+    "aliases": [
+      "screaming frog seo spider"
+    ],
+    "name": "Screaming Frog"
+  },
+  "scrum": {
+    "aliases": [],
+    "name": "Scrum"
+  },
+  "scrumban": {
+    "aliases": [],
+    "name": "Scrumban"
+  },
+  "seaborn": {
+    "aliases": [],
+    "name": "Seaborn"
+  },
+  "seasonal_decomposition": {
+    "aliases": [
+      "seasonal-trend decomposition",
+      "stl decomposition"
+    ],
+    "name": "Seasonal Decomposition"
+  },
+  "sed": {
+    "aliases": [
+      "stream editor"
+    ],
+    "name": "sed"
+  },
+  "selenium": {
+    "aliases": [
+      "selenium webdriver",
+      "webdriver"
+    ],
+    "name": "Selenium"
+  },
+  "selenium_grid": {
+    "aliases": [],
+    "name": "Selenium Grid"
+  },
+  "self_awareness": {
+    "aliases": [
+      "self awareness"
+    ],
+    "name": "Self-Awareness"
+  },
+  "self_management": {
+    "aliases": [
+      "self discipline",
+      "self-discipline"
+    ],
+    "name": "Self-Management"
+  },
+  "self_motivation": {
+    "aliases": [
+      "self-motivated",
+      "self-starter"
+    ],
+    "name": "Self-Motivation"
+  },
+  "sem": {
+    "aliases": [
+      "paid search",
+      "search engine marketing",
+      "sem"
+    ],
+    "name": "Search Engine Marketing (SEM)"
+  },
+  "semrush": {
+    "aliases": [],
+    "name": "Semrush"
+  },
+  "sensitivity_analysis": {
+    "aliases": [
+      "scenario analysis",
+      "what-if analysis"
+    ],
+    "name": "Sensitivity Analysis"
+  },
+  "seo": {
+    "aliases": [
+      "organic search optimization",
+      "search engine optimization",
+      "seo"
+    ],
+    "name": "Search Engine Optimization (SEO)"
+  },
+  "sequelize": {
+    "aliases": [],
+    "name": "Sequelize"
+  },
+  "service_design": {
+    "aliases": [],
+    "name": "Service Design"
+  },
+  "sftp": {
+    "aliases": [
+      "ssh file transfer protocol"
+    ],
+    "name": "SFTP"
+  },
+  "shadcn_ui": {
+    "aliases": [
+      "shadcn"
+    ],
+    "name": "shadcn/ui"
+  },
+  "shapiro_wilk_test": {
+    "aliases": [
+      "normality test"
+    ],
+    "name": "Shapiro-Wilk Test"
+  },
+  "sharepoint": {
+    "aliases": [
+      "ms sharepoint",
+      "sharepoint online"
+    ],
+    "name": "SharePoint"
+  },
+  "shell_scripting": {
+    "aliases": [
+      "sh scripting",
+      "shell script"
+    ],
+    "name": "Shell Scripting"
+  },
+  "shopify": {
+    "aliases": [],
+    "name": "Shopify"
+  },
+  "sidekiq": {
+    "aliases": [],
+    "name": "Sidekiq"
+  },
+  "siem": {
+    "aliases": [
+      "security information and event management"
+    ],
+    "name": "SIEM"
+  },
+  "siem_log_analysis": {
+    "aliases": [
+      "log management",
+      "security log analysis"
+    ],
+    "name": "Log Analysis"
+  },
+  "siem_powershell": {
+    "aliases": [
+      "powershell"
+    ],
+    "name": "PowerShell Scripting"
+  },
+  "siem_soar": {
+    "aliases": [
+      "security orchestration automation and response"
+    ],
+    "name": "SOAR"
+  },
+  "siemens_nx": {
+    "aliases": [
+      "nx",
+      "ug nx",
+      "unigraphics"
+    ],
+    "name": "Siemens NX"
+  },
+  "siemens_tia_portal": {
+    "aliases": [
+      "siemens step 7",
+      "simatic",
+      "step 7",
+      "tia portal"
+    ],
+    "name": "Siemens TIA Portal"
+  },
+  "signal_processing": {
+    "aliases": [
+      "digital signal processing",
+      "dsp"
+    ],
+    "name": "Signal Processing"
+  },
+  "simulink": {
+    "aliases": [],
+    "name": "Simulink"
+  },
+  "single_sign_on": {
+    "aliases": [
+      "single sign on",
+      "sso"
+    ],
+    "name": "Single Sign-On"
+  },
+  "sinon": {
+    "aliases": [
+      "sinon.js"
+    ],
+    "name": "Sinon"
+  },
+  "sisense": {
+    "aliases": [],
+    "name": "Sisense"
+  },
+  "six_sigma": {
+    "aliases": [
+      "6 sigma",
+      "dmaic"
+    ],
+    "name": "Six Sigma"
+  },
+  "sketch": {
+    "aliases": [
+      "sketch app"
+    ],
+    "name": "Sketch"
+  },
+  "slack": {
+    "aliases": [],
+    "name": "Slack"
+  },
+  "slowly_changing_dimensions": {
+    "aliases": [
+      "scd"
+    ],
+    "name": "Slowly Changing Dimensions"
+  },
+  "smartsheet": {
+    "aliases": [],
+    "name": "Smartsheet"
+  },
+  "smartsuite": {
+    "aliases": [
+      "jira service desk",
+      "jsm"
+    ],
+    "name": "Jira Service Management"
+  },
+  "smoke_testing": {
+    "aliases": [
+      "sanity testing"
+    ],
+    "name": "Smoke Testing"
+  },
+  "snort": {
+    "aliases": [],
+    "name": "Snort"
+  },
+  "snowflake": {
+    "aliases": [
+      "snowflake data cloud"
+    ],
+    "name": "Snowflake"
+  },
+  "sns": {
+    "aliases": [
+      "simple notification service",
+      "sns"
+    ],
+    "name": "Amazon SNS"
+  },
+  "soap": {
+    "aliases": [
+      "soap api",
+      "soap web services"
+    ],
+    "name": "SOAP"
+  },
+  "soapui": {
+    "aliases": [
+      "soap ui"
+    ],
+    "name": "SoapUI"
+  },
+  "soc": {
+    "aliases": [
+      "soc analyst"
+    ],
+    "name": "Security Operations Center"
+  },
+  "soc_2": {
+    "aliases": [
+      "soc 2 compliance",
+      "soc2"
+    ],
+    "name": "SOC 2"
+  },
+  "social_engineering": {
+    "aliases": [
+      "phishing assessment",
+      "phishing simulation"
+    ],
+    "name": "Social Engineering"
+  },
+  "social_media_marketing": {
+    "aliases": [
+      "smm",
+      "social media management"
+    ],
+    "name": "Social Media Marketing"
+  },
+  "socket_io": {
+    "aliases": [
+      "socket io",
+      "socketio"
+    ],
+    "name": "Socket.IO"
+  },
+  "soldering": {
+    "aliases": [
+      "smt soldering",
+      "surface mount soldering"
+    ],
+    "name": "Soldering"
+  },
+  "solidity": {
+    "aliases": [
+      "solidity lang"
+    ],
+    "name": "Solidity"
+  },
+  "solidjs": {
+    "aliases": [
+      "solid.js"
+    ],
+    "name": "SolidJS"
+  },
+  "solidworks": {
+    "aliases": [
+      "sldworks",
+      "solid works"
+    ],
+    "name": "SolidWorks"
+  },
+  "solidworks_simulation": {
+    "aliases": [
+      "solidworks fea",
+      "solidworks flow simulation"
+    ],
+    "name": "SolidWorks Simulation"
+  },
+  "sonarqube": {
+    "aliases": [
+      "sonar qube"
+    ],
+    "name": "SonarQube"
+  },
+  "spacy": {
+    "aliases": [],
+    "name": "spaCy"
+  },
+  "spark": {
+    "aliases": [],
+    "name": "Apache Spark"
+  },
+  "spark_streaming": {
+    "aliases": [
+      "structured streaming"
+    ],
+    "name": "Spark Structured Streaming"
+  },
+  "specflow": {
+    "aliases": [],
+    "name": "SpecFlow"
+  },
+  "specimen_processing": {
+    "aliases": [
+      "sample processing",
+      "specimen collection",
+      "specimen handling"
+    ],
+    "name": "Specimen Processing"
+  },
+  "spectrophotometry": {
+    "aliases": [
+      "nanodrop",
+      "uv-vis spectrophotometry"
+    ],
+    "name": "Spectrophotometry"
+  },
+  "spice_simulation": {
+    "aliases": [
+      "ltspice",
+      "ngspice",
+      "pspice",
+      "spice"
+    ],
+    "name": "SPICE Simulation"
+  },
+  "spinnaker": {
+    "aliases": [],
+    "name": "Spinnaker"
+  },
+  "splunk": {
+    "aliases": [
+      "splunk enterprise security",
+      "splunk es"
+    ],
+    "name": "Splunk"
+  },
+  "spring": {
+    "aliases": [
+      "spring framework"
+    ],
+    "name": "Spring"
+  },
+  "spring_boot": {
+    "aliases": [
+      "spring boot",
+      "springboot"
+    ],
+    "name": "Spring Boot"
+  },
+  "spring_data_jpa": {
+    "aliases": [],
+    "name": "Spring Data JPA"
+  },
+  "spring_mvc": {
+    "aliases": [],
+    "name": "Spring MVC"
+  },
+  "spring_security": {
+    "aliases": [],
+    "name": "Spring Security"
+  },
+  "sprint_planning": {
+    "aliases": [],
+    "name": "Sprint Planning"
+  },
+  "sprint_retrospective": {
+    "aliases": [
+      "retro",
+      "retrospective",
+      "sprint retro"
+    ],
+    "name": "Sprint Retrospective"
+  },
+  "sprint_review": {
+    "aliases": [],
+    "name": "Sprint Review"
+  },
+  "sprout_social": {
+    "aliases": [
+      "sproutsocial"
+    ],
+    "name": "Sprout Social"
+  },
+  "spss": {
+    "aliases": [
+      "ibm spss",
+      "spss statistics"
+    ],
+    "name": "SPSS"
+  },
+  "sql": {
+    "aliases": [
+      "structured query language"
+    ],
+    "name": "SQL"
+  },
+  "sql_alchemy": {
+    "aliases": [
+      "sql alchemy"
+    ],
+    "name": "SQLAlchemy"
+  },
+  "sql_injection": {
+    "aliases": [
+      "sqli"
+    ],
+    "name": "SQL Injection"
+  },
+  "sqlalchemy": {
+    "aliases": [
+      "sql alchemy"
+    ],
+    "name": "SQLAlchemy"
+  },
+  "sqlite": {
+    "aliases": [
+      "sqlite3"
+    ],
+    "name": "SQLite"
+  },
+  "sqs": {
+    "aliases": [
+      "simple queue service",
+      "sqs"
+    ],
+    "name": "Amazon SQS"
+  },
+  "ssas": {
+    "aliases": [
+      "ssas"
+    ],
+    "name": "SQL Server Analysis Services"
+  },
+  "ssh": {
+    "aliases": [
+      "openssh",
+      "secure shell"
+    ],
+    "name": "SSH"
+  },
+  "ssis": {
+    "aliases": [
+      "ssis"
+    ],
+    "name": "SQL Server Integration Services"
+  },
+  "ssms": {
+    "aliases": [
+      "ssms"
+    ],
+    "name": "SQL Server Management Studio"
+  },
+  "ssrs": {
+    "aliases": [
+      "ssrs"
+    ],
+    "name": "SQL Server Reporting Services"
+  },
+  "staad_pro": {
+    "aliases": [
+      "staad",
+      "staad pro"
+    ],
+    "name": "STAAD.Pro"
+  },
+  "stable_diffusion": {
+    "aliases": [],
+    "name": "Stable Diffusion"
+  },
+  "stakeholder_management": {
+    "aliases": [
+      "managing stakeholders",
+      "stakeholder engagement"
+    ],
+    "name": "Stakeholder Management"
+  },
+  "stan": {
+    "aliases": [
+      "pystan",
+      "rstan"
+    ],
+    "name": "Stan"
+  },
+  "standard_operating_procedures": {
+    "aliases": [
+      "sop development",
+      "sop writing",
+      "sops"
+    ],
+    "name": "Standard Operating Procedures (SOPs)"
+  },
+  "star_schema": {
+    "aliases": [],
+    "name": "Star Schema"
+  },
+  "stata": {
+    "aliases": [],
+    "name": "Stata"
+  },
+  "statistical_analysis": {
+    "aliases": [
+      "statistical modeling"
+    ],
+    "name": "Statistical Analysis"
+  },
+  "statistical_modeling": {
+    "aliases": [
+      "statistical analysis"
+    ],
+    "name": "Statistical Modeling"
+  },
+  "statsmodels": {
+    "aliases": [
+      "stats models"
+    ],
+    "name": "statsmodels"
+  },
+  "stimulus": {
+    "aliases": [
+      "stimulusjs"
+    ],
+    "name": "Stimulus"
+  },
+  "stitch": {
+    "aliases": [
+      "stitch data"
+    ],
+    "name": "Stitch"
+  },
+  "stored_procedures": {
+    "aliases": [
+      "stored procedure"
+    ],
+    "name": "Stored Procedures"
+  },
+  "story_points": {
+    "aliases": [
+      "story pointing"
+    ],
+    "name": "Story Points"
+  },
+  "storyboarding": {
+    "aliases": [
+      "storyboards"
+    ],
+    "name": "Storyboarding"
+  },
+  "storybook": {
+    "aliases": [],
+    "name": "Storybook"
+  },
+  "storytelling": {
+    "aliases": [
+      "narrative skills"
+    ],
+    "name": "Storytelling"
+  },
+  "strategic_thinking": {
+    "aliases": [
+      "strategic planning mindset"
+    ],
+    "name": "Strategic Thinking"
+  },
+  "stress_management": {
+    "aliases": [
+      "managing stress"
+    ],
+    "name": "Stress Management"
+  },
+  "stress_testing": {
+    "aliases": [],
+    "name": "Stress Testing"
+  },
+  "style_guides": {
+    "aliases": [
+      "brand guidelines",
+      "style guide"
+    ],
+    "name": "Style Guides"
+  },
+  "styled_components": {
+    "aliases": [
+      "styled components"
+    ],
+    "name": "styled-components"
+  },
+  "subnetting": {
+    "aliases": [
+      "cidr",
+      "subnet mask"
+    ],
+    "name": "Subnetting"
+  },
+  "supertest": {
+    "aliases": [],
+    "name": "SuperTest"
+  },
+  "supervised_learning": {
+    "aliases": [],
+    "name": "Supervised Learning"
+  },
+  "support_vector_machines": {
+    "aliases": [
+      "svm",
+      "svms"
+    ],
+    "name": "Support Vector Machines"
+  },
+  "survival_analysis": {
+    "aliases": [
+      "cox proportional hazards",
+      "cox regression",
+      "kaplan-meier",
+      "time-to-event analysis"
+    ],
+    "name": "Survival Analysis"
+  },
+  "svelte": {
+    "aliases": [
+      "sveltejs"
+    ],
+    "name": "Svelte"
+  },
+  "sveltekit": {
+    "aliases": [],
+    "name": "SvelteKit"
+  },
+  "swagger_codegen": {
+    "aliases": [],
+    "name": "Alembic"
+  },
+  "swagger_openapi_codegen": {
+    "aliases": [
+      "postman api"
+    ],
+    "name": "Postman"
+  },
+  "swagger_ui": {
+    "aliases": [],
+    "name": "Swagger UI"
+  },
+  "swift": {
+    "aliases": [
+      "swift lang",
+      "swift programming",
+      "swiftui language"
+    ],
+    "name": "Swift"
+  },
+  "swift_package_manager": {
+    "aliases": [
+      "spm"
+    ],
+    "name": "Swift Package Manager"
+  },
+  "swiftui": {
+    "aliases": [
+      "swift ui"
+    ],
+    "name": "SwiftUI"
+  },
+  "symfony": {
+    "aliases": [],
+    "name": "Symfony"
+  },
+  "systemd": {
+    "aliases": [
+      "systemctl"
+    ],
+    "name": "systemd"
+  },
+  "t_test": {
+    "aliases": [
+      "paired t-test",
+      "student's t-test",
+      "two-sample t-test"
+    ],
+    "name": "T-Test"
+  },
+  "tableau": {
+    "aliases": [
+      "tableau desktop",
+      "tableau server"
+    ],
+    "name": "Tableau"
+  },
+  "tableau_prep": {
+    "aliases": [
+      "tableau prep builder"
+    ],
+    "name": "Tableau Prep"
+  },
+  "tailwind_css": {
+    "aliases": [
+      "tailwind",
+      "tailwindcss"
+    ],
+    "name": "Tailwind CSS"
+  },
+  "talend": {
+    "aliases": [],
+    "name": "Talend"
+  },
+  "tanstack_router": {
+    "aliases": [],
+    "name": "TanStack Router"
+  },
+  "tanstack_table": {
+    "aliases": [
+      "react table"
+    ],
+    "name": "TanStack Table"
+  },
+  "tax_compliance": {
+    "aliases": [
+      "corporate tax compliance",
+      "tax reporting"
+    ],
+    "name": "Tax Compliance"
+  },
+  "tax_preparation": {
+    "aliases": [
+      "tax filing",
+      "tax prep"
+    ],
+    "name": "Tax Preparation"
+  },
+  "tcp_ip": {
+    "aliases": [
+      "tcp/ip stack",
+      "tcpip"
+    ],
+    "name": "TCP/IP"
+  },
+  "tcpdump": {
+    "aliases": [
+      "tcp dump"
+    ],
+    "name": "tcpdump"
+  },
+  "tdd": {
+    "aliases": [
+      "tdd"
+    ],
+    "name": "Test-Driven Development"
+  },
+  "team_building": {
+    "aliases": [
+      "building teams"
+    ],
+    "name": "Team Building"
+  },
+  "teamcity": {
+    "aliases": [
+      "team city"
+    ],
+    "name": "TeamCity"
+  },
+  "teamwork": {
+    "aliases": [
+      "team player",
+      "team work"
+    ],
+    "name": "Teamwork"
+  },
+  "technical_seo": {
+    "aliases": [],
+    "name": "Technical SEO"
+  },
+  "tensorflow": {
+    "aliases": [
+      "tf"
+    ],
+    "name": "TensorFlow"
+  },
+  "terraform": {
+    "aliases": [
+      "hashicorp terraform",
+      "tf"
+    ],
+    "name": "Terraform"
+  },
+  "terragrunt": {
+    "aliases": [],
+    "name": "Terragrunt"
+  },
+  "test_automation": {
+    "aliases": [
+      "automated testing",
+      "qa automation"
+    ],
+    "name": "Test Automation"
+  },
+  "test_case_design": {
+    "aliases": [
+      "test case authoring"
+    ],
+    "name": "Test Case Design"
+  },
+  "test_driven_development": {
+    "aliases": [
+      "tdd"
+    ],
+    "name": "Test-Driven Development"
+  },
+  "test_planning": {
+    "aliases": [
+      "test plans"
+    ],
+    "name": "Test Planning"
+  },
+  "test_strategy": {
+    "aliases": [],
+    "name": "Test Strategy"
+  },
+  "testflight": {
+    "aliases": [],
+    "name": "TestFlight"
+  },
+  "testing_library": {
+    "aliases": [
+      "react testing library",
+      "rtl"
+    ],
+    "name": "Testing Library"
+  },
+  "testng": {
+    "aliases": [],
+    "name": "TestNG"
+  },
+  "testrail": {
+    "aliases": [],
+    "name": "TestRail"
+  },
+  "thermodynamics": {
+    "aliases": [],
+    "name": "Thermodynamics"
+  },
+  "thoughtspot": {
+    "aliases": [],
+    "name": "ThoughtSpot"
+  },
+  "threat_hunting": {
+    "aliases": [
+      "cyber threat hunting",
+      "threat hunter"
+    ],
+    "name": "Threat Hunting"
+  },
+  "threat_intelligence": {
+    "aliases": [
+      "cti",
+      "cyber threat intelligence",
+      "threat intel"
+    ],
+    "name": "Threat Intelligence"
+  },
+  "three_js": {
+    "aliases": [
+      "threejs"
+    ],
+    "name": "Three.js"
+  },
+  "three_statement_model": {
+    "aliases": [
+      "3-statement model",
+      "three statement modeling"
+    ],
+    "name": "Three-Statement Model"
+  },
+  "tibco_spotfire": {
+    "aliases": [
+      "spotfire"
+    ],
+    "name": "TIBCO Spotfire"
+  },
+  "tidyverse": {
+    "aliases": [
+      "dplyr",
+      "ggplot2"
+    ],
+    "name": "tidyverse"
+  },
+  "tiktok_ads": {
+    "aliases": [
+      "tiktok ads manager",
+      "tiktok for business"
+    ],
+    "name": "TikTok Ads"
+  },
+  "time_management": {
+    "aliases": [
+      "managing time"
+    ],
+    "name": "Time Management"
+  },
+  "time_series_analysis": {
+    "aliases": [
+      "time series forecasting",
+      "time-series",
+      "time-series analysis"
+    ],
+    "name": "Time Series Analysis"
+  },
+  "tls_ssl": {
+    "aliases": [
+      "ssl",
+      "ssl/tls",
+      "tls"
+    ],
+    "name": "TLS/SSL"
+  },
+  "tmux": {
+    "aliases": [
+      "terminal multiplexer"
+    ],
+    "name": "tmux"
+  },
+  "tolerance_stackup": {
+    "aliases": [
+      "tolerance analysis",
+      "tolerance stackup"
+    ],
+    "name": "Tolerance Stack-up Analysis"
+  },
+  "tomcat": {
+    "aliases": [
+      "tomcat"
+    ],
+    "name": "Apache Tomcat"
+  },
+  "traceroute": {
+    "aliases": [
+      "tracert"
+    ],
+    "name": "Traceroute"
+  },
+  "training_and_development": {
+    "aliases": [
+      "delivering training",
+      "training delivery"
+    ],
+    "name": "Training and Development"
+  },
+  "transformers_architecture": {
+    "aliases": [
+      "transformer architecture",
+      "transformer models"
+    ],
+    "name": "Transformers"
+  },
+  "travis_ci": {
+    "aliases": [
+      "travisci"
+    ],
+    "name": "Travis CI"
+  },
+  "treasury_management": {
+    "aliases": [
+      "treasury",
+      "treasury operations"
+    ],
+    "name": "Treasury Management"
+  },
+  "trello": {
+    "aliases": [],
+    "name": "Trello"
+  },
+  "trello_powerups": {
+    "aliases": [
+      "portfolio management",
+      "ppm"
+    ],
+    "name": "Project Portfolio Management"
+  },
+  "trino": {
+    "aliases": [],
+    "name": "Trino"
+  },
+  "trivy": {
+    "aliases": [],
+    "name": "Trivy"
+  },
+  "tsql": {
+    "aliases": [
+      "transact sql",
+      "transact-sql"
+    ],
+    "name": "T-SQL"
+  },
+  "turbotax": {
+    "aliases": [],
+    "name": "TurboTax"
+  },
+  "typeorm": {
+    "aliases": [
+      "type orm"
+    ],
+    "name": "TypeORM"
+  },
+  "typescript": {
+    "aliases": [
+      "ts"
+    ],
+    "name": "TypeScript"
+  },
+  "typography": {
+    "aliases": [],
+    "name": "Typography"
+  },
+  "ubuntu": {
+    "aliases": [
+      "ubuntu linux"
+    ],
+    "name": "Ubuntu"
+  },
+  "ui_design": {
+    "aliases": [
+      "user interface design"
+    ],
+    "name": "UI Design"
+  },
+  "uikit": {
+    "aliases": [],
+    "name": "UIKit"
+  },
+  "unit_testing": {
+    "aliases": [
+      "unit tests"
+    ],
+    "name": "Unit Testing"
+  },
+  "unsupervised_learning": {
+    "aliases": [],
+    "name": "Unsupervised Learning"
+  },
+  "urlsession": {
+    "aliases": [
+      "nsurlsession"
+    ],
+    "name": "URLSession"
+  },
+  "usability_testing": {
+    "aliases": [
+      "usability test",
+      "user testing"
+    ],
+    "name": "Usability Testing"
+  },
+  "user_flows": {
+    "aliases": [
+      "task flows"
+    ],
+    "name": "User Flows"
+  },
+  "user_journey_mapping": {
+    "aliases": [
+      "customer journey mapping",
+      "journey mapping",
+      "user journey maps"
+    ],
+    "name": "User Journey Mapping"
+  },
+  "user_personas": {
+    "aliases": [
+      "persona development",
+      "personas"
+    ],
+    "name": "User Personas"
+  },
+  "user_research": {
+    "aliases": [
+      "design research",
+      "ux research"
+    ],
+    "name": "User Research"
+  },
+  "user_stories": {
+    "aliases": [
+      "user story"
+    ],
+    "name": "User Stories"
+  },
+  "uvicorn": {
+    "aliases": [],
+    "name": "Uvicorn"
+  },
+  "ux_design": {
+    "aliases": [
+      "user experience design"
+    ],
+    "name": "UX Design"
+  },
+  "ux_writing": {
+    "aliases": [
+      "content design",
+      "microcopy"
+    ],
+    "name": "UX Writing"
+  },
+  "vagrant": {
+    "aliases": [
+      "hashicorp vagrant"
+    ],
+    "name": "Vagrant"
+  },
+  "valuation": {
+    "aliases": [
+      "business valuation",
+      "company valuation",
+      "equity valuation"
+    ],
+    "name": "Valuation"
+  },
+  "value_stream_mapping": {
+    "aliases": [
+      "vsm"
+    ],
+    "name": "Value Stream Mapping"
+  },
+  "var_model": {
+    "aliases": [
+      "var model",
+      "var models"
+    ],
+    "name": "Vector Autoregression"
+  },
+  "variance_analysis": {
+    "aliases": [
+      "budget variance analysis"
+    ],
+    "name": "Variance Analysis"
+  },
+  "vault": {
+    "aliases": [],
+    "name": "HashiCorp Vault"
+  },
+  "vba": {
+    "aliases": [
+      "excel vba",
+      "macros",
+      "macros vba",
+      "visual basic for applications"
+    ],
+    "name": "VBA"
+  },
+  "vector_databases": {
+    "aliases": [
+      "faiss",
+      "pinecone",
+      "vector db"
+    ],
+    "name": "Vector Databases"
+  },
+  "velocity_tracking": {
+    "aliases": [
+      "sprint velocity",
+      "team velocity"
+    ],
+    "name": "Velocity Tracking"
+  },
+  "verbal_communication": {
+    "aliases": [
+      "oral communication",
+      "spoken communication"
+    ],
+    "name": "Verbal Communication"
+  },
+  "verilog": {
+    "aliases": [
+      "system verilog",
+      "systemverilog"
+    ],
+    "name": "Verilog"
+  },
+  "vertex_ai": {
+    "aliases": [
+      "gcp vertex ai",
+      "google vertex ai"
+    ],
+    "name": "Vertex AI"
+  },
+  "vhdl": {
+    "aliases": [
+      "vhdl language"
+    ],
+    "name": "VHDL"
+  },
+  "vibration_analysis": {
+    "aliases": [
+      "modal analysis"
+    ],
+    "name": "Vibration Analysis"
+  },
+  "video_marketing": {
+    "aliases": [
+      "youtube marketing"
+    ],
+    "name": "Video Marketing"
+  },
+  "vim": {
+    "aliases": [
+      "vi editor",
+      "vim editor"
+    ],
+    "name": "Vim"
+  },
+  "viper": {
+    "aliases": [],
+    "name": "VIPER"
+  },
+  "visio": {
+    "aliases": [
+      "ms visio",
+      "visio"
+    ],
+    "name": "Microsoft Visio"
+  },
+  "visual_basic": {
+    "aliases": [
+      "vb",
+      "vb.net",
+      "vbnet",
+      "visual basic .net"
+    ],
+    "name": "Visual Basic"
+  },
+  "visual_design": {
+    "aliases": [],
+    "name": "Visual Design"
+  },
+  "visual_regression_testing": {
+    "aliases": [
+      "visual testing"
+    ],
+    "name": "Visual Regression Testing"
+  },
+  "vital_signs": {
+    "aliases": [
+      "vital signs monitoring",
+      "vitals"
+    ],
+    "name": "Vital Signs Measurement"
+  },
+  "vite": {
+    "aliases": [
+      "vitejs"
+    ],
+    "name": "Vite"
+  },
+  "vitest": {
+    "aliases": [],
+    "name": "Vitest"
+  },
+  "vlookup": {
+    "aliases": [
+      "hlookup",
+      "lookup functions",
+      "xlookup"
+    ],
+    "name": "VLOOKUP"
+  },
+  "vpc": {
+    "aliases": [
+      "virtual private cloud",
+      "vpc"
+    ],
+    "name": "Amazon VPC"
+  },
+  "vpn": {
+    "aliases": [
+      "ipsec vpn",
+      "virtual private network"
+    ],
+    "name": "VPN"
+  },
+  "vue": {
+    "aliases": [
+      "vue",
+      "vue 3",
+      "vue.js",
+      "vuejs"
+    ],
+    "name": "Vue.js"
+  },
+  "vuetify": {
+    "aliases": [],
+    "name": "Vuetify"
+  },
+  "vuex": {
+    "aliases": [],
+    "name": "Vuex"
+  },
+  "vulnerability_assessment": {
+    "aliases": [
+      "vuln assessment",
+      "vulnerability scanning"
+    ],
+    "name": "Vulnerability Assessment"
+  },
+  "waterfall": {
+    "aliases": [
+      "waterfall methodology"
+    ],
+    "name": "Waterfall"
+  },
+  "wazuh": {
+    "aliases": [],
+    "name": "Wazuh"
+  },
+  "web_components": {
+    "aliases": [],
+    "name": "Web Components"
+  },
+  "webdriverio": {
+    "aliases": [
+      "wdio"
+    ],
+    "name": "WebdriverIO"
+  },
+  "webex": {
+    "aliases": [
+      "cisco webex"
+    ],
+    "name": "Webex"
+  },
+  "webflow": {
+    "aliases": [],
+    "name": "Webflow"
+  },
+  "webpack": {
+    "aliases": [],
+    "name": "Webpack"
+  },
+  "webpack_module_federation": {
+    "aliases": [
+      "webpack module federation"
+    ],
+    "name": "Module Federation"
+  },
+  "websocket": {
+    "aliases": [
+      "web socket",
+      "websockets"
+    ],
+    "name": "WebSocket"
+  },
+  "websockets": {
+    "aliases": [
+      "web sockets",
+      "websocket"
+    ],
+    "name": "WebSockets"
+  },
+  "weights_and_biases": {
+    "aliases": [
+      "w&b",
+      "wandb",
+      "weights and biases"
+    ],
+    "name": "Weights & Biases"
+  },
+  "western_blot": {
+    "aliases": [
+      "immunoblot",
+      "immunoblotting",
+      "western blotting"
+    ],
+    "name": "Western Blot"
+  },
+  "wget": {
+    "aliases": [
+      "wget command"
+    ],
+    "name": "Wget"
+  },
+  "wilcoxon_signed_rank_test": {
+    "aliases": [
+      "wilcoxon test"
+    ],
+    "name": "Wilcoxon Signed-Rank Test"
+  },
+  "windows_server": {
+    "aliases": [
+      "win server"
+    ],
+    "name": "Windows Server"
+  },
+  "wip_limits": {
+    "aliases": [
+      "wip limit",
+      "work in progress limits"
+    ],
+    "name": "WIP Limits"
+  },
+  "wireframing": {
+    "aliases": [
+      "landing page design",
+      "landing pages",
+      "wireframe",
+      "wireframes"
+    ],
+    "name": "Wireframing"
+  },
+  "wiremock": {
+    "aliases": [],
+    "name": "WireMock"
+  },
+  "wireshark": {
+    "aliases": [
+      "tshark",
+      "wire shark"
+    ],
+    "name": "Wireshark"
+  },
+  "word_embeddings": {
+    "aliases": [
+      "word vectors",
+      "word2vec"
+    ],
+    "name": "Word Embeddings"
+  },
+  "word_mail_merge": {
+    "aliases": [
+      "word mail merge"
+    ],
+    "name": "Mail Merge"
+  },
+  "wordpress": {
+    "aliases": [
+      "wp"
+    ],
+    "name": "WordPress"
+  },
+  "work_ethic": {
+    "aliases": [
+      "diligence",
+      "strong work ethic"
+    ],
+    "name": "Work Ethic"
+  },
+  "workday_financials": {
+    "aliases": [
+      "adaptive insights",
+      "workday adaptive planning"
+    ],
+    "name": "Workday Financials"
+  },
+  "working_capital_management": {
+    "aliases": [
+      "working capital analysis"
+    ],
+    "name": "Working Capital Management"
+  },
+  "working_under_pressure": {
+    "aliases": [
+      "grace under pressure",
+      "performing under pressure"
+    ],
+    "name": "Working Under Pressure"
+  },
+  "wrike": {
+    "aliases": [],
+    "name": "Wrike"
+  },
+  "written_communication": {
+    "aliases": [
+      "business writing",
+      "writing skills"
+    ],
+    "name": "Written Communication"
+  },
+  "xamarin": {
+    "aliases": [],
+    "name": "Xamarin"
+  },
+  "xcode": {
+    "aliases": [],
+    "name": "Xcode"
+  },
+  "xctest": {
+    "aliases": [],
+    "name": "XCTest"
+  },
+  "xcuitest": {
+    "aliases": [
+      "xctest"
+    ],
+    "name": "XCUITest"
+  },
+  "xero": {
+    "aliases": [],
+    "name": "Xero"
+  },
+  "xgboost": {
+    "aliases": [
+      "xg boost"
+    ],
+    "name": "XGBoost"
+  },
+  "xray": {
+    "aliases": [
+      "xray test management"
+    ],
+    "name": "Xray"
+  },
+  "xss": {
+    "aliases": [
+      "cross site scripting",
+      "xss"
+    ],
+    "name": "Cross-Site Scripting"
+  },
+  "xunit": {
+    "aliases": [
+      "xunit"
+    ],
+    "name": "xUnit.net"
+  },
+  "yaml": {
+    "aliases": [],
+    "name": "YAML"
+  },
+  "yolo": {
+    "aliases": [
+      "you only look once"
+    ],
+    "name": "YOLO"
+  },
+  "zephyr": {
+    "aliases": [
+      "zephyr scale"
+    ],
+    "name": "Zephyr"
+  },
+  "zeplin": {
+    "aliases": [],
+    "name": "Zeplin"
+  },
+  "zero_trust": {
+    "aliases": [
+      "zero trust",
+      "zta",
+      "ztna"
+    ],
+    "name": "Zero Trust Architecture"
+  },
+  "zoho_crm": {
+    "aliases": [
+      "zoho"
+    ],
+    "name": "Zoho CRM"
+  },
+  "zoom": {
+    "aliases": [
+      "zoom meetings"
+    ],
+    "name": "Zoom"
+  },
+  "zoominfo": {
+    "aliases": [],
+    "name": "ZoomInfo"
+  },
+  "zsh": {
+    "aliases": [
+      "z shell"
+    ],
+    "name": "Zsh"
+  },
+  "zustand": {
+    "aliases": [],
+    "name": "Zustand"
+  }
+}

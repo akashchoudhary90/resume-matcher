@@ -148,13 +148,14 @@ adapter and asserts schema-valid output — that is the proof of swappability.
 resume_matcher/
   inference/    InferenceAdapter + adapters, MatchExtraction/ScoreResult+ScoreExplanation schema, redaction, MCP server
   ingestion/    Handshake-export importer, resume parser (PDF/DOCX/TXT, in-memory), job-posting parser, synthetic data
-  matching/     skill taxonomy, retrieval, rerank, LLM evaluator, deterministic ranker + score explanation, coaching, flag text
+  data/         skills.json — data-driven skill vocabulary (~1,300 skills; regenerate via scripts/build_skills.py)
+  matching/     data-driven skill taxonomy (fast one-pass matcher), retrieval, rerank, LLM evaluator, deterministic ranker + score explanation, coaching, flag text
   audit/        bias-audit metrics (4/5ths + Fisher + rank-aware + homophily), proxy-leakage test
   antigaming/   hidden-text detection, keyword-stuffing checks, prompt-injection detection
   stores/       scoring_store + audit_store — two physically separated data planes
   api/          FastAPI wiring + dashboard (index.html) + ephemeral demo (demo.py, demo.html), result serializer
   ui/           Streamlit coordinator dashboard (optional)
-scripts/        gen_synthetic.py, run_demo.py
+scripts/        gen_synthetic.py, run_demo.py, build_skills.py (rebuild the skill vocab from Lightcast/ESCO)
 tests/          unit + contract + injection + audit + e2e smoke
 ```
 
