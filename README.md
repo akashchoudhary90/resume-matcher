@@ -87,14 +87,16 @@ Endpoints: `POST /api/demo/parse-job`, `POST /api/demo/run` (multipart upload),
 | `RM_DEMO_MAX_RESUMES` | `10` | Max resumes per upload. |
 | `RM_DEMO_MAX_FILE_MB` | `4` | Max size per uploaded file. |
 | `RM_DEMO_MAX_SESSIONS` | `100` | In-memory session cap (oldest evicted past this). |
-| `RM_DEMO_BACKEND` | `mock` | Matching engine: `mock` (deterministic) or `claude_cli` (Claude on your subscription). |
+| `RM_DEMO_BACKEND` | `claude_cli` | Matching engine: `claude_cli` (Claude on your subscription, default) or `mock` (deterministic). Falls back to `mock` if the token/CLI is absent. |
 | `RM_CLAUDE_CLI_MODEL` | `sonnet` | Model for the Claude backend (`sonnet` quality / `haiku` speed). |
 | `RM_DEMO_CONCURRENCY` | `4` | Parallel resume extractions per upload (Claude backend). |
 | `RM_DEMO_SEND_FILE` | `1` | With the Claude engine, send PDFs/images to Claude directly (vision). `0` = text only. |
 
-**Claude matching on your subscription (no API key).** Set `RM_DEMO_BACKEND=claude_cli` to score with
-Claude via the local **Claude Code CLI** authenticated by your subscription — same approach as the
-Kotak project, no per-token API bill. With the Claude engine, **PDFs/images are sent to Claude
+**Claude matching on your subscription (no API key).** The demo **defaults to the Claude engine**
+(`RM_DEMO_BACKEND=claude_cli`) — scoring via the local **Claude Code CLI** authenticated by your
+subscription, same approach as the Kotak project, no per-token API bill. It automatically falls back
+to the deterministic `mock` engine when the CLI/token isn't present (set `RM_DEMO_BACKEND=mock` to
+force it off). With the Claude engine, **PDFs/images are sent to Claude
 directly** (`RM_DEMO_SEND_FILE=1`) — it reads scanned/photo resumes natively and preserves layout,
 instead of relying on text extraction (`.docx`/`.txt` still use fast local extraction). Claude does
 the skill *extraction* (which skills are evidenced, with verbatim quotes) and returns its own

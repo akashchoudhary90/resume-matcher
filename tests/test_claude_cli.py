@@ -39,8 +39,7 @@ def test_demo_falls_back_to_mock_when_claude_unavailable(monkeypatch):
         store=store, backend="claude_cli", required_skills=["python"],
         files=[("a.txt", b"Python and SQL developer. " * 6)],
     )
-    assert sess.engine == "mock"
-    assert any("Claude backend unavailable" in w for w in sess.warnings)
+    assert sess.engine == "mock"  # silently fell back; engine field is the signal (no client banner)
     assert sess.results and sess.results[0]["fit_score"] >= 0
 
 

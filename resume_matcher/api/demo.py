@@ -52,9 +52,10 @@ MAX_RESUMES = _int_env("RM_DEMO_MAX_RESUMES", 10)
 MAX_FILE_MB = _int_env("RM_DEMO_MAX_FILE_MB", 4)
 TTL_MINUTES = _int_env("RM_DEMO_TTL_MINUTES", 30)
 MAX_SESSIONS = _int_env("RM_DEMO_MAX_SESSIONS", 100)
-# Matching engine: "mock" (deterministic, default) or "claude_cli" (Claude on your subscription via
-# the local Claude Code CLI — no API key). claude_cli falls back to mock if the CLI/token is absent.
-DEMO_BACKEND = os.environ.get("RM_DEMO_BACKEND", "mock")
+# Matching engine: "claude_cli" (Claude on your subscription via the local Claude Code CLI — no API
+# key; DEFAULT) or "mock" (deterministic). claude_cli falls back to mock when the CLI/token is absent,
+# so this is safe to default on even before the token is configured.
+DEMO_BACKEND = os.environ.get("RM_DEMO_BACKEND", "claude_cli")
 CONCURRENCY = max(1, _int_env("RM_DEMO_CONCURRENCY", 4))  # parallel extractions per upload batch
 # With the Claude engine, send PDFs/images to Claude directly (vision) instead of extracting text
 # first — reads scanned resumes + preserves layout. Set RM_DEMO_SEND_FILE=0 to force text extraction.
@@ -258,9 +259,7 @@ def run_demo(
         seen_labels.add(label)
         items.append((f"R{idx + 1:02d}", label, filename, data))
 
-    adapter, engine, fallback_note = _resolve_adapter(backend or DEMO_BACKEND)
-    if fallback_note:
-        warnings.append(fallback_note)
+    adapter, engine = _resolve_adapter(backend or DEMO_BACKEND)
     # File-direct (Claude reads the actual PDF/image) is on only when the Claude engine is active.
     send_file = SEND_FILE and engine == "claude_cli"
 
@@ -347,19 +346,12 @@ def run_demo(
 
 
 def _resolve_adapter(name: str):
-    """Return (adapter, engine_name, fallback_note). If the Claude CLI backend is requested but not
-    available (CLI/token missing), fall back to the deterministic mock so the demo always works."""
-    if name == "claude_cli":
-        from ..inference.adapters.claude_cli import available
-
-        if not available():
-            return (
-                get_adapter("mock"),
-                "mock",
-                "Claude backend unavailable (CLI or CLAUDE_CODE_OAUTH_TOKEN missing) — "
-                "used the deterministic engine instead.",
-            )
-    return get_adapter(name), name, ""
+    """Return (adapter, engine_name). If the Claude backend is requested but unavailable (CLI/token
+    missing), fall back to the deterministic mock so the demo always works — the `engine` field in the
+    result tells the operator which engine actually ran (no scary banner for the client)."""
+    if name == "claude_cli" and not _claude_cli.available():
+        return get_adapter("mock"), "mock"
+    return get_adapter(name), name
 
 
 _STORE: SessionStore | None = None
