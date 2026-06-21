@@ -1,0 +1,59 @@
+{
+  "_README": "Labeled (job, resume, human-rating) pairs for the accuracy harness. Replace these with real coordinator-rated examples (or real outcomes) to measure + tune. human.label in {strong, ok, weak}; human.score is an optional 0-100. Run: python scripts/eval_accuracy.py",
+  "examples": [
+    {
+      "id": "backend-strong",
+      "job": {"title": "Backend Engineer", "required_skills": ["python", "sql", "aws"], "must_have_skills": ["python"], "preferred_skills": ["docker"], "min_years": 2, "min_education": "bachelor"},
+      "resume_text": "Senior Python developer. Strong SQL and AWS. Docker in production. 5 years experience. Bachelor of Science.",
+      "human": {"label": "strong", "score": 92}
+    },
+    {
+      "id": "backend-ok",
+      "job": {"title": "Backend Engineer", "required_skills": ["python", "sql", "aws"], "must_have_skills": ["python"], "preferred_skills": ["docker"], "min_years": 2, "min_education": "bachelor"},
+      "resume_text": "Python developer with SQL. 3 years experience. Bachelor of Science.",
+      "human": {"label": "ok", "score": 58}
+    },
+    {
+      "id": "backend-weak",
+      "job": {"title": "Backend Engineer", "required_skills": ["python", "sql", "aws"], "must_have_skills": ["python"], "preferred_skills": ["docker"], "min_years": 2, "min_education": "bachelor"},
+      "resume_text": "Java and SQL developer with Docker. 4 years experience. Bachelor of Science.",
+      "human": {"label": "weak", "score": 22}
+    },
+    {
+      "id": "analyst-strong",
+      "job": {"title": "Data Analyst", "required_skills": ["sql", "excel", "tableau"], "must_have_skills": ["sql"], "preferred_skills": ["python"], "min_years": 1, "min_education": "bachelor"},
+      "resume_text": "Data analyst with SQL, Excel, Tableau, and Python. 3 years experience. Bachelor of Commerce.",
+      "human": {"label": "strong", "score": 88}
+    },
+    {
+      "id": "analyst-ok",
+      "job": {"title": "Data Analyst", "required_skills": ["sql", "excel", "tableau"], "must_have_skills": ["sql"], "preferred_skills": ["python"], "min_years": 1, "min_education": "bachelor"},
+      "resume_text": "SQL and Excel analyst. 2 years experience. Bachelor of Arts.",
+      "human": {"label": "ok", "score": 56}
+    },
+    {
+      "id": "analyst-weak",
+      "job": {"title": "Data Analyst", "required_skills": ["sql", "excel", "tableau"], "must_have_skills": ["sql"], "preferred_skills": ["python"], "min_years": 1, "min_education": "bachelor"},
+      "resume_text": "Marketing coordinator with strong communication and teamwork. 1 year experience. Bachelor of Arts.",
+      "human": {"label": "weak", "score": 14}
+    },
+    {
+      "id": "junior-strong",
+      "job": {"title": "Junior Developer", "required_skills": ["java", "git", "html"], "preferred_skills": ["python"], "min_education": "bachelor"},
+      "resume_text": "Java developer using Git daily, building HTML interfaces and Python tools. 1 year experience. Bachelor of Science.",
+      "human": {"label": "strong", "score": 84}
+    },
+    {
+      "id": "junior-ok",
+      "job": {"title": "Junior Developer", "required_skills": ["java", "git", "html"], "preferred_skills": ["python"], "min_education": "bachelor"},
+      "resume_text": "Java developer experienced with Git. Bachelor of Science.",
+      "human": {"label": "ok", "score": 55}
+    },
+    {
+      "id": "junior-weak",
+      "job": {"title": "Junior Developer", "required_skills": ["java", "git", "html"], "preferred_skills": ["python"], "min_education": "bachelor"},
+      "resume_text": "Sales associate with strong communication and customer service. Bachelor of Arts.",
+      "human": {"label": "weak", "score": 16}
+    }
+  ]
+}

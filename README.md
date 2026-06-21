@@ -92,7 +92,7 @@ brings) plus the point-by-point breakdown. Endpoints: `POST /api/demo/parse-job`
 | `RM_DEMO_MAX_FILE_MB` | `4` | Max size per uploaded file. |
 | `RM_DEMO_MAX_SESSIONS` | `100` | In-memory session cap (oldest evicted past this). |
 | `RM_DEMO_BACKEND` | `claude_cli` | Matching engine: `claude_cli` (Claude on your subscription, default) or `mock` (deterministic). Falls back to `mock` if the token/CLI is absent. |
-| `RM_CLAUDE_CLI_MODEL` | `sonnet` | Model for the Claude backend (`sonnet` quality / `haiku` speed). |
+| `RM_CLAUDE_CLI_MODEL` | `opus` | Model for the Claude backend (`opus` best / `sonnet` balanced / `haiku` fastest). |
 | `RM_DEMO_CONCURRENCY` | `4` | Parallel resume extractions per upload (Claude backend). |
 | `RM_DEMO_SEND_FILE` | `1` | With the Claude engine, send PDFs/images to Claude directly (vision). `0` = text only. |
 
@@ -129,6 +129,23 @@ service. Runbook: **[deploy/cohost/COHOST.md](deploy/cohost/COHOST.md)**.
 
 ---
 
+## Measuring & tuning accuracy
+
+Accuracy is *measurable*, not guessed. Put labeled `(job, resume, human-rating)` pairs in
+[data/eval/labeled_examples.json](data/eval/labeled_examples.json) (`human.label` ∈ strong/ok/weak,
+optional 0-100 `human.score`) and run:
+
+```bash
+python scripts/eval_accuracy.py
+```
+
+It scores each pair with the same pipeline the app uses and reports **label accuracy**,
+**within-one-bucket**, **Spearman rank correlation**, **MAE**, and a confusion matrix. Adjust the
+ranker weights ([matching/ranker.py](resume_matcher/matching/ranker.py) constants — required/preferred
+split, must-have weight, education/experience penalties) and re-run to see the metrics move. The
+shipped seed is clear-cut (≈100% agreement) to prove the harness; replace it with ~20-30
+coordinator-rated examples — and later real **outcomes** (who was shortlisted/hired) — to calibrate.
+
 ## Swapping the LLM backend (the handoff knob)
 
 Everything depends on one narrow interface, `InferenceAdapter.extract()` — never on a model SDK.
@@ -159,7 +176,7 @@ resume_matcher/
   stores/       scoring_store + audit_store — two physically separated data planes
   api/          FastAPI wiring + dashboard (index.html) + ephemeral demo (demo.py, demo.html), result serializer
   ui/           Streamlit coordinator dashboard (optional)
-scripts/        gen_synthetic.py, run_demo.py, build_skills.py (rebuild the skill vocab from Lightcast/ESCO)
+scripts/        gen_synthetic.py, run_demo.py, build_skills.py (rebuild skill vocab), eval_accuracy.py (measure agreement)
 tests/          unit + contract + injection + audit + e2e smoke
 ```
 

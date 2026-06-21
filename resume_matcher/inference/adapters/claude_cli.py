@@ -28,7 +28,7 @@ from ..adapter import InferenceAdapter, InferenceError, parse_extraction
 from ..prompt import build_messages
 from ..schema import CandidateProfile, JobSpec, MatchExtraction, match_extraction_schema
 
-_MODEL = os.environ.get("RM_CLAUDE_CLI_MODEL", "sonnet")
+_MODEL = os.environ.get("RM_CLAUDE_CLI_MODEL", "opus")  # most capable; override to sonnet/haiku for speed
 _TIMEOUT_S = float(os.environ.get("RM_CLAUDE_CLI_TIMEOUT", "90"))
 _FILE_TIMEOUT_S = float(os.environ.get("RM_CLAUDE_CLI_FILE_TIMEOUT", "150"))  # vision is slower
 _MAX_CONCURRENCY = max(1, int(os.environ.get("RM_CLAUDE_CLI_CONCURRENCY", "4") or "4"))

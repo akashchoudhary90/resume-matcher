@@ -32,7 +32,7 @@ services:
       # Demo matching engine: "claude_cli" uses your Claude subscription via the local CLI (no API
       # key). Falls back to the deterministic engine automatically if the token below is unset.
       RM_DEMO_BACKEND: "${RM_DEMO_BACKEND:-claude_cli}"
-      RM_CLAUDE_CLI_MODEL: "${RM_CLAUDE_CLI_MODEL:-sonnet}"
+      RM_CLAUDE_CLI_MODEL: "${RM_CLAUDE_CLI_MODEL:-opus}"
       # Subscription token from `claude setup-token` (NOT an API key). Set it in deploy/cohost/.env.
       CLAUDE_CODE_OAUTH_TOKEN: "${CLAUDE_CODE_OAUTH_TOKEN:-}"
     expose:
