@@ -28,7 +28,26 @@ from ..ingestion.parser import infer_education_level, infer_years_experience
 from ..matching.evaluator import evaluate
 from ..matching.taxonomy import normalize_skills
 
-DATA = Path(__file__).resolve().parents[2] / "data" / "eval" / "labeled_examples.json"
+EVAL_DIR = Path(__file__).resolve().parents[2] / "data" / "eval"
+DATA = EVAL_DIR / "labeled_examples.json"
+
+# Named eval sets. coordinator_ratings is the PRIMARY, realistic regression target (holistic
+# recruiter-style ratings on resumes that demonstrate skills WITHOUT keyword-matching); the keyword
+# mock scores POORLY on it, which is the honest signal. labeled_examples is a clear-cut seed used only
+# as a pipeline smoke/sanity check — its ~perfect score is NOT a measure of real-world accuracy.
+NAMED_DATASETS = {
+    "coordinator": EVAL_DIR / "coordinator_ratings.json",
+    "labeled": EVAL_DIR / "labeled_examples.json",
+}
+PRIMARY_DATASET = "coordinator"
+
+
+def resolve_dataset(name_or_path: str | Path | None) -> Path:
+    """Map a friendly name ('coordinator' | 'labeled') or a path to a concrete file; default PRIMARY."""
+    if name_or_path is None:
+        return NAMED_DATASETS[PRIMARY_DATASET]
+    key = str(name_or_path)
+    return NAMED_DATASETS[key] if key in NAMED_DATASETS else Path(name_or_path)
 
 _LABEL_ORDER = {"weak": 0, "ok": 1, "strong": 2}
 # Tool fit -> bucket. Aligns with the A/B/C/D grade bands (strong >= B, weak < C).

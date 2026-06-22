@@ -139,7 +139,7 @@ class AppState:
 
         # Homophily disparity (the reframed hunch): reference = modal self-identified race group.
         race_labels = self.audit_store.labels_for(pool, "race_ethnicity")
-        present = [l for l in race_labels if l]
+        present = [lab for lab in race_labels if lab]
         if present:
             ref = Counter(present).most_common(1)[0][0]
             result["homophily"] = homophily_disparity(race_labels, mask, reference_group=ref, min_cell=5)

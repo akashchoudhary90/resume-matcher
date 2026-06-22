@@ -29,7 +29,6 @@ from ..antigaming.keyword_stuffing import scan_keyword_stuffing
 from ..ingestion.job_posting import build_job_spec, detect_job_skills, skill_options
 from ..ingestion.parser import (
     ParseError,
-    SUPPORTED_EXTS,
     extract_bytes_text,
     infer_education_level,
     parse_resume_bytes,

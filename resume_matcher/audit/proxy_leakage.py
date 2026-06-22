@@ -56,9 +56,9 @@ def _auc(y_true: np.ndarray, y_score: np.ndarray) -> float:
 
 def proxy_leakage(features: np.ndarray, labels: list[str | None], target_group: str) -> dict:
     """Return leakage diagnostics for predicting membership of `target_group` from `features`."""
-    mask = np.array([l is not None for l in labels])
+    mask = np.array([lab is not None for lab in labels])
     X = np.asarray(features, dtype=float)[mask]
-    y = np.array([1 if l == target_group else 0 for l in labels if l is not None])
+    y = np.array([1 if lab == target_group else 0 for lab in labels if lab is not None])
     if len(y) < 10 or y.sum() == 0 or y.sum() == len(y):
         return {"computable": False, "reason": "insufficient or single-class data"}
 

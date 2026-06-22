@@ -1,0 +1,21 @@
+{
+  "_comment": "Committed REGRESSION FLOORS for the deterministic MOCK (keyword) baseline, per dataset. These are NOT a quality claim: the mock scores POORLY on realistic resumes (coordinator) on purpose — that gap is why the Claude engine exists. CI runs `eval_accuracy.py --check` and FAILS if a change pushes a metric past one of these floors. Floors carry slack for cross-version (scipy) jitter; tighten/loosen DELIBERATELY when you intend to move the baseline. Measured 2026-06-21 with RM mock backend: coordinator = acc 0.25 / within1 0.542 / spearman -0.097 / mae 47.9; labeled = acc 1.0 / within1 1.0 / spearman 0.975 / mae 8.61.",
+  "datasets": {
+    "coordinator": {
+      "backend": "mock",
+      "role": "primary realistic regression target",
+      "min_label_accuracy": 0.20,
+      "min_within_one_bucket": 0.50,
+      "min_spearman": -0.15,
+      "max_mae": 52.0
+    },
+    "labeled": {
+      "backend": "mock",
+      "role": "clear-cut seed; pipeline smoke/sanity only (NOT real-world accuracy)",
+      "min_label_accuracy": 0.90,
+      "min_within_one_bucket": 1.0,
+      "min_spearman": 0.90,
+      "max_mae": 12.0
+    }
+  }
+}
