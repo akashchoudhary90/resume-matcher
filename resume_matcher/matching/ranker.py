@@ -58,6 +58,8 @@ _INTEGRITY_PENALTIES = [
     ("stuffing:jd_echo", 0.85, "pastes long verbatim runs of the job description"),
     ("injection:phrase", 0.7, "text attempting to manipulate an automated screener"),
     ("injection:zero_width", 0.7, "hidden / zero-width characters used to smuggle text"),
+    ("hidden_text:white_text", 0.7, "hidden white-on-white text (invisible keyword stuffing)"),
+    ("hidden_text:tiny_font", 0.7, "near-invisible tiny-font text"),
 ]
 _INTEGRITY_FLOOR = 0.5           # combined integrity penalty never drops below this (no auto-reject)
 

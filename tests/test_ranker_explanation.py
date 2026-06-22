@@ -132,6 +132,23 @@ def test_integrity_downweight_for_keyword_stuffing():
     assert "stuffing:repetition:pythonx40" in stuffed.flags
 
 
+def test_hidden_text_white_font_downweights():
+    # Hidden white-on-white / tiny-font text (caught on the vision path) is gaming too — it must
+    # down-weight like visible keyword stuffing (#9C), not just be flagged.
+    cand = CandidateProfile(candidate_id="C", text="Real python work on production systems. " + "x" * 250)
+    ext = MatchExtraction(
+        candidate_id="C", job_id="J",
+        skill_matches=[SkillEvidence(skill_id="python", skill_name="Python",
+                                     status=MatchStatus.match, evidence_span="python")],
+    )
+    res = ranker.score(ext, cand, _job(["python"]), extra_flags=["hidden_text:white_text:42"])
+    assert res.explanation.integrity_factor < 1.0
+    assert res.fit_score < 100.0
+    # cross_modal divergence is noisier — it stays advisory (flagged, no score impact).
+    adv = ranker.score(ext, cand, _job(["python"]), extra_flags=["hidden_text:cross_modal:20 tokens"])
+    assert adv.explanation.integrity_factor == 1.0
+
+
 def test_integrity_factor_is_floored_never_auto_rejects():
     # Even stacking every gaming signal, integrity stays >= the floor and the candidate is still listed.
     cand = CandidateProfile(candidate_id="C", text="python " * 60 + "x" * 250)

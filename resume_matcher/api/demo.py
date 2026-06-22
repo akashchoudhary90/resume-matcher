@@ -24,6 +24,7 @@ from collections import OrderedDict
 from concurrent.futures import ThreadPoolExecutor
 from dataclasses import dataclass, field
 
+from ..antigaming.hidden_text import cross_modal_diff, scan_pdf
 from ..antigaming.injection import scan_injection
 from ..antigaming.keyword_stuffing import scan_keyword_stuffing
 from ..ingestion.job_posting import build_job_spec, detect_job_skills, skill_options
@@ -365,6 +366,7 @@ def run_demo(
                         independent = extract_bytes_text(filename or f"{cid}.pdf", data) or ""
                     except ParseError:
                         independent = ""
+                hidden_flags: list[str] = []
                 if cached_extraction is not None and independent.strip():
                     extraction = cached_extraction          # identical re-score: no LLM, no PII cached
                     verify_text = independent
@@ -376,9 +378,24 @@ def run_demo(
                     extraction = cached_extraction if cached_extraction is not None else fresh
                     _cache_put(key, extraction)
                     verify_text = independent if independent.strip() else resume_text
+                    # Hidden-text / cross-modal anti-gaming on the vision path. pdfplumber reads the
+                    # text layer (incl. white-on-white / tiny-font), while NDR AI's vision sees only
+                    # rendered content — so the PDF can carry hidden injection the model never sees.
+                    # Advisory + (for direct hidden text) score-affecting via the ranker integrity gate.
+                    # Best-effort: a scan failure must never break scoring.
+                    try:
+                        if ext == ".pdf" and tmp:
+                            hidden_flags += [f for f in scan_pdf(tmp)
+                                             if not f.startswith("hidden_text:scan_skipped")]
+                        if independent.strip() and resume_text.strip():
+                            hidden_flags += cross_modal_diff(
+                                visible_text=resume_text, extracted_text=independent, min_hidden=12)
+                    except Exception:  # noqa: BLE001 - anti-gaming scan is advisory, never fatal
+                        pass
                 if verify_text.strip():
                     cand = _candidate_from_text(cid, verify_text)
-                    flags = scan_injection(cand.text) + scan_keyword_stuffing(cand.text, job)
+                    flags = (scan_injection(cand.text) + scan_keyword_stuffing(cand.text, job)
+                             + hidden_flags)
                     if not independent.strip():
                         # Scanned image / no text layer: there is no independent ground truth, so quotes
                         # could only be checked against the model's own transcription — say so plainly.
