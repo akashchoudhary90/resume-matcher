@@ -15,12 +15,16 @@ import logging
 import os
 import secrets
 
-from fastapi import Depends, HTTPException, status
+from fastapi import Depends, HTTPException, Request, status
 from fastapi.security import HTTPBasic, HTTPBasicCredentials
 
 _log = logging.getLogger("resume_matcher.auth")
 _security = HTTPBasic(auto_error=False)
 _warned = False
+
+# Reachable WITHOUT credentials: the readiness probe the Docker HEALTHCHECK and the auto-deploy poller
+# hit. It exposes no secrets and no PII (just status + counts), and must answer before login works.
+_AUTH_EXEMPT_PATHS = {"/api/health"}
 
 # Known-weak / placeholder passwords. A SET-but-weak password almost always means a real deployment
 # shipped the .env.example default, so we fail fast rather than guard real PII with "admin".
@@ -41,8 +45,12 @@ def assert_admin_password_strong() -> None:
         )
 
 
-def require_auth(credentials: HTTPBasicCredentials | None = Depends(_security)) -> None:
+def require_auth(
+    request: Request, credentials: HTTPBasicCredentials | None = Depends(_security)
+) -> None:
     global _warned
+    if request.url.path in _AUTH_EXEMPT_PATHS:
+        return  # readiness probe — must work unauthenticated for healthchecks/deploy polling
     password = os.environ.get("RM_ADMIN_PASSWORD")
     if not password:
         if not _warned:

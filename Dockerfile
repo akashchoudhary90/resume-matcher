@@ -38,6 +38,12 @@ ENV RM_INFERENCE_BACKEND=mock \
 
 EXPOSE 8000
 
+# Container readiness: Docker (and the auto-deploy poller, which gates rollback on this) marks the app
+# healthy only once /api/health returns 200. /api/health is auth-exempt and uses stdlib only (no curl
+# in the image). start-period covers Python + optional Claude-CLI warm-up so we don't flap on boot.
+HEALTHCHECK --interval=30s --timeout=5s --start-period=45s --retries=3 \
+  CMD python -c "import sys,urllib.request; sys.exit(0 if urllib.request.urlopen('http://127.0.0.1:8000/api/health', timeout=4).status == 200 else 1)"
+
 # serve.py runs uvicorn with ws="none" (the app has no websockets; avoids a uvicorn/websockets clash).
 # Single process on purpose: app state is in-memory, so one worker keeps it consistent.
 CMD ["python", "scripts/serve.py"]

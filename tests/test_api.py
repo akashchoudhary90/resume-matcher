@@ -16,7 +16,10 @@ def client():
 
 
 def test_health_and_index(client):
-    assert client.get("/api/health").json() == {"status": "ok"}
+    h = client.get("/api/health")
+    assert h.status_code == 200
+    body = h.json()
+    assert body["status"] == "ok" and "active_sessions" in body  # real readiness probe
     assert client.get("/").status_code == 200  # dashboard HTML served
 
 
@@ -47,15 +50,24 @@ def test_unknown_ids_404(client):
 
 
 def test_admin_password_gate(monkeypatch):
-    # When RM_ADMIN_PASSWORD is set, every route requires Basic auth.
+    # When RM_ADMIN_PASSWORD is set, every route EXCEPT the readiness probe requires Basic auth.
     monkeypatch.setenv("RM_ADMIN_USER", "admin")
     monkeypatch.setenv("RM_ADMIN_PASSWORD", "s3cret")
     gated = TestClient(create_app())
 
-    assert gated.get("/api/health").status_code == 401            # no credentials
-    assert gated.get("/api/health", auth=("admin", "wrong")).status_code == 401
-    assert gated.get("/api/health", auth=("admin", "s3cret")).status_code == 200
+    assert gated.get("/api/status").status_code == 401            # no credentials
+    assert gated.get("/api/status", auth=("admin", "wrong")).status_code == 401
+    assert gated.get("/api/status", auth=("admin", "s3cret")).status_code == 200
     assert gated.get("/", auth=("admin", "s3cret")).status_code == 200  # dashboard gated too
+
+
+def test_health_is_auth_exempt(monkeypatch):
+    # /api/health must answer 200 WITHOUT credentials even when the gate is on — the Docker HEALTHCHECK
+    # and the auto-deploy poller hit it unauthenticated. It exposes only status + counts, no PII.
+    monkeypatch.setenv("RM_ADMIN_PASSWORD", "s3cret")
+    gated = TestClient(create_app())
+    r = gated.get("/api/health")
+    assert r.status_code == 200 and r.json()["status"] == "ok"
 
 
 @pytest.mark.parametrize("weak", ["admin", "password", "changeme", "CHANGE_ME_BEFORE_DEPLOY"])

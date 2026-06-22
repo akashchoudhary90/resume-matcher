@@ -109,7 +109,23 @@ def create_app():
 
     @app.get("/api/health")
     def health() -> dict:
-        return {"status": "ok"}
+        # Real readiness probe (auth-exempt): confirms the process booted, the dashboards it serves are
+        # present, and the in-memory session store is responsive. The Docker HEALTHCHECK and the
+        # auto-deploy poller gate on this; a broken deploy returns 503 and is rolled back. No PII.
+        ready = (_STATIC / "index.html").exists()
+        try:
+            sessions = demo_store.active_count()
+        except Exception:  # noqa: BLE001 - store unresponsive => not ready
+            ready, sessions = False, -1
+        body = {
+            "status": "ok" if ready else "unhealthy",
+            "version": app.version,
+            "demo_enabled": demo_enabled,
+            "active_sessions": sessions,
+        }
+        if not ready:
+            raise HTTPException(503, body)
+        return body
 
     @app.get("/api/status")
     def status() -> dict:
