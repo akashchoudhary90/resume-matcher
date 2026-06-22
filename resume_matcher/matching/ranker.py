@@ -44,7 +44,8 @@ _REQUIRED_WEIGHT = 75.0
 _PREFERRED_WEIGHT = 25.0
 _BELOW_EDU_FACTOR = 0.85
 _MUST_HAVE_WEIGHT = 2.0          # a must-have skill weighs 2x a regular required skill
-_MISSING_MUST_HAVE_FACTOR = 0.4  # missing a deal-breaker heavily penalizes (but never auto-rejects)
+_MISSING_MUST_HAVE_FACTOR = 0.4  # floor: ALL must-haves missing (heavy penalty, never auto-rejects)
+_MISSING_MUST_HAVE_CAP = 0.7     # most relief when only a few of several must-haves are missing
 _MIN_EXPERIENCE_FACTOR = 0.7     # floor of the graded experience penalty
 _MAX_EVIDENCE_SPAN = 160
 _MIN_EVIDENCE_ALNUM = 3          # a quote with fewer alphanumerics is too generic to be evidence
@@ -309,13 +310,21 @@ def score(
         else:
             exp_note = f"Meets the minimum experience ({job.min_years:g}+ yrs; no adjustment)."
 
-    # Must-have gate: a missing deal-breaker heavily penalizes (still listed, never auto-rejected).
+    # Must-have gate: missing deal-breakers penalize, GRADED by the fraction missing — missing 1 of 4
+    # is less severe than missing all 4 — and floored at _MISSING_MUST_HAVE_FACTOR (never auto-rejects).
+    # With a single must-have, missing it still applies the full floor (backward-compatible).
     missing_must = [s for s in req_ids if s in must_set and s not in verified_by_skill]
     must_factor, must_note = 1.0, ""
     if must_set:
         if missing_must:
-            must_factor = _MISSING_MUST_HAVE_FACTOR
-            must_note = ("Missing must-have skill(s): "
+            # Graded between the floor (ALL missing) and the cap (a few of several missing). Even one
+            # missing deal-breaker is a real penalty (factor <= cap); a single must-have missing floors
+            # at _MISSING_MUST_HAVE_FACTOR (backward-compatible). frac_missing in (0, 1].
+            frac_missing = len(missing_must) / len(must_set)
+            must_factor = round(
+                _MISSING_MUST_HAVE_FACTOR
+                + (_MISSING_MUST_HAVE_CAP - _MISSING_MUST_HAVE_FACTOR) * (1.0 - frac_missing), 3)
+            must_note = (f"Missing {len(missing_must)} of {len(must_set)} must-have skill(s): "
                          f"{', '.join(canonical_name(s) for s in missing_must)} — x{must_factor}.")
             for s in missing_must:
                 flags.append(f"missing_must_have:{s}")

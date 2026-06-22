@@ -279,6 +279,31 @@ def test_must_have_missing_heavily_penalized_and_flagged():
     assert res.fit_score < 50  # deal-breaker missing -> not shortlist-worthy
 
 
+def test_must_have_penalty_is_graded_by_fraction_missing():
+    # #15: missing 2 of 4 must-haves is graded (x0.7), not the flat 0.4 cliff; reconciles exactly.
+    job = JobSpec(job_id="J", title="t", employer="e",
+                  required_skills=["python", "sql", "docker", "aws"],
+                  must_have_skills=["python", "sql", "docker", "aws"])
+    cand = CandidateProfile(candidate_id="C", text="python and sql expert " + "x" * 250)
+    ext = MatchExtraction(candidate_id="C", job_id="J",
+                          skill_matches=[_ev("python", "python"), _ev("sql", "sql")])
+    res = ranker.score(ext, cand, job)
+    assert res.explanation.must_have_factor == 0.55  # missing 2/4 -> 0.4 + 0.3*(1-0.5)
+    assert any(f == "missing_must_have:docker" for f in res.flags)
+    ex = res.explanation
+    assert round(ex.subtotal * ex.education_factor * ex.experience_factor * ex.must_have_factor
+                 * ex.integrity_factor, 1) == res.fit_score
+
+
+def test_single_must_have_missing_keeps_full_floor():
+    # Backward-compat: with one must-have, missing it still applies the full 0.4 floor.
+    job = JobSpec(job_id="J", title="t", employer="e",
+                  required_skills=["python", "sql"], must_have_skills=["python"])
+    cand = CandidateProfile(candidate_id="C", text="sql expert " + "x" * 250)
+    ext = MatchExtraction(candidate_id="C", job_id="J", skill_matches=[_ev("sql", "sql")])
+    assert ranker.score(ext, cand, job).explanation.must_have_factor == 0.4
+
+
 def test_must_have_weighs_double_within_required():
     job = JobSpec(job_id="J", title="t", employer="e",
                   required_skills=["python", "sql"], must_have_skills=["python"])
