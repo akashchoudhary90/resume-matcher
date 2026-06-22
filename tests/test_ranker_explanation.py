@@ -32,9 +32,10 @@ def test_explanation_reconciles_to_fit_score():
     result = evaluate(cand, _job(["python", "sql", "docker"], ["react"]))
     ex = result.explanation
     assert ex is not None
-    # The headline math the user checks must hold exactly.
+    # The headline math the user checks must hold exactly (now including the integrity factor).
     assert ex.final_score == result.fit_score
-    assert round(ex.subtotal * ex.education_factor, 1) == result.fit_score
+    assert round(ex.subtotal * ex.education_factor * ex.experience_factor * ex.must_have_factor
+                 * ex.integrity_factor, 1) == result.fit_score
     assert round(ex.required_earned + ex.preferred_earned, 2) == ex.subtotal
 
 
@@ -110,6 +111,43 @@ def test_short_real_skill_token_still_verifies():
     assert res.fit_score == 100.0
 
 
+def test_integrity_downweight_for_keyword_stuffing():
+    # Anti-gaming flags must now LOWER the score (audit #10) — they used to be computed and ignored,
+    # so a keyword-stuffed resume could score ~94. The penalty is bounded and never auto-rejects.
+    cand = CandidateProfile(candidate_id="C", text="python " * 60 + "x" * 250)
+    ext = MatchExtraction(
+        candidate_id="C", job_id="J",
+        skill_matches=[SkillEvidence(skill_id="python", skill_name="Python",
+                                     status=MatchStatus.match, evidence_span="python")],
+    )
+    clean = ranker.score(ext, cand, _job(["python"]))
+    stuffed = ranker.score(ext, cand, _job(["python"]), extra_flags=["stuffing:repetition:pythonx40"])
+    assert clean.fit_score == 100.0
+    assert stuffed.fit_score < clean.fit_score
+    ex = stuffed.explanation
+    assert ex.integrity_factor < 1.0
+    # the breakdown still reconciles EXACTLY with the new integrity factor in the chain
+    assert round(ex.subtotal * ex.education_factor * ex.experience_factor * ex.must_have_factor
+                 * ex.integrity_factor, 1) == stuffed.fit_score
+    assert "stuffing:repetition:pythonx40" in stuffed.flags
+
+
+def test_integrity_factor_is_floored_never_auto_rejects():
+    # Even stacking every gaming signal, integrity stays >= the floor and the candidate is still listed.
+    cand = CandidateProfile(candidate_id="C", text="python " * 60 + "x" * 250)
+    ext = MatchExtraction(
+        candidate_id="C", job_id="J",
+        skill_matches=[SkillEvidence(skill_id="python", skill_name="Python",
+                                     status=MatchStatus.match, evidence_span="python")],
+    )
+    res = ranker.score(ext, cand, _job(["python"]), extra_flags=[
+        "stuffing:repetition:px40", "stuffing:jd_echo",
+        "injection:phrase:x", "injection:zero_width:ZWSP",
+    ])
+    assert res.explanation.integrity_factor >= 0.5  # floored — no auto-reject
+    assert res.fit_score > 0
+
+
 def test_education_penalty_is_shown_and_applied():
     cand = CandidateProfile(
         candidate_id="C1", education_level="diploma", years_experience=1,
@@ -124,7 +162,10 @@ def test_education_penalty_is_shown_and_applied():
 
 def test_empty_required_skills_renormalizes_to_preferred():
     """With no required skills, preferred carries the full 100 pts (no free points)."""
-    cand = CandidateProfile(candidate_id="C1", text="Strong Python developer. " * 20)
+    cand = CandidateProfile(
+        candidate_id="C1",
+        text="Strong Python developer who shipped varied production features across several teams.",
+    )
     result = evaluate(cand, _job([], ["python"]))
     assert "no_required_skills" in result.flags
     ex = result.explanation
@@ -184,7 +225,9 @@ def test_education_row_reconciles_on_penalty():
 
 
 def test_duplicate_skill_ids_collapsed():
-    cand = CandidateProfile(candidate_id="C", text="python " * 60)
+    cand = CandidateProfile(
+        candidate_id="C", text="Senior python engineer who built varied production data systems and tools."
+    )
     res = evaluate(cand, _job(["python", "python"], ["python"]))
     assert "duplicate_skill_ids_collapsed" in res.flags
     assert len([c for c in res.explanation.components if c.bucket == "required"]) == 1

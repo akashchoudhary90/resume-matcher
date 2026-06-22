@@ -45,14 +45,17 @@ def test_ranker_discards_unverifiable_evidence():
     assert result.subscores["required_coverage"] == 0.5
 
 
-def test_injection_text_is_flagged_but_not_acted_on():
+def test_injection_text_is_flagged_downweighted_but_not_auto_rejected():
     payload = injection_payloads()[0]
     candidate = CandidateProfile(
         candidate_id="C", skills=["python"], text=f"Skilled in Python. {payload}"
     )
     result = evaluate(candidate, _job(), adapter=MockAdapter())
     assert any(f.startswith("injection:") for f in result.flags)
-    # Java still missing -> not awarded full marks despite the 'award full marks' injection.
+    # The injection is now ACTED ON as a bounded down-weight (audit #10), not merely flagged...
+    assert result.explanation.integrity_factor < 1.0
+    # ...but never auto-rejected (still listed) and the fabricated 'full marks' claim is not credited.
+    assert result.fit_score > 0
     assert result.fit_score < 80
     assert "java" not in {m.skill_id for m in result.verified_matches}
 

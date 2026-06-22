@@ -137,7 +137,8 @@ class ScoreComponent(BaseModel):
 class ScoreExplanation(BaseModel):
     """A fully decomposed, human-readable derivation of `fit_score`. The components reconcile
     EXACTLY to the headline number:
-        round(sum(c.points_earned for required+preferred) * education_factor, 1) == fit_score
+        round(subtotal * education_factor * experience_factor * must_have_factor * integrity_factor, 1)
+        == fit_score
     so the UI can show the arithmetic and the user can check it themselves."""
 
     formula: str = ""  # the literal arithmetic, e.g. "100 x (0.75 x req_cov + 0.25 x pref_cov) x edu"
@@ -153,7 +154,9 @@ class ScoreExplanation(BaseModel):
     experience_note: str = ""
     must_have_factor: float = 1.0  # penalty when a deal-breaker (must-have) skill is missing
     must_have_note: str = ""
-    final_score: float = 0.0  # round(subtotal * education * experience * must_have, 1) == fit_score
+    integrity_factor: float = 1.0  # bounded penalty for keyword-stuffing / JD-echo / injection signals
+    integrity_note: str = ""
+    final_score: float = 0.0  # round(subtotal * edu * experience * must_have * integrity, 1) == fit
     summary: str = ""  # one-paragraph plain-English "why this score"
 
 

@@ -342,6 +342,7 @@ function explanationHtml(ex){
         ${mult('Education', ex.education_factor, ex.education_note)}
         ${mult('Experience', ex.experience_factor, ex.experience_note)}
         ${mult('Must-have penalty', ex.must_have_factor, ex.must_have_note)}
+        ${mult('Integrity', ex.integrity_factor, ex.integrity_note)}
         <tr><td colspan="3"><b>Final fit score</b></td><td><span class="score ${gradeClass(scoreGrade(ex.final_score))}">${ex.final_score}</span></td></tr>
       </tfoot>
     </table>`;

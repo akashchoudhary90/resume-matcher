@@ -49,7 +49,32 @@ _MIN_EXPERIENCE_FACTOR = 0.7     # floor of the graded experience penalty
 _MAX_EVIDENCE_SPAN = 160
 _MIN_EVIDENCE_ALNUM = 3          # a quote with fewer alphanumerics is too generic to be evidence
 
+# Integrity (anti-gaming) penalties. Advisory flags from antigaming/* now DOWN-WEIGHT the score via a
+# bounded multiplier — they never auto-reject (locked decision). Each tuple: (flag-prefix, factor,
+# human label). The verbatim-evidence check already blocks fabricated *skills*; this additionally
+# discounts resumes that game the screener (e.g. a keyword-stuffed resume that used to score ~94).
+_INTEGRITY_PENALTIES = [
+    ("stuffing:repetition", 0.7, "keyword stuffing (a term spammed to game matching)"),
+    ("stuffing:jd_echo", 0.85, "pastes long verbatim runs of the job description"),
+    ("injection:phrase", 0.7, "text attempting to manipulate an automated screener"),
+    ("injection:zero_width", 0.7, "hidden / zero-width characters used to smuggle text"),
+]
+_INTEGRITY_FLOOR = 0.5           # combined integrity penalty never drops below this (no auto-reject)
+
 _WS_RE = re.compile(r"\s+")
+
+
+def _integrity_factor(flags: list[str]) -> tuple[float, str]:
+    """Bounded down-weight for anti-gaming signals present in `flags`. Returns (factor, note)."""
+    factor, hits = 1.0, []
+    for prefix, mult, label in _INTEGRITY_PENALTIES:
+        if any(f.startswith(prefix) for f in flags):
+            factor *= mult
+            hits.append(label)
+    if not hits:
+        return 1.0, ""
+    factor = round(max(_INTEGRITY_FLOOR, factor), 3)
+    return factor, f"Integrity signals ({'; '.join(hits)}); x{factor} (flagged for human review)."
 
 
 def _norm_ws(s: str) -> str:
@@ -160,7 +185,8 @@ def _weighted_components(
     return comps, earned_total
 
 
-def _summary(fit, grade, comps, n_discarded, missing_must, edu_factor, exp_factor) -> str:
+def _summary(fit, grade, comps, n_discarded, missing_must, edu_factor, exp_factor,
+             integrity_factor=1.0) -> str:
     real = [c for c in comps if c.bucket in ("required", "preferred")]
     got = sum(1 for c in real if c.verified and c.status == MatchStatus.match)
     parts = [f"Fit {fit:.1f} (grade {grade})."]
@@ -175,6 +201,9 @@ def _summary(fit, grade, comps, n_discarded, missing_must, edu_factor, exp_facto
         parts.append("Below the job's minimum experience (penalty applied).")
     if edu_factor < 1.0:
         parts.append("Below the job's minimum education (penalty applied).")
+    if integrity_factor < 1.0:
+        parts.append("Anti-gaming signals detected (keyword stuffing / injection) — score down-weighted, "
+                     "flagged for human review.")
     return " ".join(parts)
 
 
@@ -291,7 +320,11 @@ def score(
         else:
             must_note = "All must-have skills are present (no adjustment)."
 
-    fit = round(subtotal * edu_factor * exp_factor * must_factor, 1)
+    # Integrity gate: anti-gaming signals (keyword stuffing, JD echo, prompt-injection text) apply a
+    # bounded down-weight. Never an auto-reject — the resume stays listed and the signal is flagged.
+    integrity_factor, integrity_note = _integrity_factor(flags)
+
+    fit = round(subtotal * edu_factor * exp_factor * must_factor * integrity_factor, 1)
     grade = "A" if fit >= 80 else "B" if fit >= 65 else "C" if fit >= 50 else "D"
 
     info_comps: list[ScoreComponent] = []
@@ -302,7 +335,7 @@ def score(
             note="No required or preferred skills were provided, so no fit score can be computed."))
 
     explanation = ScoreExplanation(
-        formula="fit = round( skills_subtotal x education x experience x must_have , 1 )",
+        formula="fit = round( skills_subtotal x education x experience x must_have x integrity , 1 )",
         components=req_comps + pref_comps + info_comps,
         required_possible=round(req_w, 1),
         preferred_possible=round(pref_w, 1),
@@ -315,9 +348,11 @@ def score(
         experience_note=exp_note,
         must_have_factor=must_factor,
         must_have_note=must_note,
+        integrity_factor=integrity_factor,
+        integrity_note=integrity_note,
         final_score=fit,
         summary=_summary(fit, grade, req_comps + pref_comps, len(discarded), missing_must,
-                         edu_factor, exp_factor),
+                         edu_factor, exp_factor, integrity_factor),
     )
 
     if not candidate.has_resume or len(candidate.text) < 200:
