@@ -12,6 +12,7 @@ introspect real annotation objects to wire request/Form parameters, and stringiz
 break that. The upload route parses the multipart form manually (request.form) so it can raise the
 per-file size / count limits above Starlette's defaults and keep uploads in memory.
 """
+import logging
 import os
 import threading
 import time
@@ -27,6 +28,7 @@ from .service import get_state
 
 _STATIC = Path(__file__).with_name("static")
 _SWEEPER_STARTED = False
+_log = logging.getLogger("resume_matcher.api")
 
 
 def _split_ids(value: str) -> list[str]:
@@ -218,10 +220,12 @@ def create_app():
                 max_files=demo_mod.MAX_RESUMES, max_fields=50, max_part_size=max_part
             )
         except Exception as exc:  # noqa: BLE001 - malformed/oversized upload -> clean 4xx
+            # Log the raw cause server-side; never echo internal exception text to the client.
+            _log.warning("demo upload rejected at multipart parse: %s", exc)
             raise HTTPException(
                 400,
                 f"Upload rejected (too large, too many files, or malformed). "
-                f"Limit: {demo_mod.MAX_RESUMES} files, {demo_mod.MAX_FILE_MB} MB each. [{exc}]",
+                f"Limit: {demo_mod.MAX_RESUMES} files, {demo_mod.MAX_FILE_MB} MB each.",
             )
         resume_parts = [v for v in form.getlist("resumes") if hasattr(v, "read")]
         files = [((p.filename or ""), await p.read()) for p in resume_parts]

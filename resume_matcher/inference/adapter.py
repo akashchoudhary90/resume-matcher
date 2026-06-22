@@ -60,20 +60,59 @@ class InferenceAdapter(ABC):
         return result
 
 
-def parse_extraction(raw: str, candidate: CandidateProfile, job: JobSpec) -> MatchExtraction:
-    """Parse a model's raw text into a validated MatchExtraction. Tolerates JSON wrapped in prose /
-    code fences. Raises InferenceError on unrecoverable output."""
-    text = raw.strip()
+def _balanced_object(text: str) -> str | None:
+    """Return the first brace-balanced {...} object in `text`, tracking string literals so braces
+    inside quoted values don't count. Returns None if no balanced object is found. This is more
+    robust than first-'{' .. last-'}', which over-captures when prose with braces trails the JSON."""
+    start = text.find("{")
+    if start == -1:
+        return None
+    depth, in_str, esc = 0, False, False
+    for i in range(start, len(text)):
+        c = text[i]
+        if in_str:
+            if esc:
+                esc = False
+            elif c == "\\":
+                esc = True
+            elif c == '"':
+                in_str = False
+            continue
+        if c == '"':
+            in_str = True
+        elif c == "{":
+            depth += 1
+        elif c == "}":
+            depth -= 1
+            if depth == 0:
+                return text[start : i + 1]
+    return None
+
+
+def extract_json_object(raw: str) -> dict:
+    """Parse the JSON object out of a model's raw text. Tolerates code fences and surrounding prose;
+    uses brace-balancing (not last-'}') so trailing text with braces doesn't break it. Raises
+    InferenceError when no valid JSON object can be recovered. Shared by every adapter parser."""
+    text = (raw or "").strip()
     if "```" in text:  # strip markdown code fences if present
         parts = text.split("```")
         text = max(parts, key=len).removeprefix("json").strip()
-    start, end = text.find("{"), text.rfind("}")
-    if start == -1 or end == -1:
-        raise InferenceError(f"No JSON object found in model output: {raw[:200]!r}")
+    blob = _balanced_object(text)
+    if blob is None:  # last-ditch fallback (e.g. truncated output): first-'{' .. last-'}'
+        start, end = text.find("{"), text.rfind("}")
+        if start == -1 or end == -1 or end < start:
+            raise InferenceError(f"No JSON object found in model output: {raw[:200]!r}")
+        blob = text[start : end + 1]
     try:
-        data = json.loads(text[start : end + 1])
+        return json.loads(blob)
     except json.JSONDecodeError as exc:
         raise InferenceError(f"Model output was not valid JSON: {exc}") from exc
+
+
+def parse_extraction(raw: str, candidate: CandidateProfile, job: JobSpec) -> MatchExtraction:
+    """Parse a model's raw text into a validated MatchExtraction. Tolerates JSON wrapped in prose /
+    code fences. Raises InferenceError on unrecoverable output."""
+    data = extract_json_object(raw)
     data.setdefault("candidate_id", candidate.candidate_id)
     data.setdefault("job_id", job.job_id)
     try:

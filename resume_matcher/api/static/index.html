@@ -158,7 +158,7 @@ async function loadJobs(){
 }
 
 async function showShortlist(jobId){
-  const data = await api(`/api/jobs/${jobId}/shortlist`);
+  const data = await api(`/api/jobs/${encodeURIComponent(jobId)}/shortlist`);
   const rows = data.shortlist.map(c => {
     const flags = (c.flags_explained && c.flags_explained.length)
       ? c.flags_explained.map(flagChipFull).join('')

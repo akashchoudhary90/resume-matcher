@@ -24,7 +24,7 @@ import subprocess
 import tempfile
 import threading
 
-from ..adapter import InferenceAdapter, InferenceError, parse_extraction
+from ..adapter import InferenceAdapter, InferenceError, extract_json_object, parse_extraction
 from ..prompt import build_messages
 from ..schema import CandidateProfile, JobSpec, MatchExtraction, match_extraction_schema
 
@@ -123,17 +123,8 @@ def _build_file_prompt(job: JobSpec, candidate_id: str, file_basename: str) -> s
 
 
 def _parse_json_object(raw: str) -> dict:
-    text = (raw or "").strip()
-    if "```" in text:
-        parts = text.split("```")
-        text = max(parts, key=len).removeprefix("json").strip()
-    start, end = text.find("{"), text.rfind("}")
-    if start == -1 or end == -1:
-        raise InferenceError(f"No JSON object in Claude output: {raw[:200]!r}")
-    try:
-        return json.loads(text[start : end + 1])
-    except json.JSONDecodeError as exc:
-        raise InferenceError(f"Claude output was not valid JSON: {exc}") from exc
+    # Shared brace-balanced parser (handles code fences + trailing prose); see inference/adapter.py.
+    return extract_json_object(raw)
 
 
 def extract_from_file(file_path: str, job: JobSpec, candidate_id: str) -> tuple[str, MatchExtraction]:

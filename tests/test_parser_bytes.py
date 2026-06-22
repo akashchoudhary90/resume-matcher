@@ -35,6 +35,15 @@ def test_infer_years_experience_robust():
     assert infer_years_experience("no experience mentioned") == 0.0
 
 
+def test_infer_years_spelled_clamped_and_hyphen_safe():
+    # #17: more spelled-out numbers, an implausible-value clamp, and no hyphenated-compound misparse.
+    assert infer_years_experience("seventeen years in operations") == 17.0
+    assert infer_years_experience("nineteen years as a teacher") == 19.0
+    assert infer_years_experience("thirteen years of practice") == 13.0
+    assert infer_years_experience("over 100 years of combined team experience") == 0.0  # implausible
+    assert infer_years_experience("twenty-five years") != 5.0  # not misread as the 2nd half "five"
+
+
 def test_txt_bytes_parsed_and_redacted():
     data = b"Jane Doe\nEmail: jane@example.com Phone: (416) 555-1212\nPython and SQL developer."
     cand = parse_resume_bytes("R01", "jane.txt", data)

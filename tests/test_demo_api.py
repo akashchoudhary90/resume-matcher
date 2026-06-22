@@ -71,6 +71,9 @@ def test_too_many_resumes_400(client):
     files = [_file(f"r{i}.txt", b"python sql") for i in range(11)]
     r = client.post("/api/demo/run", data={"required_skills": "python"}, files=files)
     assert r.status_code == 400
+    # #19: a generic client message; the raw parser exception is logged server-side, not echoed.
+    detail = r.json().get("detail", "")
+    assert "Upload rejected" in detail and "Exception" not in detail and "Traceback" not in r.text
 
 
 def test_demo_page_served(client):

@@ -72,6 +72,17 @@ def test_offbox_adapter_strips_contacts_before_transmission(monkeypatch):
     assert "jane@example.com" in cand.text  # caller's object unchanged (verification source intact)
 
 
+def test_extract_json_object_is_brace_balanced():
+    # #14: brace-balancing (not first-'{'..last-'}') so trailing prose with stray braces doesn't break
+    # parsing, and braces inside string values are ignored.
+    from resume_matcher.inference.adapter import extract_json_object
+
+    raw = '{"a": 1, "skill": "C{plus}{plus}"} then trailing prose with a stray } brace'
+    assert extract_json_object(raw) == {"a": 1, "skill": "C{plus}{plus}"}
+    fenced = 'Sure!\n```json\n{"x": [1, 2], "y": "}"}\n```\nhope that helps {ok}'
+    assert extract_json_object(fenced) == {"x": [1, 2], "y": "}"}
+
+
 def test_available_false_without_token(monkeypatch):
     monkeypatch.delenv("CLAUDE_CODE_OAUTH_TOKEN", raising=False)
     assert claude_cli.available() is False

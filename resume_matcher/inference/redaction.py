@@ -11,6 +11,20 @@ from __future__ import annotations
 import re
 
 EMAIL_RE = re.compile(r"\b[\w.+-]+@[\w-]+\.[\w.-]+\b")
+# Obfuscated email: explicit "(at)"/"[at]" + "(dot)"/"[dot]" (or a literal dot) markers people use to
+# dodge naive scrapers. Requires the bracketed marker (unambiguous), so it never fires on prose.
+_OBF_AT = r"(?:\(\s*at\s*\)|\[\s*at\s*\])"
+_OBF_DOT = r"(?:\(\s*dot\s*\)|\[\s*dot\s*\]|\.)"
+OBFUSCATED_EMAIL_RE = re.compile(
+    rf"[\w.+-]+\s*{_OBF_AT}\s*[\w-]+\s*{_OBF_DOT}\s*[a-z]{{2,}}", re.IGNORECASE
+)
+# Scheme-less profile/social links (e.g. github.com/jane, linkedin.com/in/jane). A host whitelist —
+# NOT a generic TLD match — so tech domains named as skills (react.dev, spring.io) are NOT redacted.
+PROFILE_URL_RE = re.compile(
+    r"\b(?:linkedin|github|gitlab|bitbucket|twitter|medium|behance|dribbble|facebook|instagram|"
+    r"stackoverflow|kaggle)\.(?:com|net|io|org)(?:/\S*)?",
+    re.IGNORECASE,
+)
 # Phone numbers in the common NANP / international shapes: an optional +country code, then a
 # 3-digit area group (optionally parenthesized) and 3+4 digit groups joined by a SINGLE separator,
 # OR a bare run of 10-14 digits. Using single-char separators (not a greedy [\d\s.()-]+) means it
@@ -34,7 +48,9 @@ def redact_text(text: str, name: str | None = None) -> str:
     if not text:
         return ""
     out = EMAIL_RE.sub("[EMAIL]", text)
+    out = OBFUSCATED_EMAIL_RE.sub("[EMAIL]", out)
     out = URL_RE.sub("[URL]", out)
+    out = PROFILE_URL_RE.sub("[URL]", out)
     out = ADDRESS_RE.sub("[ADDRESS]", out)
     out = POSTAL_CA_RE.sub("[POSTAL]", out)
     out = PHONE_RE.sub("[PHONE]", out)
@@ -48,11 +64,11 @@ def assert_redacted(text: str) -> list[str]:
     """Return a list of leak descriptions still present in `text` (empty == clean). Used by tests
     and as a tripwire before any non-local adapter call."""
     leaks: list[str] = []
-    if EMAIL_RE.search(text):
+    if EMAIL_RE.search(text) or OBFUSCATED_EMAIL_RE.search(text):
         leaks.append("email")
     if PHONE_RE.search(text):
         leaks.append("phone")
-    if URL_RE.search(text):
+    if URL_RE.search(text) or PROFILE_URL_RE.search(text):
         leaks.append("url")
     if ADDRESS_RE.search(text):
         leaks.append("address")

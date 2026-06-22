@@ -69,22 +69,30 @@ def infer_education_level(text: str) -> str | None:
 
 _NUM_WORDS = {
     "one": 1, "two": 2, "three": 3, "four": 4, "five": 5, "six": 6, "seven": 7, "eight": 8,
-    "nine": 9, "ten": 10, "eleven": 11, "twelve": 12, "fifteen": 15, "twenty": 20,
+    "nine": 9, "ten": 10, "eleven": 11, "twelve": 12, "thirteen": 13, "fourteen": 14, "fifteen": 15,
+    "sixteen": 16, "seventeen": 17, "eighteen": 18, "nineteen": 19, "twenty": 20, "thirty": 30,
+    "forty": 40,
 }
+_MAX_PLAUSIBLE_YEARS = 60.0  # discard "100 years of combined team experience" and typos
 # "X years/yrs" (digit or spelled), optional "+", not followed by "ago"/"old" (those aren't tenure).
+# Spelled forms use a left lookbehind so a hyphenated compound ("twenty-five years") doesn't match its
+# second half ("five years" -> 5); longest words first so e.g. "seventeen" wins over "seven".
 _YEARS_DIGIT = re.compile(r"\b(\d+(?:\.\d+)?)\s*\+?\s*(?:years?|yrs?)\b(?!\s+(?:ago|old))")
 _YEARS_WORD = re.compile(
-    r"\b(" + "|".join(_NUM_WORDS) + r")\s*\+?\s*(?:years?|yrs?)\b(?!\s+(?:ago|old))"
+    r"(?<![\w-])(" + "|".join(sorted(_NUM_WORDS, key=len, reverse=True))
+    + r")\s*\+?\s*(?:years?|yrs?)\b(?!\s+(?:ago|old))"
 )
 
 
 def infer_years_experience(text: str) -> float:
     """Best-effort total years of experience. Handles digits and spelled-out numbers, "X+ years",
     and "X years as a ..." (not just "X years of experience"); ignores "X years ago/old". Returns the
-    LARGEST plausible figure mentioned (a recruiter reads total tenure)."""
+    LARGEST PLAUSIBLE figure mentioned (a recruiter reads total tenure), discarding implausible values
+    (e.g. "100 years combined") above a sane cap."""
     low = (text or "").lower()
     yrs = [float(m.group(1)) for m in _YEARS_DIGIT.finditer(low)]
     yrs += [float(_NUM_WORDS[m.group(1)]) for m in _YEARS_WORD.finditer(low)]
+    yrs = [y for y in yrs if 0 < y <= _MAX_PLAUSIBLE_YEARS]
     return max(yrs) if yrs else 0.0
 
 

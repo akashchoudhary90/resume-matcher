@@ -17,6 +17,21 @@ def test_redaction_strips_direct_identifiers():
     assert assert_redacted(out) == []  # tripwire passes
 
 
+def test_redaction_catches_obfuscated_email_and_profile_urls():
+    # #11: bracketed obfuscation + scheme-less profile links that the basic patterns missed.
+    out = redact_text("jane [at] example [dot] com or github.com/janedoe and linkedin.com/in/jane")
+    assert "[EMAIL]" in out and "example" not in out
+    assert "janedoe" not in out and "linkedin.com/in/jane" not in out
+    assert assert_redacted("contact jane (at) corp (dot) io") == ["email"]
+    assert "url" in assert_redacted("portfolio at github.com/someone")
+
+
+def test_redaction_does_not_eat_tech_domains():
+    # ...but tech domains named as SKILLS (not contact links) must survive.
+    assert "react.dev" in redact_text("Contributed to the react.dev documentation")
+    assert "spring.io" in redact_text("Used spring.io guides extensively")
+
+
 def test_assert_redacted_detects_leaks():
     assert "email" in assert_redacted("reach me at a@b.com")
 
