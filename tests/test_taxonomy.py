@@ -31,6 +31,14 @@ def test_bare_node_is_not_nodejs():
     assert normalize_skills("Built with Node.js and nodejs tooling") == ["node_js"]  # qualified still matches
 
 
+def test_behavioral_alias_credits_demonstrated_docker():
+    # #9 transferable skills: "containerized" demonstrates Docker even without the word "docker".
+    assert "docker" in normalize_skills("Containerized the microservices for deployment")
+    assert "docker" in normalize_skills("Led the containerization of legacy apps")
+    # ...but the alias is distinctive and must NOT fire on unrelated prose.
+    assert "docker" not in normalize_skills("We shipped features and improved reliability across teams.")
+
+
 def test_core_skills_preserved_after_refactor():
     for s in ["python", "java", "javascript", "sql", "machine_learning", "aws", "git", "agile"]:
         assert s in normalize_skills(f"experience with {canonical_name(s)}"), s

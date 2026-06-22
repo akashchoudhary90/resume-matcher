@@ -38,6 +38,16 @@ _STOPWORDS = {
     "node",
 }
 
+# Curated transferable/behavioral aliases: distinctive phrasings that DEMONSTRATE a skill without
+# naming it, which the literal surface map would otherwise miss. Deliberately small + high-confidence
+# (rare, unambiguous words) so they credit real signal without polluting ordinary prose. The LLM
+# engine handles the open-ended "demonstrated, not named" cases; this covers a few common ones for the
+# deterministic path. Maps surface form -> canonical id (must exist in the vocabulary to take effect).
+_BEHAVIORAL_ALIASES = {
+    "containerize": "docker", "containerized": "docker", "containerised": "docker",
+    "containerization": "docker", "containerisation": "docker",
+}
+
 # Minimal fallback so the package imports even if the data file is missing.
 _FALLBACK = {
     "python": {"name": "Python", "aliases": []},
@@ -96,6 +106,11 @@ def _build_surface_map() -> dict[str, str]:
     for cid, spec in _RAW.items():
         for alias in spec.get("aliases", []) or []:
             add(alias, cid)
+    # Pass 3: curated behavioral aliases (transferable phrasings) — only for ids in the vocabulary and
+    # only if the surface isn't already claimed by a canonical name/alias above.
+    for surface, cid in _BEHAVIORAL_ALIASES.items():
+        if cid in _CANONICAL:
+            add(surface, cid)
     return index
 
 

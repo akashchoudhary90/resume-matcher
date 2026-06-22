@@ -25,6 +25,12 @@ SYSTEM = (
     "EVIDENCE RULE: For every skill you mark 'match' or 'partial', `evidence_span` MUST be a short "
     "VERBATIM quote copied from the resume text. If you cannot quote it, mark the skill 'missing'. "
     "Do not invent evidence.\n"
+    "DEMONSTRATED, NOT JUST NAMED: Credit a skill as 'match' when the resume clearly DEMONSTRATES it "
+    "through described work even if the skill's name never appears — and set `evidence_span` to the "
+    "verbatim phrase that shows it. E.g. 'pulled raw order data from the warehouse with queries' "
+    "demonstrates SQL, and 'stood the services up in containers' demonstrates Docker — quote that "
+    "phrase. Prefer the phrase that demonstrates the skill over a bare entry in a skills list. The "
+    "verbatim-quote rule still holds: if you cannot quote supporting text, mark the skill 'missing'.\n"
     "Return ONLY a single JSON object that conforms to the provided schema. No prose outside JSON."
 )
 
