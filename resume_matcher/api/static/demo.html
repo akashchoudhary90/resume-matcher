@@ -280,7 +280,7 @@ $('#runBtn').onclick = async () => {
   fd.append('min_education', $('#minEdu').value);
   fd.append('min_years', $('#minYears').value.trim());
   FILES.forEach(f=> fd.append('resumes', f, f.name));
-  $('#runBtn').disabled=true; $('#runStatus').textContent='Scoring… (processed in memory, discarded after; AI matching can take a bit for several resumes)';
+  $('#runBtn').disabled=true; $('#runStatus').textContent='Scoring… (processed in memory, discarded after; NDR AI matching can take a bit for several resumes)';
   try{
     const r = await fetch('/api/demo/run', {method:'POST', body:fd});
     const d = await r.json();
@@ -403,7 +403,7 @@ function renderResults(d){
   const prefList = (job.preferred_skills||[]).map(s=>esc(s.name)).join(', ')||'—';
   const mustList = (job.must_have_skills||[]).map(s=>esc(s.name)).join(', ');
   const engine = d.engine==='claude_cli'
-    ? `<span class="pill" style="color:var(--green)">engine: AI extraction (Claude)</span>`
+    ? `<span class="pill" style="color:var(--green)">engine: NDR AI</span>`
     : `<span class="pill">engine: deterministic (keyword)</span>`;
   const head = `<div class="card">
       <h2>${esc(job.title||'Role')} <span class="muted" style="font-weight:400">@ ${esc(job.employer||'')}</span> ${engine}</h2>

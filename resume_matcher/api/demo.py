@@ -144,8 +144,8 @@ class DemoSession:
                     "Your resumes were processed transiently and are not stored: the full resume "
                     "text is discarded right after scoring (only the score breakdown with short "
                     "quotes is kept), and contact identifiers (email, phone, links, address) are "
-                    "redacted before scoring. When the AI reads a PDF/image directly, a temporary "
-                    "copy is written so the AI engine can open it, then deleted immediately. This "
+                    "redacted before scoring. When NDR AI reads a PDF/image directly, a temporary "
+                    "copy is written so the NDR AI engine can open it, then deleted immediately. This "
                     "session auto-deletes when idle and you can delete it now; a restart erases all."
                 ),
             },
@@ -384,9 +384,9 @@ def run_demo(
                         # could only be checked against the model's own transcription — say so plainly.
                         flags.append("evidence_verified_against_model_transcription")
                     return ranker.score(extraction, cand, job, extra_flags=flags), cand, label, None
-                note = f"{label}: AI read no text from the file; tried local text extraction."
+                note = f"{label}: NDR AI read no text from the file; tried local text extraction."
             except Exception as exc:  # noqa: BLE001 - fall back to text extraction
-                note = f"{label}: AI file-read failed ({type(exc).__name__}); used text extraction."
+                note = f"{label}: NDR AI file-read failed ({type(exc).__name__}); used text extraction."
             finally:
                 if tmp:
                     try:
@@ -404,7 +404,7 @@ def run_demo(
             return None, None, label, f"{label}: {exc}"
         if not cand.text.strip():
             return None, None, label, note or (
-                f"{label}: no readable text. If it's a scanned/photo PDF, the AI engine can read "
+                f"{label}: no readable text. If it's a scanned/photo PDF, the NDR AI engine can read "
                 f"it — otherwise upload a text-based PDF, a .docx, or a .txt."
             )
         flags = scan_injection(cand.text) + scan_keyword_stuffing(cand.text, job)
