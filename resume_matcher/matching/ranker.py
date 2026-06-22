@@ -17,6 +17,8 @@ This is the honesty boundary: `fit_score` is fit/readiness, NOT a predicted prob
 """
 from __future__ import annotations
 
+import re
+
 from ..inference.schema import (
     CandidateProfile,
     Confidence,
@@ -45,16 +47,36 @@ _MUST_HAVE_WEIGHT = 2.0          # a must-have skill weighs 2x a regular require
 _MISSING_MUST_HAVE_FACTOR = 0.4  # missing a deal-breaker heavily penalizes (but never auto-rejects)
 _MIN_EXPERIENCE_FACTOR = 0.7     # floor of the graded experience penalty
 _MAX_EVIDENCE_SPAN = 160
+_MIN_EVIDENCE_ALNUM = 3          # a quote with fewer alphanumerics is too generic to be evidence
+
+_WS_RE = re.compile(r"\s+")
+
+
+def _norm_ws(s: str) -> str:
+    """Collapse runs of whitespace to a single space (and trim) so verification tolerates layout
+    differences between the resume text and a model's transcription, without becoming more lenient
+    about actual content."""
+    return _WS_RE.sub(" ", s).strip()
 
 
 def _edu_rank(level: str | None) -> int | None:
     return _EDU_RANK.get(level.strip().lower()) if level else None
 
 
-def _verify(text: str, ev: SkillEvidence) -> bool:
+def _verify(norm_text: str, ev: SkillEvidence) -> bool:
+    """True only when the claimed quote is a MEANINGFUL verbatim substring of the candidate's text.
+
+    `norm_text` is the candidate text, already whitespace-normalized + lowercased by the caller.
+    Degenerate spans — a lone space, a single character, or a 1-2 char token — are rejected even if
+    technically present, because they are a substring of virtually any resume and would let an
+    untrusted model (or an injected resume that steers it) fabricate a "verified" skill and move the
+    score. This is the trust boundary that makes the verbatim-evidence guarantee real."""
     if ev.status == MatchStatus.missing or not ev.evidence_span:
         return False
-    return ev.evidence_span.lower() in text.lower()
+    span = ev.evidence_span.strip()
+    if sum(ch.isalnum() for ch in span) < _MIN_EVIDENCE_ALNUM:
+        return False
+    return _norm_ws(span).lower() in norm_text
 
 
 def _clip_span(span: str | None) -> str | None:
@@ -176,10 +198,11 @@ def score(
 
     verified: list[SkillEvidence] = []
     discarded: list[SkillEvidence] = []
+    cand_text_norm = _norm_ws(candidate.text).lower()
     for ev in extraction.skill_matches:
         if ev.status == MatchStatus.missing or ev.skill_id not in job_skill_ids:
             continue  # off-spec or non-match -> never counted
-        if _verify(candidate.text, ev):
+        if _verify(cand_text_norm, ev):
             verified.append(ev)
         else:
             discarded.append(ev)

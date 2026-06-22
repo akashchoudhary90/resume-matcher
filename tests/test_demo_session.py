@@ -82,6 +82,41 @@ def test_gap_view_extra_skills():
     assert "Docker" in extra and "Tableau" in extra and "Python" not in extra
 
 
+def test_candidate_from_text_redacts_contacts_keeps_name():
+    # The file-direct/transcription helper must strip contact identifiers but keep the body + name.
+    from resume_matcher.api.demo import _candidate_from_text
+
+    cand = _candidate_from_text(
+        "R1", "Jane Doe\njane@example.com (416) 555-1212\nPython and SQL developer."
+    )
+    assert "jane@example.com" not in cand.text and "555" not in cand.text  # contact redacted
+    assert "Jane" in cand.text  # applicant name kept (identifiable, by consent)
+    assert "python" in cand.skills and "sql" in cand.skills  # body preserved
+
+
+def test_demo_text_path_redacts_contacts_before_scoring(monkeypatch):
+    # Contact identifiers must be stripped from the candidate text BEFORE it reaches the matching
+    # engine (and any LLM) — keeping only the body + name. We spy on the adapter's input to prove it.
+    from resume_matcher.inference.adapters import mock as mock_mod
+
+    seen: dict[str, str] = {}
+    orig = mock_mod.MockAdapter._extract
+
+    def spy(self, candidate, job):
+        seen["text"] = candidate.text
+        return orig(self, candidate, job)
+
+    monkeypatch.setattr(mock_mod.MockAdapter, "_extract", spy)
+    store = SessionStore(ttl_seconds=600)
+    run_demo(
+        store=store, required_skills=["python"],
+        files=[("a.txt", b"Jane Doe\njane@example.com (416) 555-1212\nPython developer. " * 2)],
+    )
+    text = seen["text"]
+    assert "jane@example.com" not in text and "555" not in text  # contact identifiers redacted
+    assert "Jane" in text and "Python developer" in text  # name + body kept
+
+
 def test_run_demo_writes_nothing_to_disk():
     before = _snapshot(ROOT)
     store = SessionStore(ttl_seconds=600)
@@ -163,3 +198,23 @@ def test_max_sessions_evicts_oldest():
     run_demo(store=store, required_skills=["python"], files=_files(1))  # triggers eviction
     assert store.active_count() <= 2
     assert store.get(a.session_id) is None  # oldest evicted
+
+
+def test_extract_cache_evicts_only_lru_not_whole_cache(monkeypatch):
+    # Overflow must drop ONLY the least-recently-used entry, not clear() the whole consistency cache.
+    from resume_matcher.api import demo as demo_mod
+
+    monkeypatch.setattr(demo_mod, "CACHE_MAX", 3)
+    demo_mod._EXTRACT_CACHE.clear()
+    try:
+        for i in range(3):
+            demo_mod._cache_put(f"k{i}", i)
+        assert demo_mod._cache_get("k0") == 0  # touch k0 -> most-recently-used
+        demo_mod._cache_put("k3", 3)           # overflow: evicts the LRU (k1)
+        assert len(demo_mod._EXTRACT_CACHE) == 3
+        assert demo_mod._cache_get("k1") is None   # evicted
+        assert demo_mod._cache_get("k0") == 0      # survived (recently touched)
+        assert demo_mod._cache_get("k2") == 2
+        assert demo_mod._cache_get("k3") == 3
+    finally:
+        demo_mod._EXTRACT_CACHE.clear()

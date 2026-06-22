@@ -6,9 +6,25 @@ import pytest
 from resume_matcher.ingestion.parser import (
     ParseError,
     extract_bytes_text,
+    infer_education_level,
     infer_years_experience,
     parse_resume_bytes,
 )
+
+
+def test_infer_education_level_real_degrees():
+    assert infer_education_level("Completed a Bachelor of Science in CS") == "bachelor"
+    assert infer_education_level("M.Sc. in Statistics") == "master"
+    assert infer_education_level("PhD candidate") == "phd"
+    assert infer_education_level("MBA, finance concentration") == "master"
+    assert infer_education_level("Diploma in graphic design") == "diploma"
+
+
+def test_infer_education_level_no_match_inside_ordinary_words():
+    # The old patterns lacked per-alternative word boundaries: "scuba"->bachelor, "samba"->master.
+    for word in ("PADI scuba certification", "played in a samba band", "diplomatic internship",
+                 "studied Bengali", "mastermind of the project"):
+        assert infer_education_level(word) is None, word
 
 
 def test_infer_years_experience_robust():

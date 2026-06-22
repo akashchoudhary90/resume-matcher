@@ -56,3 +56,17 @@ def test_admin_password_gate(monkeypatch):
     assert gated.get("/api/health", auth=("admin", "wrong")).status_code == 401
     assert gated.get("/api/health", auth=("admin", "s3cret")).status_code == 200
     assert gated.get("/", auth=("admin", "s3cret")).status_code == 200  # dashboard gated too
+
+
+@pytest.mark.parametrize("weak", ["admin", "password", "changeme", "CHANGE_ME_BEFORE_DEPLOY"])
+def test_weak_admin_password_refuses_to_start(monkeypatch, weak):
+    # A SET-but-weak password (e.g. shipped admin/admin) must fail fast at app creation.
+    monkeypatch.setenv("RM_ADMIN_PASSWORD", weak)
+    with pytest.raises(RuntimeError, match="weak"):
+        create_app()
+
+
+def test_unset_admin_password_starts_open(monkeypatch):
+    # Unset is still allowed: local-dev open mode (warned per-request, not refused).
+    monkeypatch.delenv("RM_ADMIN_PASSWORD", raising=False)
+    assert TestClient(create_app()).get("/api/health").status_code == 200

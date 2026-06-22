@@ -76,7 +76,10 @@ def create_app():
     except ImportError as exc:  # pragma: no cover - optional dep
         raise RuntimeError("FastAPI not installed. pip install -r requirements-extra.txt") from exc
 
-    from .auth import require_auth
+    from .auth import assert_admin_password_strong, require_auth
+
+    # Refuse to start if the admin password is a known-weak default (e.g. shipped admin/admin).
+    assert_admin_password_strong()
 
     # App-level dependency => the gate covers the dashboard, every /api/* route, and the docs.
     app = FastAPI(title="Resume Matcher", version="0.1.0", dependencies=[Depends(require_auth)])

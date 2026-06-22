@@ -78,6 +78,38 @@ def test_unverifiable_claim_is_not_counted():
     assert result.fit_score == 0.0  # the only required skill was not counted
 
 
+def test_degenerate_evidence_span_does_not_verify():
+    """A trivially-matching span (a lone space, a single char, punctuation) must NOT count as
+    verbatim evidence — otherwise an untrusted/injected model could fabricate a perfect score by
+    emitting a span that is a substring of every resume (injection-resistance bypass)."""
+    cand = CandidateProfile(candidate_id="C", text="A generic resume describing varied work. " * 8)
+    for span in (" ", "e", "a", ".", "  ", "x"):
+        ext = MatchExtraction(
+            candidate_id="C", job_id="J",
+            skill_matches=[SkillEvidence(skill_id="python", skill_name="Python",
+                                         status=MatchStatus.match, evidence_span=span)],
+        )
+        res = ranker.score(ext, cand, _job(["python"]))
+        assert res.fit_score == 0.0, f"degenerate span {span!r} should not verify a skill"
+        assert res.verified_matches == []
+        assert any(f.startswith("unverifiable_evidence") for f in res.flags)
+
+
+def test_short_real_skill_token_still_verifies():
+    """The degenerate-span guard must not reject legitimate short skill quotes like 'SQL' or 'AWS'."""
+    cand = CandidateProfile(candidate_id="C", text="Wrote SQL and used AWS daily. " + "x" * 250)
+    ext = MatchExtraction(
+        candidate_id="C", job_id="J",
+        skill_matches=[
+            SkillEvidence(skill_id="sql", skill_name="SQL", status=MatchStatus.match, evidence_span="SQL"),
+            SkillEvidence(skill_id="aws", skill_name="AWS", status=MatchStatus.match, evidence_span="AWS"),
+        ],
+    )
+    res = ranker.score(ext, cand, _job(["sql", "aws"]))
+    assert {m.skill_id for m in res.verified_matches} == {"sql", "aws"}
+    assert res.fit_score == 100.0
+
+
 def test_education_penalty_is_shown_and_applied():
     cand = CandidateProfile(
         candidate_id="C1", education_level="diploma", years_experience=1,

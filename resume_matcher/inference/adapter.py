@@ -70,7 +70,7 @@ def parse_extraction(raw: str, candidate: CandidateProfile, job: JobSpec) -> Mat
 
 
 def get_adapter(backend: str | None = None) -> InferenceAdapter:
-    """Factory. RM_INFERENCE_BACKEND in {mock, claude_code, ollama, openai_compat}; default mock."""
+    """Factory. RM_INFERENCE_BACKEND in {mock, claude_code, claude_cli, ollama, openai_compat}; default mock."""
     backend = (backend or os.environ.get("RM_INFERENCE_BACKEND", "mock")).lower()
     if backend == "mock":
         from .adapters.mock import MockAdapter

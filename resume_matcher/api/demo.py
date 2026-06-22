@@ -20,6 +20,7 @@ import secrets
 import tempfile
 import threading
 import time
+from collections import OrderedDict
 from concurrent.futures import ThreadPoolExecutor
 from dataclasses import dataclass, field
 
@@ -29,16 +30,17 @@ from ..ingestion.job_posting import build_job_spec, detect_job_skills, skill_opt
 from ..ingestion.parser import (
     ParseError,
     SUPPORTED_EXTS,
+    extract_bytes_text,
     infer_education_level,
-    infer_years_experience,
     parse_resume_bytes,
+    parse_resume_text,
 )
 from ..inference.adapter import get_adapter
 from ..inference.adapters import claude_cli as _claude_cli
 from ..inference.schema import CandidateProfile
 from ..matching import coaching as coaching_mod
 from ..matching import ranker
-from ..matching.taxonomy import canonical_name, normalize_skills
+from ..matching.taxonomy import canonical_name
 from .serialize import result_to_dict
 
 
@@ -65,8 +67,8 @@ CACHE_MAX = _int_env("RM_DEMO_CACHE_MAX", 512)  # in-memory extraction cache (co
 
 # Cache the LLM EXTRACTION keyed by (content, job, model). The LLM is non-deterministic, so this makes
 # re-scoring the SAME resume against the SAME job IDENTICAL (and instant). In-memory only (no disk),
-# bounded, cleared on restart — consistent with the ephemeral privacy posture.
-_EXTRACT_CACHE: dict[str, object] = {}
+# bounded (LRU eviction), cleared on restart — consistent with the ephemeral privacy posture.
+_EXTRACT_CACHE: "OrderedDict[str, object]" = OrderedDict()
 _CACHE_LOCK = threading.Lock()
 
 
@@ -89,14 +91,18 @@ def _cache_key(kind: str, model: str, job_sig: str, content: bytes) -> str:
 
 def _cache_get(key: str):
     with _CACHE_LOCK:
-        return _EXTRACT_CACHE.get(key)
+        value = _EXTRACT_CACHE.get(key)
+        if value is not None:
+            _EXTRACT_CACHE.move_to_end(key)  # mark most-recently-used
+        return value
 
 
 def _cache_put(key: str, value) -> None:
     with _CACHE_LOCK:
-        if len(_EXTRACT_CACHE) >= CACHE_MAX:
-            _EXTRACT_CACHE.clear()
         _EXTRACT_CACHE[key] = value
+        _EXTRACT_CACHE.move_to_end(key)
+        while len(_EXTRACT_CACHE) > CACHE_MAX:
+            _EXTRACT_CACHE.popitem(last=False)  # evict only the least-recently-used entry
 
 
 class DemoError(Exception):
@@ -138,8 +144,9 @@ class DemoSession:
                 "note": (
                     "Your resumes were processed transiently and are not stored: the full resume "
                     "text is discarded right after scoring (only the score breakdown with short "
-                    "quotes is kept). When NDR AI reads a PDF/image directly, a temporary copy is "
-                    "written so the AI engine can open it, then deleted immediately. This "
+                    "quotes is kept), and contact identifiers (email, phone, links, address) are "
+                    "redacted before scoring. When the AI reads a PDF/image directly, a temporary "
+                    "copy is written so the AI engine can open it, then deleted immediately. This "
                     "session auto-deletes when idle and you can delete it now; a restart erases all."
                 ),
             },
@@ -244,15 +251,13 @@ def _label_for(filename: str, idx: int) -> str:
 
 
 def _candidate_from_text(cid: str, text: str) -> CandidateProfile:
-    """Build a CandidateProfile from already-clean text (e.g. Claude's file transcription)."""
-    return CandidateProfile(
-        candidate_id=cid,
-        text=text,
-        skills=normalize_skills(text),
-        education_level=infer_education_level(text),
-        years_experience=infer_years_experience(text),
-        has_resume=bool(text.strip()),
-    )
+    """Build a CandidateProfile from extracted/transcribed text.
+
+    Runs the SAME ingestion hygiene as the text path (it routes through parse_resume_text): invisible
+    /zero-width chars are stripped, and CONTACT identifiers (email/phone/url/address/postal) are
+    redacted while the resume BODY and the applicant NAME are kept (the consented-demo posture,
+    boundary #3). Model output is never treated as "already clean"."""
+    return parse_resume_text(cid, text, auto_redact_name=False)
 
 
 def run_demo(
@@ -330,9 +335,10 @@ def run_demo(
             return cached
         try:
             ex = adapter.extract(cand, job)
+            _cache_put(key, ex)  # cache ONLY successful real-engine extractions
         except Exception:  # noqa: BLE001 - per-candidate fail-quiet to the deterministic engine
+            # Do NOT cache: a transient CLI failure must not poison every re-score under the model key.
             ex = get_adapter("mock").extract(cand, job)
-        _cache_put(key, ex)
         return ex
 
     def _score_upload(item):
@@ -343,24 +349,45 @@ def run_demo(
         # --- File-direct: Claude reads the actual PDF/image (best fidelity, reads scans) ---
         if send_file and _claude_cli.supports_file(filename or ""):
             key = _cache_key("file", model, job_sig, data)
-            cached = _cache_get(key)
+            # The cache holds ONLY the de-identified extraction (stable, consistent re-scores) — never
+            # the full resume text/transcription, so nothing PII outlives the session in this global
+            # store (privacy: "Delete my data now" + TTL purge no longer leave the resume behind).
+            cached_extraction = _cache_get(key)
             tmp = None
             try:
-                if cached is not None:
-                    resume_text, extraction = cached  # identical re-score, no LLM call
+                # Verify the model's quotes against an INDEPENDENT local parse of the bytes, never the
+                # model's own transcription (that would make the verbatim guarantee circular — a model
+                # could fabricate a skill identically in its transcription and its quote and "verify"
+                # itself). Only a PDF with a real text layer has independent text here; true scans /
+                # images yield nothing and fall back to the transcription (flagged below).
+                independent = ""
+                if ext == ".pdf":
+                    try:
+                        independent = extract_bytes_text(filename or f"{cid}.pdf", data) or ""
+                    except ParseError:
+                        independent = ""
+                if cached_extraction is not None and independent.strip():
+                    extraction = cached_extraction          # identical re-score: no LLM, no PII cached
+                    verify_text = independent
                 else:
                     fd, tmp = tempfile.mkstemp(suffix=ext or ".pdf")
                     with os.fdopen(fd, "wb") as fh:
                         fh.write(data)  # written briefly so the CLI can read it; deleted in finally
-                    resume_text, extraction = _claude_cli.extract_from_file(tmp, job, cid)
-                    _cache_put(key, (resume_text, extraction))
-                if resume_text.strip():
-                    cand = _candidate_from_text(cid, resume_text)
-                    flags = scan_injection(resume_text) + scan_keyword_stuffing(resume_text, job)
+                    resume_text, fresh = _claude_cli.extract_from_file(tmp, job, cid)
+                    extraction = cached_extraction if cached_extraction is not None else fresh
+                    _cache_put(key, extraction)
+                    verify_text = independent if independent.strip() else resume_text
+                if verify_text.strip():
+                    cand = _candidate_from_text(cid, verify_text)
+                    flags = scan_injection(cand.text) + scan_keyword_stuffing(cand.text, job)
+                    if not independent.strip():
+                        # Scanned image / no text layer: there is no independent ground truth, so quotes
+                        # could only be checked against the model's own transcription — say so plainly.
+                        flags.append("evidence_verified_against_model_transcription")
                     return ranker.score(extraction, cand, job, extra_flags=flags), cand, label, None
-                note = f"{label}: NDR AI read no text from the file; tried local text extraction."
+                note = f"{label}: AI read no text from the file; tried local text extraction."
             except Exception as exc:  # noqa: BLE001 - fall back to text extraction
-                note = f"{label}: NDR AI file-read failed ({type(exc).__name__}); used text extraction."
+                note = f"{label}: AI file-read failed ({type(exc).__name__}); used text extraction."
             finally:
                 if tmp:
                     try:
@@ -368,13 +395,17 @@ def run_demo(
                     except OSError:
                         pass
         # --- Text path (default for .txt/.docx; also the fallback for the above) ---
+        # Consented demo: keep the resume body + the applicant NAME (identifiable, by consent) but
+        # still strip CONTACT identifiers (email/phone/url/address) before the text is scored, sent
+        # to the LLM, or quoted in the breakdown (boundary #3) — auto_redact_name=False keeps the
+        # name, the default redact=True strips contacts.
         try:
-            cand = parse_resume_bytes(cid, filename or f"{cid}.txt", data, redact=False)
+            cand = parse_resume_bytes(cid, filename or f"{cid}.txt", data, auto_redact_name=False)
         except ParseError as exc:
             return None, None, label, f"{label}: {exc}"
         if not cand.text.strip():
             return None, None, label, note or (
-                f"{label}: no readable text. If it's a scanned/photo PDF, the NDR AI engine can read "
+                f"{label}: no readable text. If it's a scanned/photo PDF, the AI engine can read "
                 f"it — otherwise upload a text-based PDF, a .docx, or a .txt."
             )
         flags = scan_injection(cand.text) + scan_keyword_stuffing(cand.text, job)

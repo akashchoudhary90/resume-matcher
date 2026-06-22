@@ -11,7 +11,15 @@ from __future__ import annotations
 import re
 
 EMAIL_RE = re.compile(r"\b[\w.+-]+@[\w-]+\.[\w.-]+\b")
-PHONE_RE = re.compile(r"(\+?\d[\d\-\s().]{7,}\d)")
+# Phone numbers in the common NANP / international shapes: an optional +country code, then a
+# 3-digit area group (optionally parenthesized) and 3+4 digit groups joined by a SINGLE separator,
+# OR a bare run of 10-14 digits. Using single-char separators (not a greedy [\d\s.()-]+) means it
+# will NOT bridge a "2018 - 2024" date range or a "1000 - 2000" metric range into a fake phone
+# number — the old pattern's most damaging over-redaction.
+PHONE_RE = re.compile(
+    r"(?<![\w.])(?:\+\d{1,3}[\s.\-]?)?(?:\(\d{3}\)|\d{3})[\s.\-]\d{3}[\s.\-]\d{4}(?![\w])"
+    r"|(?<![\d.])\+?\d{10,14}(?![\d.])"
+)
 URL_RE = re.compile(r"https?://\S+|\bwww\.\S+", re.IGNORECASE)
 # North-American-ish street address line (number + street + suffix)
 ADDRESS_RE = re.compile(
@@ -48,4 +56,6 @@ def assert_redacted(text: str) -> list[str]:
         leaks.append("url")
     if ADDRESS_RE.search(text):
         leaks.append("address")
+    if POSTAL_CA_RE.search(text):  # redact_text strips these, so the tripwire must check them too
+        leaks.append("postal")
     return leaks

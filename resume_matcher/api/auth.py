@@ -22,6 +22,24 @@ _log = logging.getLogger("resume_matcher.auth")
 _security = HTTPBasic(auto_error=False)
 _warned = False
 
+# Known-weak / placeholder passwords. A SET-but-weak password almost always means a real deployment
+# shipped the .env.example default, so we fail fast rather than guard real PII with "admin".
+_WEAK_PASSWORDS = {"admin", "password", "passwd", "changeme", "change_me_before_deploy", "secret", "123456"}
+
+
+def assert_admin_password_strong() -> None:
+    """Fail fast at startup if RM_ADMIN_PASSWORD is set to a known-weak/default value.
+
+    Unset is allowed (open local-dev mode, handled per-request in require_auth with a warning); a weak
+    *set* password is refused so the documented copy-the-example deploy path can't ship admin/admin.
+    """
+    password = os.environ.get("RM_ADMIN_PASSWORD")
+    if password and password.strip().lower() in _WEAK_PASSWORDS:
+        raise RuntimeError(
+            f"RM_ADMIN_PASSWORD is set to a known-weak/default value ({password!r}). "
+            "Set a strong password (e.g. in deploy/cohost/.env) before starting the app."
+        )
+
 
 def require_auth(credentials: HTTPBasicCredentials | None = Depends(_security)) -> None:
     global _warned

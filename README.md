@@ -7,8 +7,8 @@ a **bias-audit dashboard**, and defenses against gamed / AI-generated resumes.
 It runs on a **swappable local LLM** (default: local Claude Code, no paid API) so the receiving
 team can drop in their own backend later with a one-line config change.
 
-> Full design rationale, legal boundaries, and the 12-week roadmap live in the approved plan:
-> `C:\Users\akash\.claude\plans\form-now-the-problem-wise-karp.md`.
+> Full design rationale and the load-bearing legal/architectural boundaries live in
+> [`docs/DESIGN.md`](docs/DESIGN.md). Read it before changing scoring, redaction, or the data planes.
 
 ---
 

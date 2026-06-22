@@ -159,6 +159,8 @@ let ttlTimer = null;
 
 function esc(s){ return (s==null?'':String(s)).replace(/[&<>"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c])); }
 function gradeClass(g){ return 'g-'+g; }
+const EDU_LABELS={none:'No minimum',diploma:'Diploma',certificate:'Certificate',associate:'Associate',bachelor:"Bachelor's",master:"Master's",phd:'PhD'};
+function eduLabel(k){ if(k==null||k==='') return ''; const key=String(k).toLowerCase(); return EDU_LABELS[key]||(key.charAt(0).toUpperCase()+key.slice(1)); }
 
 async function loadConfig(){
   try{
@@ -278,7 +280,7 @@ $('#runBtn').onclick = async () => {
   fd.append('min_education', $('#minEdu').value);
   fd.append('min_years', $('#minYears').value.trim());
   FILES.forEach(f=> fd.append('resumes', f, f.name));
-  $('#runBtn').disabled=true; $('#runStatus').textContent='Scoring… (processed in memory, discarded after; NDR AI matching can take a bit for several resumes)';
+  $('#runBtn').disabled=true; $('#runStatus').textContent='Scoring… (processed in memory, discarded after; AI matching can take a bit for several resumes)';
   try{
     const r = await fetch('/api/demo/run', {method:'POST', body:fd});
     const d = await r.json();
@@ -368,7 +370,7 @@ function resultCard(res){
   const gaps = (res.blocking_gaps||[]).map(g=>`<div>• <b>${esc(g.skill)}</b> (${esc(g.difficulty)}) — ${esc(g.action)}</div>`).join('')
              || '<div class="muted">No blocking essential gaps.</div>';
   const meta = [];
-  if(res.education_level) meta.push(`education: ${esc(res.education_level)}`);
+  if(res.education_level) meta.push(`education: ${esc(eduLabel(res.education_level))}`);
   if(res.years_experience) meta.push(`${res.years_experience} yrs exp`);
   if(res.skills_found!=null) meta.push(`${res.skills_found} skills detected`);
   return `
@@ -400,11 +402,11 @@ function renderResults(d){
   const prefList = (job.preferred_skills||[]).map(s=>esc(s.name)).join(', ')||'—';
   const mustList = (job.must_have_skills||[]).map(s=>esc(s.name)).join(', ');
   const engine = d.engine==='claude_cli'
-    ? `<span class="pill" style="color:var(--green)">engine: NDR AI</span>`
-    : `<span class="pill">engine: standard</span>`;
+    ? `<span class="pill" style="color:var(--green)">engine: AI extraction (Claude)</span>`
+    : `<span class="pill">engine: deterministic (keyword)</span>`;
   const head = `<div class="card">
       <h2>${esc(job.title||'Role')} <span class="muted" style="font-weight:400">@ ${esc(job.employer||'')}</span> ${engine}</h2>
-      <div class="muted">${mustList?`<b style="color:var(--red)">Must-have: ${mustList}</b> &nbsp;·&nbsp; `:''}Required: ${reqList} &nbsp;·&nbsp; Preferred: ${prefList}${job.min_education?` &nbsp;·&nbsp; min education: ${esc(job.min_education)}`:''}${job.min_years?` &nbsp;·&nbsp; min experience: ${esc(String(job.min_years))} yrs`:''}</div>
+      <div class="muted">${mustList?`<b style="color:var(--red)">Must-have: ${mustList}</b> &nbsp;·&nbsp; `:''}Required: ${reqList} &nbsp;·&nbsp; Preferred: ${prefList}${job.min_education?` &nbsp;·&nbsp; min education: ${esc(eduLabel(job.min_education))}`:''}${job.min_years?` &nbsp;·&nbsp; min experience: ${esc(String(job.min_years))} yrs`:''}</div>
       <div class="muted" style="margin-top:6px">${d.n_resumes} resume(s) scored. ${esc((d.privacy&&d.privacy.note)||'')}</div>
     </div>`;
   $('#results').innerHTML = warn + head + (d.results||[]).map(resultCard).join('');

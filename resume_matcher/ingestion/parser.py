@@ -22,12 +22,14 @@ from ..matching.taxonomy import normalize_skills
 TEXT_EXTS = {".txt", ".text", ".md", ""}
 SUPPORTED_EXTS = TEXT_EXTS | {".pdf", ".docx"}
 
+# Each alternative is individually bounded with \b...\b. Without per-alternative boundaries the | binds
+# looser than concatenation, so e.g. "scuba" matched b\.?a\b -> bachelor and "samba" matched mba\b.
 _EDU_PATTERNS = [
-    (r"\bph\.?d\b|\bdoctorate\b", "phd"),
-    (r"\bmaster|m\.?sc|m\.?eng|mba\b", "master"),
-    (r"\bbachelor|b\.?sc|b\.?eng|b\.?a\b", "bachelor"),
+    (r"\b(?:ph\.?d|doctorate)\b", "phd"),
+    (r"\b(?:master|m\.?sc|m\.?eng|mba)\b", "master"),
+    (r"\b(?:bachelor|b\.?sc|b\.?eng|b\.?a)\b", "bachelor"),
     (r"\bassociate\b", "associate"),
-    (r"\bdiploma|certificate\b", "diploma"),
+    (r"\b(?:diploma|certificate)\b", "diploma"),
 ]
 
 # A name-shaped header line: 2-4 capitalized tokens, no digits/@.

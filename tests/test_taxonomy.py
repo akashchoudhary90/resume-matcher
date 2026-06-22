@@ -25,6 +25,12 @@ def test_trailing_punctuation_and_node_disambiguation():
     assert normalize_skills("Built with Node.js") == ["node_js"]
 
 
+def test_bare_node_is_not_nodejs():
+    # "node" is a stopword: generic infra/graph prose must not fabricate a Node.js skill.
+    assert normalize_skills("ran a three-node cluster and visited each node in the graph") == []
+    assert normalize_skills("Built with Node.js and nodejs tooling") == ["node_js"]  # qualified still matches
+
+
 def test_core_skills_preserved_after_refactor():
     for s in ["python", "java", "javascript", "sql", "machine_learning", "aws", "git", "agile"]:
         assert s in normalize_skills(f"experience with {canonical_name(s)}"), s

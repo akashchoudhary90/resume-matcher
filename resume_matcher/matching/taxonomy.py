@@ -34,6 +34,8 @@ _STOPWORDS = {
     "less", "lit", "dig", "storm", "beam", "pig", "hive", "camel", "impala", "ant", "grunt", "gulp",
     "bun", "crystal", "arc", "racket", "sage", "comet", "meteor", "ember", "backbone", "remix",
     "astro", "prism", "ping", "elm", "nim", "pike", "io", "hugo", "spark",
+    # bare "node" matches "three-node cluster"/"each node"; Node.js still matches via node.js/nodejs.
+    "node",
 }
 
 # Minimal fallback so the package imports even if the data file is missing.
