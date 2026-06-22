@@ -27,6 +27,51 @@ def test_adapter_parses_cli_output(monkeypatch):
     assert ext.skill_matches[0].skill_id == "python"
 
 
+def test_run_cli_decodes_stdout_as_utf8(monkeypatch):
+    # Non-ASCII resumes (accents, CJK, smart quotes) must not mojibake or raise UnicodeDecodeError:
+    # stdout/stderr are decoded as UTF-8 with errors="replace", regardless of the OS locale codec.
+    import subprocess
+
+    monkeypatch.setenv("CLAUDE_CODE_OAUTH_TOKEN", "tok")
+    monkeypatch.setattr(claude_cli.shutil, "which", lambda _: "claude")
+    captured = {}
+
+    class _Proc:
+        returncode = 0
+        stdout = '{"ok": true, "name": "José"}'
+        stderr = ""
+
+    def fake_run(argv, **kw):
+        captured.update(kw)
+        return _Proc()
+
+    monkeypatch.setattr(subprocess, "run", fake_run)
+    out = claude_cli._run_cli("prompt", extra_args=[], cwd=None, timeout=5)
+    assert "José" in out
+    assert captured.get("encoding") == "utf-8" and captured.get("errors") == "replace"
+
+
+def test_offbox_adapter_strips_contacts_before_transmission(monkeypatch):
+    # claude_cli sends resume text off-box (to Anthropic). Contact identifiers must be stripped before
+    # transmission, and the caller's candidate (the ranker's verification source) must be untouched.
+    from resume_matcher.inference.schema import CandidateProfile, JobSpec
+
+    seen = {}
+
+    def fake(prompt, **kw):
+        seen["prompt"] = prompt
+        return '{"candidate_id":"x","job_id":"x","skill_matches":[],"gaps":[],"rationale":""}'
+
+    monkeypatch.setattr(claude_cli, "_run_cli", fake)
+    cand = CandidateProfile(
+        candidate_id="C1", text="Jane Doe jane@example.com (416) 555-1212\nPython developer."
+    )
+    job = JobSpec(job_id="J1", title="t", employer="e", required_skills=["python"])
+    claude_cli.ClaudeCliAdapter().extract(cand, job)
+    assert "jane@example.com" not in seen["prompt"] and "555" not in seen["prompt"]  # stripped pre-send
+    assert "jane@example.com" in cand.text  # caller's object unchanged (verification source intact)
+
+
 def test_available_false_without_token(monkeypatch):
     monkeypatch.delenv("CLAUDE_CODE_OAUTH_TOKEN", raising=False)
     assert claude_cli.available() is False

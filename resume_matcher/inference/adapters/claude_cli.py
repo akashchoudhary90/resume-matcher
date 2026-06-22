@@ -76,6 +76,10 @@ def _run_cli(prompt: str, *, extra_args: list[str], cwd: str | None, timeout: fl
         try:
             proc = subprocess.run(
                 argv, stdin=subprocess.DEVNULL, capture_output=True, text=True,
+                # Force UTF-8 for stdout/stderr (default is the OS locale codec — cp1252 on Windows —
+                # which mojibakes or raises UnicodeDecodeError on accented names / CJK / smart quotes).
+                # errors="replace" guarantees we never crash on an undecodable byte.
+                encoding="utf-8", errors="replace",
                 timeout=timeout, cwd=cwd or tempfile.gettempdir(),
             )
         except subprocess.TimeoutExpired as exc:
@@ -158,6 +162,7 @@ def extract_from_file(file_path: str, job: JobSpec, candidate_id: str) -> tuple[
 class ClaudeCliAdapter(InferenceAdapter):
     name = "claude_cli"
     is_local = True  # runs through YOUR Claude session (subscription), governed by you
+    transmits_offbox = True  # ...but the text still goes to Anthropic — contacts are stripped first
 
     def _extract(self, candidate: CandidateProfile, job: JobSpec) -> MatchExtraction:
         raw = _run_cli(

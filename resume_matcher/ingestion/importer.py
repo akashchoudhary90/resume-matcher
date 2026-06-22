@@ -40,6 +40,25 @@ def _split_skills(value: str) -> list[str]:
     return [s.strip() for s in re.split(r"[;,|]", value) if s.strip()] if value else []
 
 
+def _safe_years(value) -> float | None:
+    """Parse a years-of-experience CSV cell that may be free-form.
+
+    Real Handshake exports contain values like '3 years', '5+', '1-2', 'N/A', or blanks. A bare
+    float() raises ValueError on any of these and would abort the WHOLE import mid-stream, losing
+    every row parsed so far. Return the first plausible number, else None (years are then re-inferred
+    from the resume text downstream)."""
+    if value is None:
+        return None
+    s = str(value).strip()
+    if not s:
+        return None
+    try:
+        return float(s)
+    except ValueError:
+        m = re.search(r"\d+(?:\.\d+)?", s)
+        return float(m.group()) if m else None
+
+
 def import_students(meta_csv: str | Path, resume_dir: str | Path | None = None) -> ImportResult:
     """Stitch a student metadata CSV to resume files by `candidate_id` (falling back to email local
     part). Expected CSV columns: candidate_id, email, name, education_level, years_experience,
@@ -62,8 +81,7 @@ def import_students(meta_csv: str | Path, resume_dir: str | Path | None = None) 
             cid = (row.get("candidate_id") or email or f"row{result.total_rows}").strip()
             name = (row.get("name") or "").strip() or None
             edu = (row.get("education_level") or "").strip() or None
-            yexp = row.get("years_experience")
-            yexp_val = float(yexp) if yexp not in (None, "") else None
+            yexp_val = _safe_years(row.get("years_experience"))
 
             resume_path = _find_resume(resume_dir, row, cid)
             if resume_path is not None:

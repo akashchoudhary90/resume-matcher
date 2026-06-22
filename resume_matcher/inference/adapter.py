@@ -10,7 +10,7 @@ import json
 import os
 from abc import ABC, abstractmethod
 
-from .redaction import assert_redacted
+from .redaction import assert_redacted, redact_text
 from .schema import CandidateProfile, JobSpec, MatchExtraction
 
 
@@ -23,17 +23,30 @@ class InferenceAdapter(ABC):
 
     `is_local` flags whether resume text leaves the machine. Anything non-local must only ever
     receive redacted text — enforced by `extract()` below.
+
+    `transmits_offbox` flags a backend that sends resume text to a REMOTE provider even though it is
+    "governed by you" (e.g. the Claude subscription CLI). Such backends are not `is_local=False`
+    (the consented demo deliberately sends the resume body + name), but `extract()` still strips
+    direct CONTACT identifiers before transmission — a backstop so a caller that forgot to redact
+    can never leak an email/phone/url/address off the box (boundary #3).
     """
 
     name: str = "base"
     is_local: bool = True
+    transmits_offbox: bool = False
 
     @abstractmethod
     def _extract(self, candidate: CandidateProfile, job: JobSpec) -> MatchExtraction:
         ...
 
     def extract(self, candidate: CandidateProfile, job: JobSpec) -> MatchExtraction:
-        if not self.is_local:
+        if self.transmits_offbox:
+            # Mandatory contact-only redaction before anything leaves the box. Done on a COPY so the
+            # caller's candidate (and the text the deterministic ranker verifies against) is unchanged.
+            safe = redact_text(candidate.text or "", name=None)
+            if safe != (candidate.text or ""):
+                candidate = candidate.model_copy(update={"text": safe})
+        elif not self.is_local:
             leaks = assert_redacted(candidate.text)
             if leaks:
                 raise InferenceError(
