@@ -41,6 +41,9 @@ def test_load_and_browse(client):
 
     audit = client.get("/api/audit").json()
     assert audit["available"] and "race_ethnicity" in audit["attributes"]
+    assert "exposure" in audit  # #26: rank-aware exposure parity wired in
+    if "homophily" in audit:
+        assert "reference_basis" in audit["homophily"]  # #26: reference group made explicit
 
 
 def test_unknown_ids_404(client):

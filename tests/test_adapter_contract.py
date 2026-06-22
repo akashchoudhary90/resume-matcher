@@ -41,6 +41,24 @@ def test_mock_finds_quotable_evidence(strong_candidate, python_job):
         assert m.evidence_span and m.evidence_span.lower() in strong_candidate.text.lower()
 
 
+def test_non_local_adapter_refuses_unredacted_pii(python_job):
+    # #20: the redaction tripwire — a non-local adapter must REFUSE un-redacted PII, and accept clean text.
+    from resume_matcher.inference.adapter import InferenceAdapter, InferenceError
+    from resume_matcher.inference.schema import CandidateProfile, MatchExtraction
+
+    class _Remote(InferenceAdapter):
+        name = "remote"
+        is_local = False
+
+        def _extract(self, c, j):
+            return MatchExtraction(candidate_id=c.candidate_id, job_id=j.job_id)
+
+    with pytest.raises(InferenceError, match="PII"):
+        _Remote().extract(CandidateProfile(candidate_id="C", text="reach me at a@b.com"), python_job)
+    clean = CandidateProfile(candidate_id="C", text="Python developer with broad experience.")
+    assert _Remote().extract(clean, python_job) is not None
+
+
 def test_parse_extraction_recovers_json_from_noisy_output(strong_candidate, python_job):
     # JSON wrapped in prose + code fences, with ids omitted — exercises both recovery and defaulting.
     raw = (

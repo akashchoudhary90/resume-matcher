@@ -190,6 +190,33 @@ def test_sweep_removes_expired():
     assert store.active_count() == 0
 
 
+def test_session_store_and_cache_concurrency():
+    # #20: hammer create/get/delete + the shared extraction cache from many threads; no crash, no
+    # corrupted invariants (active_count stays sane, store survives).
+    import threading
+
+    store = SessionStore(ttl_seconds=600, max_sessions=50)
+    errors: list[Exception] = []
+
+    def worker(i: int) -> None:
+        try:
+            for _ in range(12):
+                s = run_demo(store=store, required_skills=["python"],
+                             files=[(f"r{i}.txt", b"Python and SQL developer with experience. " * 4)])
+                store.get(s.session_id)
+                store.delete(s.session_id)
+        except Exception as exc:  # noqa: BLE001
+            errors.append(exc)
+
+    threads = [threading.Thread(target=worker, args=(i,)) for i in range(8)]
+    for t in threads:
+        t.start()
+    for t in threads:
+        t.join()
+    assert not errors, errors[:3]
+    assert 0 <= store.active_count() <= 50
+
+
 def test_max_sessions_evicts_oldest():
     store = SessionStore(ttl_seconds=600, max_sessions=2)
     a = run_demo(store=store, required_skills=["python"], files=_files(1))

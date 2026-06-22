@@ -5,6 +5,7 @@ endpoints). Equivalent CLI: `uvicorn resume_matcher.api.app:app --ws none --relo
 """
 from __future__ import annotations
 
+import logging
 import os
 import pathlib
 import sys
@@ -17,6 +18,12 @@ def main() -> None:
 
     from resume_matcher.api.app import create_app
 
+    # Leveled, timestamped logs so the app's own warnings (sweep failures, rejected uploads, autoload
+    # errors) are visible alongside uvicorn's — controllable via RM_LOG_LEVEL.
+    logging.basicConfig(
+        level=os.environ.get("RM_LOG_LEVEL", "INFO").upper(),
+        format="%(asctime)s %(levelname)s %(name)s: %(message)s",
+    )
     host = os.environ.get("RM_HOST", "127.0.0.1")
     port = int(os.environ.get("RM_PORT", "8000"))
     print(f"Serving Resume Matcher on http://{host}:{port}  (backend: {os.environ.get('RM_INFERENCE_BACKEND', 'mock')})")

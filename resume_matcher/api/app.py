@@ -96,8 +96,8 @@ def _start_sweeper() -> None:
             time.sleep(60)
             try:
                 store.sweep()
-            except Exception:  # noqa: BLE001 - a sweep error must never kill the thread
-                pass
+            except Exception as exc:  # noqa: BLE001 - a sweep error must never kill the thread
+                _log.warning("demo session sweep failed: %s", exc)
 
     threading.Thread(target=_loop, name="rm-demo-sweeper", daemon=True).start()
 
@@ -318,8 +318,8 @@ def create_app():
             for p in resume_parts:
                 try:
                     await p.close()  # release the in-memory spool for each upload
-                except Exception:  # noqa: BLE001
-                    pass
+                except Exception as exc:  # noqa: BLE001
+                    _log.debug("upload part close failed: %s", exc)
         return sess.to_dict()
 
     @app.get("/api/demo/session/{session_id}")
@@ -341,8 +341,8 @@ def create_app():
     if os.environ.get("RM_AUTOLOAD", "").lower() in ("1", "true", "yes"):
         try:
             state.load_synthetic()
-        except Exception:  # noqa: BLE001 - never block startup on demo data
-            pass
+        except Exception as exc:  # noqa: BLE001 - never block startup on demo data
+            _log.warning("RM_AUTOLOAD synthetic preload failed: %s", exc)
 
     return app
 

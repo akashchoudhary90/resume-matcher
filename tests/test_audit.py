@@ -2,7 +2,7 @@
 import numpy as np
 import pytest
 
-from resume_matcher.audit.metrics import homophily_disparity, selection_audit
+from resume_matcher.audit.metrics import exposure_parity, homophily_disparity, selection_audit
 from resume_matcher.audit.proxy_leakage import proxy_leakage
 from resume_matcher.stores.data_planes import AuditStore, ProtectedDataError, ScoringStore
 
@@ -29,6 +29,15 @@ def test_homophily_disparity_is_the_reframed_hunch():
     out = homophily_disparity(labels, selected, reference_group="A", min_cell=5)
     assert out["computable"] and out["flagged"]
     assert out["disparity_ratio"] < 0.8
+
+
+def test_exposure_parity_rank_aware():
+    # #26: rank-aware exposure (was dead code, now wired into audit()). Group ranked lower is under-exposed.
+    labels = ["A"] * 6 + ["B"] * 6
+    ranks = list(range(1, 7)) + list(range(7, 13))  # A ranked 1-6, B ranked 7-12
+    out = exposure_parity(labels, ranks, min_cell=5)
+    assert out["exposure"]["A"] > out["exposure"]["B"]
+    assert out["parity_ratio"] is not None and out["parity_ratio"] < 1.0
 
 
 def test_proxy_leakage_detects_correlated_features_and_not_independent():

@@ -83,6 +83,46 @@ def test_extract_json_object_is_brace_balanced():
     assert extract_json_object(fenced) == {"x": [1, 2], "y": "}"}
 
 
+def test_run_cli_nonzero_exit_and_timeout_raise(monkeypatch):
+    # #20: _run_cli must turn a CLI failure / timeout into a clean InferenceError (callers fall back).
+    import subprocess
+
+    import pytest
+
+    from resume_matcher.inference.adapter import InferenceError
+
+    monkeypatch.setenv("CLAUDE_CODE_OAUTH_TOKEN", "tok")
+    monkeypatch.setattr(claude_cli.shutil, "which", lambda _: "claude")
+
+    class _P:
+        returncode = 2
+        stdout = ""
+        stderr = "boom"
+
+    monkeypatch.setattr(subprocess, "run", lambda *a, **k: _P())
+    with pytest.raises(InferenceError, match="exited 2"):
+        claude_cli._run_cli("p", extra_args=[], cwd=None, timeout=5)
+
+    def _timeout(*a, **k):
+        raise subprocess.TimeoutExpired(cmd="claude", timeout=5)
+
+    monkeypatch.setattr(subprocess, "run", _timeout)
+    with pytest.raises(InferenceError, match="timed out"):
+        claude_cli._run_cli("p", extra_args=[], cwd=None, timeout=5)
+
+
+def test_extract_json_object_rejects_garbage_and_invalid():
+    # #20: no JSON object, or a malformed one, must raise InferenceError (never silently mis-parse).
+    import pytest
+
+    from resume_matcher.inference.adapter import InferenceError, extract_json_object
+
+    with pytest.raises(InferenceError):
+        extract_json_object("there is no json here at all")
+    with pytest.raises(InferenceError):
+        extract_json_object('{"a": 1, this is not valid}')
+
+
 def test_available_false_without_token(monkeypatch):
     monkeypatch.delenv("CLAUDE_CODE_OAUTH_TOKEN", raising=False)
     assert claude_cli.available() is False

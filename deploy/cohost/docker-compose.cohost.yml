@@ -41,6 +41,9 @@ services:
       - rmdemo
     mem_limit: 512m            # hard caps: the demo cannot starve the trading bot on the same host
     cpus: 0.5
+    # Let an in-flight scoring call finish on redeploy/stop before SIGKILL (vision calls run up to
+    # RM_CLAUDE_CLI_FILE_TIMEOUT=150s); default 10s would cut them off. Scoped to THIS service only.
+    stop_grace_period: 180s
     restart: unless-stopped
 
   caddy:

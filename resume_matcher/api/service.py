@@ -13,7 +13,7 @@ from pathlib import Path
 
 import numpy as np
 
-from ..audit.metrics import AuditReport, homophily_disparity, selection_audit
+from ..audit.metrics import AuditReport, exposure_parity, homophily_disparity, selection_audit
 from ..audit.proxy_leakage import proxy_leakage
 from ..ingestion.importer import import_students, load_jobs
 from ..ingestion.synthetic import generate_dataset
@@ -137,12 +137,29 @@ class AppState:
             report = selection_audit(labels, mask, attribute=attr, min_cell=5)
             result["attributes"][attr] = _report_to_dict(report)
 
-        # Homophily disparity (the reframed hunch): reference = modal self-identified race group.
+        # Rank-aware exposure parity: a group can pass top-k parity yet be ranked systematically
+        # lower. Use each candidate's BEST (smallest) position across the per-job shortlists.
+        best_rank: dict[str, int] = {}
+        for sl in self.run.shortlists:
+            for pos, r in enumerate(sl.ranked, start=1):
+                if r.candidate_id not in best_rank or pos < best_rank[r.candidate_id]:
+                    best_rank[r.candidate_id] = pos
+        ranks = [best_rank.get(cid, len(pool) + 1) for cid in pool]
         race_labels = self.audit_store.labels_for(pool, "race_ethnicity")
+        result["exposure"] = exposure_parity(race_labels, ranks, min_cell=5)
+
+        # Homophily disparity (the reframed hunch): reference = modal self-identified race group.
         present = [lab for lab in race_labels if lab]
         if present:
             ref = Counter(present).most_common(1)[0][0]
-            result["homophily"] = homophily_disparity(race_labels, mask, reference_group=ref, min_cell=5)
+            homophily = homophily_disparity(race_labels, mask, reference_group=ref, min_cell=5)
+            # Be explicit that the reference is the modal CANDIDATE group, NOT the hiring team's
+            # dominant group (which the audit ideally compares against but we don't collect here) —
+            # so the metric isn't misread as a true in-group/out-group hiring-team comparison.
+            homophily["reference_basis"] = (
+                "modal self-identified candidate group (hiring-team composition not collected)"
+            )
+            result["homophily"] = homophily
 
         # Proxy-leakage diagnostic on the scoring features.
         feats = np.array(
