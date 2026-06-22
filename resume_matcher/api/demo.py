@@ -13,10 +13,12 @@ app.py; the matching itself reuses the same deterministic pipeline as the synthe
 """
 from __future__ import annotations
 
+import glob
 import hashlib
 import json
 import os
 import secrets
+import shutil
 import tempfile
 import threading
 import time
@@ -353,7 +355,7 @@ def run_demo(
             # the full resume text/transcription, so nothing PII outlives the session in this global
             # store (privacy: "Delete my data now" + TTL purge no longer leave the resume behind).
             cached_extraction = _cache_get(key)
-            tmp = None
+            tmp = tmpdir = None
             try:
                 # Verify the model's quotes against an INDEPENDENT local parse of the bytes, never the
                 # model's own transcription (that would make the verbatim guarantee circular — a model
@@ -371,9 +373,14 @@ def run_demo(
                     extraction = cached_extraction          # identical re-score: no LLM, no PII cached
                     verify_text = independent
                 else:
-                    fd, tmp = tempfile.mkstemp(suffix=ext or ".pdf")
-                    with os.fdopen(fd, "wb") as fh:
-                        fh.write(data)  # written briefly so the CLI can read it; deleted in finally
+                    # Per-request PRIVATE temp dir (mkdtemp is mode 0700) rather than a file in the
+                    # shared system temp: the CLI runs with cwd here, so even acceptEdits stays
+                    # sandboxed to this dir, and the whole dir (file + any artifacts) is rmtree'd in
+                    # finally — nothing lingers in shared temp on a crash/SIGKILL (startup sweep mops up).
+                    tmpdir = tempfile.mkdtemp(prefix="rmdemo_")
+                    tmp = os.path.join(tmpdir, f"resume{ext or '.pdf'}")
+                    with open(tmp, "wb") as fh:
+                        fh.write(data)  # written briefly so the CLI can read it; dir deleted in finally
                     resume_text, fresh = _claude_cli.extract_from_file(tmp, job, cid)
                     extraction = cached_extraction if cached_extraction is not None else fresh
                     _cache_put(key, extraction)
@@ -405,11 +412,8 @@ def run_demo(
             except Exception as exc:  # noqa: BLE001 - fall back to text extraction
                 note = f"{label}: NDR AI file-read failed ({type(exc).__name__}); used text extraction."
             finally:
-                if tmp:
-                    try:
-                        os.unlink(tmp)
-                    except OSError:
-                        pass
+                if tmpdir:
+                    shutil.rmtree(tmpdir, ignore_errors=True)
         # --- Text path (default for .txt/.docx; also the fallback for the above) ---
         # Consented demo: keep the resume body + the applicant NAME (identifiable, by consent) but
         # still strip CONTACT identifiers (email/phone/url/address) before the text is scored, sent
@@ -479,6 +483,17 @@ def _resolve_adapter(name: str):
     if name == "claude_cli" and not _claude_cli.available():
         return get_adapter("mock"), "mock"
     return get_adapter(name), name
+
+
+def sweep_stale_tmpdirs() -> int:
+    """Best-effort: remove leftover per-request file-direct temp dirs (rmdemo_*) from a prior
+    crash/SIGKILL. Safe to call at startup (no requests are in flight then). Returns the count removed."""
+    removed = 0
+    for path in glob.glob(os.path.join(tempfile.gettempdir(), "rmdemo_*")):
+        if os.path.isdir(path):
+            shutil.rmtree(path, ignore_errors=True)
+            removed += 1
+    return removed
 
 
 _STORE: SessionStore | None = None

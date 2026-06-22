@@ -6,8 +6,10 @@ WORKDIR /app
 # Extras here power the web layer + the real-data demo: python-multipart (file uploads),
 # pypdf + python-docx (parse uploaded .pdf/.docx resumes in memory).
 COPY requirements.txt .
+# Version-constrained to match requirements-extra.txt (reproducible builds; no bare/unpinned deps).
 RUN pip install --no-cache-dir -r requirements.txt \
-    fastapi "uvicorn>=0.29" python-multipart pdfplumber pypdf python-docx
+    "fastapi>=0.110" "uvicorn>=0.29" "python-multipart>=0.0.9" \
+    "pdfplumber>=0.11" "pypdf>=4.0" "python-docx>=1.1"
 
 # OPTIONAL Claude backend (RM_DEMO_BACKEND=claude_cli): the Claude Code CLI native binary, used to
 # score via your SUBSCRIPTION (CLAUDE_CODE_OAUTH_TOKEN from `claude setup-token`) — no API key/bill.

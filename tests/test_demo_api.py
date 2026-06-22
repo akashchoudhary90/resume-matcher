@@ -76,6 +76,17 @@ def test_too_many_resumes_400(client):
     assert "Upload rejected" in detail and "Exception" not in detail and "Traceback" not in r.text
 
 
+def test_demo_run_rate_limited(monkeypatch):
+    # #1: a single client flooding /api/demo/run is throttled (429) after the burst is spent.
+    monkeypatch.setenv("RM_DEMO_RATE_BURST", "2")
+    monkeypatch.setenv("RM_DEMO_RATE_PER_MIN", "1")  # ~0.017/s refill — negligible during the test
+    throttled = TestClient(create_app())
+    files = [_file("a.txt", b"python developer")]
+    codes = [throttled.post("/api/demo/run", data={"required_skills": "python"}, files=files).status_code
+             for _ in range(3)]
+    assert codes[2] == 429  # burst of 2 exhausted -> third request rejected
+
+
 def test_demo_page_served(client):
     assert client.get("/demo").status_code == 200
 

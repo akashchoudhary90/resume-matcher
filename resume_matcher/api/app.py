@@ -31,6 +31,38 @@ _SWEEPER_STARTED = False
 _log = logging.getLogger("resume_matcher.api")
 
 
+def _client_key(request) -> str:
+    """Best-effort client identity for rate limiting: the first X-Forwarded-For hop (the demo sits
+    behind Caddy) else the socket peer."""
+    xff = request.headers.get("x-forwarded-for", "")
+    if xff:
+        return xff.split(",")[0].strip()
+    return request.client.host if request.client else "unknown"
+
+
+class _RateLimiter:
+    """Tiny in-memory token bucket per client key — process-local, matching the in-RAM demo posture.
+    Not a substitute for an edge limiter, but it stops a single client from flooding the LLM path."""
+
+    def __init__(self, capacity: int, refill_per_sec: float) -> None:
+        self.capacity = float(max(1, capacity))
+        self.refill = max(0.001, refill_per_sec)
+        self._buckets: dict[str, tuple[float, float]] = {}
+        self._lock = threading.Lock()
+
+    def allow(self, key: str, now: float) -> bool:
+        with self._lock:
+            if len(self._buckets) > 10000:
+                self._buckets.clear()  # crude bound; the demo is low-volume + auth-gated
+            tokens, last = self._buckets.get(key, (self.capacity, now))
+            tokens = min(self.capacity, tokens + (now - last) * self.refill)
+            if tokens < 1.0:
+                self._buckets[key] = (tokens, now)
+                return False
+            self._buckets[key] = (tokens - 1.0, now)
+            return True
+
+
 def _split_ids(value: str) -> list[str]:
     import re
 
@@ -90,6 +122,16 @@ def create_app():
     demo_enabled = os.environ.get("RM_DEMO_ENABLED", "1").lower() in ("1", "true", "yes")
     _ensure_in_memory_uploads()
     _start_sweeper()
+    demo_mod.sweep_stale_tmpdirs()  # mop up any crash-leftover file-direct temp dirs at startup
+
+    # DoS guards for the public demo (defense in depth — the app is also admin-auth gated):
+    demo_rate = _RateLimiter(
+        demo_mod._int_env("RM_DEMO_RATE_BURST", 15),
+        demo_mod._int_env("RM_DEMO_RATE_PER_MIN", 30) / 60.0,
+    )
+    demo_run_sem = threading.BoundedSemaphore(max(1, demo_mod._int_env("RM_DEMO_MAX_CONCURRENT_RUNS", 4)))
+    # Reject a too-large upload from its declared Content-Length BEFORE buffering the body in RAM.
+    max_body_bytes = int(demo_mod.MAX_RESUMES * demo_mod.MAX_FILE_MB * 1024 * 1024 * 1.1) + 1_048_576
 
     def _require_demo() -> None:
         if not demo_enabled:
@@ -214,6 +256,14 @@ def create_app():
         # Starlette's 1 MB default, and (b) cap the upload (count + per-file size) at the framework
         # edge. Combined with _ensure_in_memory_uploads(), nothing spills to disk.
         _require_demo()
+        if not demo_rate.allow(_client_key(request), time.time()):
+            raise HTTPException(429, "Too many requests — please slow down and retry shortly.")
+        clen = request.headers.get("content-length", "")
+        if clen.isdigit() and int(clen) > max_body_bytes:
+            raise HTTPException(
+                413,
+                f"Upload too large. Limit: {demo_mod.MAX_RESUMES} files, {demo_mod.MAX_FILE_MB} MB each.",
+            )
         max_part = demo_mod.MAX_FILE_MB * 1024 * 1024
         try:
             form = await request.form(
@@ -240,6 +290,10 @@ def create_app():
             except ValueError:
                 return None
 
+        # Cap concurrent scoring runs (each does parsing + LLM calls) so a burst can't exhaust the
+        # box; reject fast with 429 rather than queueing unbounded work.
+        if not demo_run_sem.acquire(blocking=False):
+            raise HTTPException(429, "The demo is busy scoring other uploads — please retry in a moment.")
         try:
             # run_demo is synchronous + CPU-bound (PDF/DOCX parse, matching); keep it off the event
             # loop so one upload doesn't stall other requests on this worker.
@@ -259,6 +313,7 @@ def create_app():
         except DemoError as exc:
             raise HTTPException(400, str(exc))
         finally:
+            demo_run_sem.release()
             files = []  # drop the uploaded bytes promptly
             for p in resume_parts:
                 try:
