@@ -12,21 +12,32 @@ from ..inference.schema import CandidateProfile, JobSpec, ScoreResult
 from . import ranker
 
 
+def antigaming_flags(text: str, job: JobSpec) -> list[str]:
+    """Advisory anti-gaming flags from the resume text (injection + keyword-stuffing). Pure code, so
+    it cannot itself be injected; the ranker decides whether/how they affect the score."""
+    return scan_injection(text) + scan_keyword_stuffing(text, job)
+
+
+def score_with_antigaming(
+    extraction,
+    candidate: CandidateProfile,
+    job: JobSpec,
+    extra_flags: list[str] | None = None,
+) -> ScoreResult:
+    """The single scoring chokepoint: run the anti-gaming scans on the candidate text, merge any
+    caller-supplied flags (e.g. the demo's hidden-text / file-direct signals), and hand everything to
+    the deterministic ranker. Used by both evaluate() and the ephemeral demo so they cannot drift."""
+    flags = list(extra_flags or []) + antigaming_flags(candidate.text, job)
+    return ranker.score(extraction, candidate, job, extra_flags=flags)
+
+
 def evaluate(
     candidate: CandidateProfile,
     job: JobSpec,
     adapter: InferenceAdapter | None = None,
 ) -> ScoreResult:
     adapter = adapter or get_adapter()
-
-    # Anti-gaming checks run on the resume text BEFORE/independent of the LLM. These produce
-    # advisory flags only — never an auto-reject (plan §D).
-    flags: list[str] = []
-    flags += scan_injection(candidate.text)
-    flags += scan_keyword_stuffing(candidate.text, job)
-
-    extraction = adapter.extract(candidate, job)
-    return ranker.score(extraction, candidate, job, extra_flags=flags)
+    return score_with_antigaming(adapter.extract(candidate, job), candidate, job)
 
 
 def evaluate_many(

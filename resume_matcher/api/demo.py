@@ -27,8 +27,7 @@ from concurrent.futures import ThreadPoolExecutor
 from dataclasses import dataclass, field
 
 from ..antigaming.hidden_text import cross_modal_diff, scan_pdf
-from ..antigaming.injection import scan_injection
-from ..antigaming.keyword_stuffing import scan_keyword_stuffing
+from ..config import DemoConfig, env_int
 from ..ingestion.job_posting import build_job_spec, detect_job_skills, skill_options
 from ..ingestion.parser import (
     ParseError,
@@ -41,31 +40,24 @@ from ..inference.adapter import get_adapter
 from ..inference.adapters import claude_cli as _claude_cli
 from ..inference.schema import CandidateProfile
 from ..matching import coaching as coaching_mod
-from ..matching import ranker
+from ..matching.evaluator import score_with_antigaming
 from ..matching.taxonomy import canonical_name
 from .serialize import result_to_dict
 
-
-def _int_env(name: str, default: int) -> int:
-    try:
-        return int(os.environ.get(name, "").strip() or default)
-    except ValueError:
-        return default
-
-
-MAX_RESUMES = _int_env("RM_DEMO_MAX_RESUMES", 10)
-MAX_FILE_MB = _int_env("RM_DEMO_MAX_FILE_MB", 4)
-TTL_MINUTES = _int_env("RM_DEMO_TTL_MINUTES", 30)
-MAX_SESSIONS = _int_env("RM_DEMO_MAX_SESSIONS", 100)
-# Matching engine: "claude_cli" (Claude on your subscription via the local Claude Code CLI — no API
-# key; DEFAULT) or "mock" (deterministic). claude_cli falls back to mock when the CLI/token is absent,
-# so this is safe to default on even before the token is configured.
-DEMO_BACKEND = os.environ.get("RM_DEMO_BACKEND", "claude_cli")
-CONCURRENCY = max(1, _int_env("RM_DEMO_CONCURRENCY", 4))  # parallel extractions per upload batch
-# With the Claude engine, send PDFs/images to Claude directly (vision) instead of extracting text
-# first — reads scanned resumes + preserves layout. Set RM_DEMO_SEND_FILE=0 to force text extraction.
-SEND_FILE = os.environ.get("RM_DEMO_SEND_FILE", "1").lower() in ("1", "true", "yes")
-CACHE_MAX = _int_env("RM_DEMO_CACHE_MAX", 512)  # in-memory extraction cache (consistency + speed)
+# Demo config now lives in resume_matcher/config.py (one documented home for the RM_* knobs). The
+# public names below are kept as module constants for back-compat (app.py + tests reference them).
+_int_env = env_int  # app.py reads its request-time rate-limit knobs via demo_mod._int_env
+_CFG = DemoConfig.from_env()
+MAX_RESUMES = _CFG.max_resumes
+MAX_FILE_MB = _CFG.max_file_mb
+TTL_MINUTES = _CFG.ttl_minutes
+MAX_SESSIONS = _CFG.max_sessions
+# Matching engine: "claude_cli" (NDR AI on your subscription via the local Claude Code CLI — no API
+# key; DEFAULT) or "mock" (deterministic). claude_cli falls back to mock when the CLI/token is absent.
+DEMO_BACKEND = _CFG.backend
+CONCURRENCY = _CFG.concurrency           # parallel extractions per upload batch
+SEND_FILE = _CFG.send_file               # send PDFs/images to NDR AI directly (vision) vs text-first
+CACHE_MAX = _CFG.cache_max               # in-memory extraction cache (consistency + speed)
 
 # Cache the LLM EXTRACTION keyed by (content, job, model). The LLM is non-deterministic, so this makes
 # re-scoring the SAME resume against the SAME job IDENTICAL (and instant). In-memory only (no disk),
@@ -401,13 +393,12 @@ def run_demo(
                         pass
                 if verify_text.strip():
                     cand = _candidate_from_text(cid, verify_text)
-                    flags = (scan_injection(cand.text) + scan_keyword_stuffing(cand.text, job)
-                             + hidden_flags)
+                    extra = list(hidden_flags)
                     if not independent.strip():
                         # Scanned image / no text layer: there is no independent ground truth, so quotes
                         # could only be checked against the model's own transcription — say so plainly.
-                        flags.append("evidence_verified_against_model_transcription")
-                    return ranker.score(extraction, cand, job, extra_flags=flags), cand, label, None
+                        extra.append("evidence_verified_against_model_transcription")
+                    return score_with_antigaming(extraction, cand, job, extra_flags=extra), cand, label, None
                 note = f"{label}: NDR AI read no text from the file; tried local text extraction."
             except Exception as exc:  # noqa: BLE001 - fall back to text extraction
                 note = f"{label}: NDR AI file-read failed ({type(exc).__name__}); used text extraction."
@@ -428,8 +419,7 @@ def run_demo(
                 f"{label}: no readable text. If it's a scanned/photo PDF, the NDR AI engine can read "
                 f"it — otherwise upload a text-based PDF, a .docx, or a .txt."
             )
-        flags = scan_injection(cand.text) + scan_keyword_stuffing(cand.text, job)
-        return ranker.score(_text_extraction(cand), cand, job, extra_flags=flags), cand, label, note
+        return score_with_antigaming(_text_extraction(cand), cand, job), cand, label, note
 
     workers = min(len(items), CONCURRENCY) or 1
     with ThreadPoolExecutor(max_workers=workers) as pool:
