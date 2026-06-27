@@ -73,6 +73,26 @@ def test_internally_consistent_forgery_still_fails_on_signature():
     assert verify_defense_file(f)["signatures_valid"] is False
 
 
+def test_canonicalization_survives_browser_int_float_roundtrip():
+    # A browser's JSON.stringify turns 75.0 into 75; canonicalization must treat them identically or the
+    # hash chain breaks for real users who verify in the page. (Regression for a live-caught bug.)
+    f = build_defense_file(_session(), generated_at=1000.0)
+
+    def to_js(o):
+        if isinstance(o, bool):
+            return o
+        if isinstance(o, float) and o == int(o):
+            return int(o)
+        if isinstance(o, dict):
+            return {k: to_js(v) for k, v in o.items()}
+        if isinstance(o, list):
+            return [to_js(v) for v in o]
+        return o
+
+    v = verify_defense_file(to_js(f))
+    assert v["chain_intact"] and v["all_reconcile"]
+
+
 def test_hmac_fallback_when_cryptography_absent(monkeypatch):
     monkeypatch.setattr(df, "_ED25519_OK", False)
     f = build_defense_file(_session(), generated_at=1000.0)

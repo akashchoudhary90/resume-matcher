@@ -43,9 +43,29 @@ except Exception:  # noqa: BLE001 - optional dep; HMAC keeps the feature working
     _ED25519_OK = False
 
 
+def _normalize_numbers(obj):
+    """Make numbers stable across a JSON round-trip and across languages: an integer-valued float (75.0)
+    canonicalizes identically to the integer (75) — exactly what a browser's JSON.stringify does. Without
+    this, a file verified in Python (which keeps 75.0) and one re-serialized by JS (which emits 75) would
+    hash differently, breaking the chain for real users."""
+    if isinstance(obj, bool):
+        return obj
+    if isinstance(obj, float):
+        i = int(obj)
+        return i if obj == i else obj
+    if isinstance(obj, dict):
+        return {k: _normalize_numbers(v) for k, v in obj.items()}
+    if isinstance(obj, list):
+        return [_normalize_numbers(v) for v in obj]
+    return obj
+
+
 def _canonical(obj) -> bytes:
-    """Deterministic JSON bytes for hashing/signing (sorted keys, no incidental whitespace)."""
-    return json.dumps(obj, sort_keys=True, separators=(",", ":"), ensure_ascii=False).encode("utf-8")
+    """Deterministic JSON bytes for hashing/signing — sorted keys, no incidental whitespace, and numbers
+    normalized so they survive a JSON round-trip (see _normalize_numbers). Matches the open spec."""
+    return json.dumps(
+        _normalize_numbers(obj), sort_keys=True, separators=(",", ":"), ensure_ascii=False,
+    ).encode("utf-8")
 
 
 def _sha256(b: bytes) -> str:
@@ -202,6 +222,8 @@ def build_defense_file(session: dict, *, generated_at: float) -> dict:
         "sig_alg": signer["alg"],
         "public_key": signer["public_key"],
         "salt": salt,
+        "verify_at": "/verify",   # a public, no-login page that re-verifies this file
+        "spec": "docs/DEFENSE_FILE_SPEC.md",
         "n_decisions": len(records),
         "disclaimer": ("Tamper-evident, reproducible record of how each fit-readiness score was derived "
                        "from the recorded breakdown. NOT a probability of hire and NOT a claim of "
@@ -212,9 +234,19 @@ def build_defense_file(session: dict, *, generated_at: float) -> dict:
     return file
 
 
-def verify_defense_file(file: dict) -> dict:
-    """Independently re-verify a Defense File: hash chain, per-record reconciliation, and (for Ed25519)
-    signatures from the included public key. Returns a structured verdict."""
+def issuer_public_key() -> dict:
+    """This engine's current signing identity — publish it (e.g. at /api/defense-file/pubkey and in the
+    spec) so a verifier can authenticate Defense Files against it OUT-OF-BAND. Do not trust the key
+    embedded inside a file alone: a forger can sign with their own key and embed it."""
+    signer = _make_signer()
+    return {"sig_alg": signer["alg"], "public_key": signer["public_key"]}
+
+
+def verify_defense_file(file: dict, expected_public_key: str | None = None) -> dict:
+    """Independently re-verify a Defense File WITHOUT trusting the issuer: hash chain, per-record
+    reconciliation, and (for Ed25519) signatures from the embedded public key. Pass `expected_public_key`
+    (obtained out-of-band) to also AUTHENTICATE the issuer — without it, a self-consistent forgery signed
+    by an attacker's own key would still pass the chain/signature checks (`issuer_verified` stays None)."""
     verifier = _make_verifier(file.get("sig_alg"), file.get("public_key"))
     prev = None
     chain_ok = recon_ok = sig_ok = True
@@ -231,16 +263,28 @@ def verify_defense_file(file: dict) -> dict:
         prev = rec.get("record_hash")
 
     signatures_valid = sig_ok if verifier is not None else None
-    ok = chain_ok and recon_ok and (signatures_valid is not False)
+    issuer_key = file.get("public_key")
+    issuer_verified: bool | None = None
+    if expected_public_key is not None:
+        issuer_verified = bool(issuer_key) and hmac.compare_digest(issuer_key, expected_public_key)
+    ok = (chain_ok and recon_ok and (signatures_valid is not False)
+          and (issuer_verified is not False))
     return {
         "ok": ok,
         "n_decisions": len(file.get("records", [])),
         "chain_intact": chain_ok,
         "all_reconcile": recon_ok,
         "signatures_valid": signatures_valid,
+        "issuer_key": issuer_key,
+        "issuer_verified": issuer_verified,
         "sig_alg": file.get("sig_alg"),
         "note": ("Each score re-derives exactly from its recorded breakdown; records are hash-chained"
                  + ("; signatures verified with the included public key."
                     if file.get("sig_alg") == "ed25519"
-                    else "; HMAC signature verification requires the server key.")),
+                    else "; HMAC signature verification requires the server key.")
+                 + (" Issuer authenticated against the expected key."
+                    if issuer_verified else
+                    " Provide the issuer's published key to authenticate the signer."
+                    if issuer_verified is None else
+                    " WARNING: signed by an UNEXPECTED key — not from the stated issuer.")),
     }

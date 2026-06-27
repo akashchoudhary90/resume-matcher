@@ -28,8 +28,13 @@ _warned = False
 
 ADMIN_COOKIE = "rm_admin"
 
-# Reachable WITHOUT a session: the readiness probe, and the sign-in page + its endpoints.
-_AUTH_EXEMPT_PATHS = {"/api/health", "/login", "/api/login", "/api/logout"}
+# Reachable WITHOUT a session: the readiness probe, the sign-in page + its endpoints, and the PUBLIC
+# Defense-File verifier (a regulator/auditor/opposing counsel has no admin login; the verifier exposes
+# no secrets or PII — it only re-checks a file the caller already holds).
+_AUTH_EXEMPT_PATHS = {
+    "/api/health", "/login", "/api/login", "/api/logout",
+    "/verify", "/api/verify", "/api/defense-file/pubkey",
+}
 
 # Known-weak / placeholder passwords. admin/admin is INTENTIONALLY allowed for the synthetic-data demo
 # (the user wants it) — we warn but never refuse to start.

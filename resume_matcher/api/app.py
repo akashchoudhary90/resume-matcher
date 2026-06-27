@@ -253,6 +253,14 @@ def create_app():
             return FileResponse(str(page))
         raise HTTPException(404, "Sign-in page not found.")
 
+    @app.get("/verify", include_in_schema=False)
+    def verify_page():
+        # PUBLIC (no sign-in): drop a Defense File, re-verify it without trusting the issuer.
+        page = _STATIC / "verify.html"
+        if page.exists():
+            return FileResponse(str(page))
+        raise HTTPException(404, "Verifier page not found.")
+
     @app.get("/api/health")
     def health() -> dict:
         # Real readiness probe (auth-exempt): confirms the process booted, the dashboards it serves are
@@ -773,6 +781,32 @@ def create_app():
     def admin_logout(response: Response) -> dict:
         response.delete_cookie(ADMIN_COOKIE)
         return {"ok": True}
+
+    # ---- PUBLIC independent verifier (auth-exempt; no secrets/PII) ------------------------------
+    @app.get("/api/defense-file/pubkey")
+    def defense_file_pubkey() -> dict:
+        # Publish this engine's signing identity so anyone can authenticate a Defense File OUT-OF-BAND.
+        from ..audit.defense_file import issuer_public_key
+
+        return issuer_public_key()
+
+    @app.post("/api/verify")
+    async def public_verify(request: Request) -> dict:
+        if not demo_rate.allow(_client_key(request), time.time()):
+            raise HTTPException(429, "Too many requests — please slow down and retry shortly.")
+        clen = request.headers.get("content-length", "")
+        if clen.isdigit() and int(clen) > 5 * 1024 * 1024:
+            raise HTTPException(413, "That file is too large to verify here.")
+        try:
+            file = await request.json()
+        except Exception:  # noqa: BLE001
+            raise HTTPException(400, "Send a Defense File as JSON.")
+        if not isinstance(file, dict) or "records" not in file:
+            raise HTTPException(400, "That doesn't look like a Defense File (no 'records').")
+        from ..audit.defense_file import issuer_public_key, verify_defense_file
+
+        # Authenticate against THIS engine's published key (the file's embedded key alone proves nothing).
+        return verify_defense_file(file, expected_public_key=issuer_public_key()["public_key"])
 
     # For a deployed demo, optionally pre-load the synthetic dataset so the page isn't empty.
     if os.environ.get("RM_AUTOLOAD", "").lower() in ("1", "true", "yes"):
