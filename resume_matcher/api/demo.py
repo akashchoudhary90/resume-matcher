@@ -41,6 +41,7 @@ from ..inference.adapters import claude_cli as _claude_cli
 from ..inference.schema import CandidateProfile
 from ..matching import coaching as coaching_mod
 from ..matching import counterfactual as counterfactual_mod
+from ..matching import jd_audit as jd_audit_mod
 from ..matching.evaluator import score_with_antigaming
 from ..matching.taxonomy import canonical_name
 from .serialize import result_to_dict
@@ -118,6 +119,7 @@ class DemoSession:
     engine: str = "mock"  # which matching engine actually ran ("mock" | "claude_cli")
     duplicates_removed: int = 0  # byte-identical uploads skipped (same résumé dropped twice)
     grid: dict | None = None  # multi-job fit grid (candidate×role); None for a single-job session
+    jd_audit: dict | None = None  # reverse-audit of how the posting's requirements shape the pool
     # NB: raw resume text is intentionally NOT a field here — it is dropped after scoring.
 
     @property
@@ -132,6 +134,7 @@ class DemoSession:
             "job": self.job,
             "results": self.results,
             "grid": self.grid,
+            "jd_audit": self.jd_audit,
             "n_resumes": self.n_resumes,
             "duplicates_removed": self.duplicates_removed,
             "warnings": self.warnings,
@@ -164,7 +167,7 @@ class SessionStore:
         self._lock = threading.Lock()
 
     def create(self, job: dict, results: list[dict], n_resumes: int, warnings: list[str],
-               engine: str = "mock", duplicates_removed: int = 0) -> DemoSession:
+               engine: str = "mock", duplicates_removed: int = 0, jd_audit: dict | None = None) -> DemoSession:
         now = time.time()
         sid = secrets.token_urlsafe(24)
         sess = DemoSession(
@@ -178,6 +181,7 @@ class SessionStore:
             warnings=warnings,
             engine=engine,
             duplicates_removed=duplicates_removed,
+            jd_audit=jd_audit,
         )
         with self._lock:
             self._evict_if_needed_locked(now)
@@ -514,11 +518,15 @@ def run_demo(
         "min_education": job.min_education,
         "min_years": job.min_years,
     }
+    # Reverse-audit the posting's own requirements (how they shape the qualified pool) — exact re-scores
+    # on the same ranker. None when there's nothing to say (too few candidates / no relaxable requirement).
+    jd_audit = jd_audit_mod.audit_requirements(scored, job)
+
     # Local resume text / bytes go out of scope here and are garbage-collected; only `results`
     # (the score breakdown) is persisted in the session.
     return store.create(
         job=job_summary, results=results, n_resumes=len(scored), warnings=warnings, engine=engine,
-        duplicates_removed=duplicates_removed,
+        duplicates_removed=duplicates_removed, jd_audit=jd_audit,
     )
 
 

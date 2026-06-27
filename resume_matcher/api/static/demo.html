@@ -742,6 +742,20 @@ function nextGradeHtml(res){
   return `<div class="nextgrade"><b>▲ ${g.steps.length} change(s) from grade ${esc(g.target_grade)}</b>
     — now ${esc(String(g.current_score))} → projected <b>~${esc(String(g.projected_score))}</b>: ${steps}</div>`;
 }
+function jdAuditHtml(d){
+  const a = d.jd_audit; if(!a || !(a.findings&&a.findings.length)) return '';
+  const rows = a.findings.slice(0,5).map(f=>`
+    <div style="display:flex;gap:10px;align-items:center;padding:6px 0;border-bottom:1px solid var(--line)">
+      <div style="flex:1">${esc(f.requirement)}</div>
+      <div class="muted" style="white-space:nowrap">frees <b style="color:var(--green)">${f.freed_count}</b>${f.sole_blocked?` · <span style="color:var(--amber)">${f.sole_blocked} blocked solely by this</span>`:''}</div>
+    </div>`).join('');
+  return `<div class="card" style="border-color:var(--amber)">
+    <h2>⚖ Job posting audit <span class="muted" style="font-weight:400">— is this posting over-filtering your pool?</span></h2>
+    <div class="muted" style="margin-bottom:8px">${esc(a.summary)}</div>
+    <div style="font-size:12.5px"><div class="muted" style="text-transform:uppercase;font-size:11px;margin-bottom:4px">Relaxing a requirement would add candidates who clear the bar:</div>${rows}</div>
+    <div class="muted" style="font-size:11.5px;margin-top:8px">Pool impact only (who clears grade B+) — not who to hire, and not group disparity.</div>
+  </div>`;
+}
 function resultCard(res, rank){
   const ex = res.explanation;
   const flags = (res.flags_explained||[]).map(f=>`<div class="flag ${f.severity}">${esc(f.text)}</div>`).join('');
@@ -799,7 +813,7 @@ function renderResults(d){
         <button class="ghost" title="A tamper-evident, reproducible, signed record of every decision — verifiable by anyone, no trust required." onclick="location.href='/api/demo/session/${encodeURIComponent(d.session_id)}/defense-file.json'">🔒 Defense File</button>
       </div>`}
     </div>`;
-  $('#results').innerHTML = warn + dup + head + (d.results||[]).map((r,i)=>resultCard(r,i+1)).join('');
+  $('#results').innerHTML = warn + dup + head + jdAuditHtml(d) + (d.results||[]).map((r,i)=>resultCard(r,i+1)).join('');
   if(!SAVED_VIEW) startTTL(d.privacy && d.privacy.seconds_until_auto_delete);
 }
 
