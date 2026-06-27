@@ -40,6 +40,7 @@ from ..inference.adapter import get_adapter
 from ..inference.adapters import claude_cli as _claude_cli
 from ..inference.schema import CandidateProfile
 from ..matching import coaching as coaching_mod
+from ..matching import counterfactual as counterfactual_mod
 from ..matching.evaluator import score_with_antigaming
 from ..matching.taxonomy import canonical_name
 from .serialize import result_to_dict
@@ -498,6 +499,8 @@ def run_demo(
             row["skills_found"] = len(cand.skills)
             # Skills the candidate has that the job didn't ask for (the "also brings" half of the gap view).
             row["extra_skills"] = [canonical_name(s) for s in cand.skills if s not in job_skill_set]
+            # Exact, fewest-change path to the next grade up (None if already grade A / not close).
+            row["gap_to_next"] = counterfactual_mod.gap_to_next_grade(res, cand, job)
         results.append(row)
 
     must_set = set(job.must_have_skills)
