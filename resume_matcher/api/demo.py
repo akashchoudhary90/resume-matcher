@@ -284,6 +284,15 @@ def _label_for(filename: str, idx: int) -> str:
     return stem or f"Resume {idx + 1}"
 
 
+def extract_job_text(filename: str, data: bytes) -> str:
+    """Extract plain text from an uploaded JD file (pdf/docx/txt). Returns '' if unreadable. Unlike a
+    résumé, a job posting is NOT PII, so it is not redacted — we keep the full posting text."""
+    try:
+        return extract_bytes_text(filename or "jd.txt", data) or ""
+    except ParseError:
+        return ""
+
+
 def _candidate_from_text(cid: str, text: str) -> CandidateProfile:
     """Build a CandidateProfile from extracted/transcribed text.
 
@@ -591,6 +600,48 @@ def run_demo_grid(
         grid=grid,
         duplicates_removed=duplicates_removed,
     )
+
+
+def run_demo_grid_from_files(
+    *,
+    store: SessionStore,
+    jd_files: list[tuple[str, bytes]],
+    resume_files: list[tuple[str, bytes]],
+    backend: str | None = None,
+) -> DemoSession:
+    """Bulk match: a folder of JD FILES × a folder of résumé files -> a candidate×role fit grid.
+
+    Extracts each JD file's text into a role (title = filename), caps to the demo limits with an HONEST
+    truncation message (no silent drop — the cap is the upgrade hook), then reuses run_demo_grid."""
+    if not jd_files:
+        raise DemoError("Upload at least one job-description file.")
+    if not resume_files:
+        raise DemoError("Upload at least one résumé file.")
+
+    warnings: list[str] = []
+    n_jds, n_res = len(jd_files), len(resume_files)
+    if n_jds > MAX_JOBS:
+        warnings.append(f"Demo limit: matched the first {MAX_JOBS} of {n_jds} job descriptions — "
+                        f"upgrade to match your whole folder.")
+        jd_files = jd_files[:MAX_JOBS]
+    if n_res > MAX_RESUMES:
+        warnings.append(f"Demo limit: matched the first {MAX_RESUMES} of {n_res} résumés — "
+                        f"upgrade to match your whole folder.")
+        resume_files = resume_files[:MAX_RESUMES]
+
+    jobs: list[dict] = []
+    for filename, data in jd_files:
+        text = extract_job_text(filename, data)
+        if not text.strip():
+            warnings.append(f"'{_label_for(filename, 0)}': no readable text in the JD file — skipped.")
+            continue
+        jobs.append({"title": _label_for(filename, 0), "employer": "", "job_text": text})
+    if not jobs:
+        raise DemoError("None of the uploaded JD files were readable. Use text-based PDF/DOCX/TXT.")
+
+    sess = run_demo_grid(store=store, jobs=jobs, files=resume_files, backend=backend)
+    sess.warnings = list(dict.fromkeys(warnings + sess.warnings))  # surface the cap/skip notes too
+    return sess
 
 
 def _resolve_adapter(name: str):

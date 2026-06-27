@@ -151,7 +151,13 @@
     </div>
     <label>Paste the job description</label>
     <textarea id="jobText" placeholder="Paste the full job posting here. We'll detect the skills it asks for — you can edit them below."></textarea>
-    <div style="margin-top:10px"><button id="detectBtn" class="ghost">Detect skills from posting</button></div>
+    <div style="margin-top:10px;display:flex;gap:8px;align-items:center;flex-wrap:wrap">
+      <button id="detectBtn" class="ghost">Detect skills from posting</button>
+      <span class="muted">or</span>
+      <button id="jdUploadBtn" class="ghost" type="button">Upload a JD file</button>
+      <input id="jdFile" type="file" accept=".pdf,.docx,.txt,.text,.md" class="hidden" />
+      <span id="jdFileStatus" class="muted"></span>
+    </div>
 
     <div id="skillsBox" class="hidden">
       <h3>Skills this job needs <span class="muted" style="font-weight:400">— tag each <b style="color:var(--red)">Must-have</b> (deal-breaker), <b style="color:var(--blue)">Required</b>, or <b style="color:var(--amber)">Preferred</b>. Must-haves weigh double and missing one heavily lowers the score.</span></h3>
@@ -201,6 +207,33 @@
     <span id="runStatus" class="muted"></span>
   </div>
 
+  <!-- BULK: a folder of JDs x a folder of resumes -->
+  <div class="card" style="border-color:var(--accent)">
+    <div class="step">BULK MATCH</div>
+    <h2>A folder of JDs × a folder of resumes <span class="muted" style="font-weight:400">— upload many job descriptions and many resumes; we score every resume against every role and show the best-fit role for each</span></h2>
+    <div class="row2">
+      <div>
+        <label>Job descriptions</label>
+        <div id="jdDrop" class="drop">Click to choose a <b>JD folder</b>, or drag JD files here <span class="muted">(.pdf/.docx/.txt)</span>
+          <input id="jdFolder" type="file" multiple webkitdirectory class="hidden" />
+        </div>
+        <div id="jdList" class="muted" style="margin-top:6px;font-size:12.5px"></div>
+      </div>
+      <div>
+        <label>Resumes</label>
+        <div id="resDrop" class="drop">Click to choose a <b>resume folder</b>, or drag resume files here <span class="muted">(.pdf/.docx/.txt)</span>
+          <input id="resFolder" type="file" multiple webkitdirectory class="hidden" />
+        </div>
+        <div id="resList" class="muted" style="margin-top:6px;font-size:12.5px"></div>
+      </div>
+    </div>
+    <div style="margin-top:12px;display:flex;gap:10px;align-items:center;flex-wrap:wrap">
+      <button id="bulkBtn">Match all</button>
+      <span id="bulkStatus" class="muted"></span>
+      <span class="muted" style="font-size:12px">Demo matches up to <span class="maxN">10</span> resumes × <span id="maxJobs2">3</span> JDs per run; bigger folders are an upgrade.</span>
+    </div>
+  </div>
+
   <!-- RESULTS -->
   <div id="results"></div>
 </main>
@@ -223,7 +256,7 @@ async function loadConfig(){
     const r = await fetch('/api/demo/config'); CFG = await r.json();
     $('#maxN').textContent = CFG.max_resumes;
     document.querySelectorAll('.maxN').forEach(e=>e.textContent=CFG.max_resumes);
-    if(CFG.max_jobs) $('#maxJobs').textContent = CFG.max_jobs;
+    if(CFG.max_jobs){ $('#maxJobs').textContent = CFG.max_jobs; $('#maxJobs2').textContent = CFG.max_jobs; }
     if(CFG.free_runs>0) updateQuota({limit:CFG.free_runs, remaining:CFG.runs_remaining});
   }catch(e){}
 }
@@ -424,6 +457,26 @@ $('#detectBtn').onclick = () => detectSkills(false);
 $('#jobText').addEventListener('blur', () => { if(!SKILLS.length) detectSkills(true); });
 $('#addSkill').addEventListener('keydown', e=>{ if(e.key==='Enter'){ e.preventDefault(); addSkill($('#addSkill').value); $('#addSkill').value=''; }});
 
+/* ---------- upload a JD file (fills the posting + detects skills) ---------- */
+$('#jdUploadBtn').onclick = () => $('#jdFile').click();
+$('#jdFile').addEventListener('change', async e => {
+  const f = e.target.files[0]; if(!f) return;
+  $('#jdFileStatus').textContent = 'Reading ' + f.name + '…';
+  const fd = new FormData(); fd.append('jd', f, f.name);
+  try{
+    const r = await fetch('/api/demo/parse-job-file', {method:'POST', body:fd});
+    const d = await r.json();
+    if(!r.ok){ $('#jdFileStatus').textContent=''; banner(d.detail||'Could not read the JD file.', 'err'); return; }
+    $('#jobText').value = d.text || '';
+    if(d.title && !$('#jobTitle').value) $('#jobTitle').value = d.title;
+    if(d.min_education && !$('#minEdu').value) $('#minEdu').value = d.min_education;
+    SKILLS = (d.detected_skills||[]).map(s=>({id:s.id, name:s.name, bucket:'required'}));
+    renderSkills();
+    $('#jdFileStatus').textContent = 'Loaded ' + f.name + ' ✓';
+  }catch(err){ $('#jdFileStatus').textContent=''; banner('Upload failed: ' + err, 'err'); }
+  e.target.value = '';
+});
+
 /* ---------- files ---------- */
 const drop = $('#drop'), fileInput = $('#fileInput');
 drop.onclick = ()=> fileInput.click();
@@ -562,6 +615,48 @@ function showCell(cid, j){
   $('#cellDetail').innerHTML = `<div class="card"><div class="muted"><b>${esc(c.label)}</b> — breakdown for <b>${esc(role.title||('Role '+(j+1)))}</b></div></div>` + resultCard(cell.result, null);
   $('#cellDetail').scrollIntoView({behavior:'smooth', block:'start'});
 }
+
+/* ---------- bulk: a folder of JDs × a folder of resumes ---------- */
+let JD_FILES = [], RES_FILES = [];
+const DOC_RE = /\.(pdf|docx|txt|text|md)$/i;
+function setupBulkDrop(dropId, inputId, which){
+  const drop = $('#'+dropId), input = $('#'+inputId);
+  drop.onclick = () => input.click();
+  ['dragover','dragenter'].forEach(ev=>drop.addEventListener(ev, e=>{e.preventDefault(); drop.classList.add('hot');}));
+  ['dragleave','drop'].forEach(ev=>drop.addEventListener(ev, e=>{e.preventDefault(); drop.classList.remove('hot');}));
+  drop.addEventListener('drop', e => addBulk(which, e.dataTransfer.files));
+  input.addEventListener('change', e => addBulk(which, e.target.files));
+}
+function addBulk(which, list){
+  const docs = [...list].filter(f => DOC_RE.test(f.name));
+  if(which==='jd') JD_FILES = docs; else RES_FILES = docs;
+  renderBulk();
+  if(list.length && !docs.length) banner('No .pdf/.docx/.txt files found in that selection.', 'warn');
+}
+function renderBulk(){
+  $('#jdList').textContent  = JD_FILES.length  ? `${JD_FILES.length} JD file(s) selected`     : '';
+  $('#resList').textContent = RES_FILES.length ? `${RES_FILES.length} resume file(s) selected` : '';
+}
+setupBulkDrop('jdDrop','jdFolder','jd');
+setupBulkDrop('resDrop','resFolder','res');
+$('#bulkBtn').onclick = async () => {
+  if(!JD_FILES.length){ banner('Choose a folder (or files) of job descriptions.', 'warn'); return; }
+  if(!RES_FILES.length){ banner('Choose a folder (or files) of resumes.', 'warn'); return; }
+  const fd = new FormData();
+  JD_FILES.forEach(f => fd.append('jds', f, f.name));
+  RES_FILES.forEach(f => fd.append('resumes', f, f.name));
+  $('#bulkBtn').disabled = true;
+  $('#bulkStatus').textContent = `Matching ${RES_FILES.length} resume(s) × ${JD_FILES.length} JD(s)… (each resume is scored against each role)`;
+  try{
+    const r = await fetch('/api/demo/run-grid-files', {method:'POST', body:fd});
+    const d = await r.json();
+    if(!r.ok){
+      if(r.status===402 && d.detail && d.detail.upgrade){ showUpgrade(d.detail); }
+      else { banner((d.detail&&d.detail.error)||d.detail||'Matching failed.', 'err'); }
+    } else { SESSION = d.session_id; SAVED_VIEW = false; renderGrid(d); }
+  }catch(e){ banner('Request failed: ' + e, 'err'); }
+  $('#bulkBtn').disabled = false; $('#bulkStatus').textContent = '';
+};
 
 /* ---------- delete ---------- */
 $('#deleteBtn').onclick = async () => {

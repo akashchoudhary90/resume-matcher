@@ -356,6 +356,35 @@ def create_app():
             "preferred_skills": skill_options(spec.preferred_skills),
         }
 
+    @app.post("/api/demo/parse-job-file")
+    async def demo_parse_job_file(request: Request) -> dict:
+        # Upload a JD as a file (pdf/docx/txt): extract its text + auto-detect skills, so the user can
+        # drop a posting instead of pasting it. Returns the text to fill the textarea.
+        _require_demo()
+        if not demo_rate.allow(_client_key(request), time.time()):
+            raise HTTPException(429, "Too many requests — please slow down and retry shortly.")
+        max_part = demo_mod.MAX_FILE_MB * 1024 * 1024
+        try:
+            form = await request.form(max_files=1, max_fields=10, max_part_size=max_part)
+        except Exception as exc:  # noqa: BLE001
+            _log.warning("JD file rejected at multipart parse: %s", exc)
+            raise HTTPException(400, f"Upload rejected (too large or malformed). Limit {demo_mod.MAX_FILE_MB} MB.")
+        part = next((v for v in form.getlist("jd") if hasattr(v, "read")), None)
+        if part is None:
+            raise HTTPException(400, "No JD file uploaded.")
+        data = await part.read()
+        text = demo_mod.extract_job_text(part.filename or "jd.txt", data)
+        if not text.strip():
+            raise HTTPException(400, "Could not read any text from that file. Use a text-based PDF, DOCX, or TXT.")
+        title = demo_mod._label_for(part.filename or "", 0)
+        spec, detected = parse_job_posting(text, title=title, employer="")
+        return {
+            "title": spec.title or title,
+            "text": text,
+            "min_education": spec.min_education,
+            "detected_skills": skill_options(detected),
+        }
+
     @app.post("/api/demo/run")
     async def demo_run(request: Request) -> dict:
         # Parse multipart ourselves so we can (a) accept files up to RM_DEMO_MAX_FILE_MB instead of
@@ -559,6 +588,71 @@ def create_app():
             demo_run_sem.release()
             files = []
             for p in resume_parts:
+                try:
+                    await p.close()
+                except Exception as exc:  # noqa: BLE001
+                    _log.debug("upload part close failed: %s", exc)
+        demo_quota.charge(ckey, batch_sig, now)
+        body = sess.to_dict()
+        if demo_quota.enabled:
+            body["quota"] = {"limit": demo_quota.limit,
+                             "remaining": demo_quota.remaining(ckey, time.time())}
+        return body
+
+    # Bulk match: a folder of JD files × a folder of résumé files -> a candidate×role grid.
+    @app.post("/api/demo/run-grid-files")
+    async def demo_run_grid_files(request: Request) -> dict:
+        _require_demo()
+        if not demo_rate.allow(_client_key(request), time.time()):
+            raise HTTPException(429, "Too many requests — please slow down and retry shortly.")
+        # Both folders can be sizeable; allow a body big enough for the demo caps before buffering.
+        grid_body_max = int((demo_mod.MAX_RESUMES + demo_mod.MAX_JOBS) * demo_mod.MAX_FILE_MB
+                            * 1024 * 1024 * 1.1) + 1_048_576
+        clen = request.headers.get("content-length", "")
+        if clen.isdigit() and int(clen) > grid_body_max:
+            raise HTTPException(413, "Upload too large for the demo — use fewer or smaller files.")
+        max_part = demo_mod.MAX_FILE_MB * 1024 * 1024
+        try:
+            form = await request.form(
+                max_files=demo_mod.MAX_RESUMES + demo_mod.MAX_JOBS + 10, max_fields=20,
+                max_part_size=max_part,
+            )
+        except Exception as exc:  # noqa: BLE001
+            _log.warning("grid-files upload rejected at multipart parse: %s", exc)
+            raise HTTPException(400, "Upload rejected (too large, too many files, or malformed).")
+        jd_parts = [v for v in form.getlist("jds") if hasattr(v, "read")]
+        resume_parts = [v for v in form.getlist("resumes") if hasattr(v, "read")]
+        jd_files = [((p.filename or ""), await p.read()) for p in jd_parts]
+        resume_files = [((p.filename or ""), await p.read()) for p in resume_parts]
+
+        ckey = _client_key(request)
+        now = time.time()
+        sig = sorted(hashlib.sha256(d).hexdigest() for _, d in jd_files + resume_files)
+        batch_sig = hashlib.sha256(("gridfiles\x00" + "\x00".join(sig)).encode("utf-8")).hexdigest()
+        if not demo_quota.allowed(ckey, batch_sig, now):
+            raise HTTPException(402, detail={
+                "upgrade": True,
+                "error": "You've used all your free demo matches.",
+                "message": ("The demo lets you try every feature on a few small batches so you can see "
+                            "how it works. To run your full pipeline — all your roles and résumés — "
+                            "let's get you set up with full access."),
+                "limit": demo_quota.limit, "remaining": 0,
+            })
+
+        if not demo_run_sem.acquire(blocking=False):
+            raise HTTPException(429, "The demo is busy scoring other uploads — please retry in a moment.")
+        try:
+            sess = await run_in_threadpool(
+                demo_mod.run_demo_grid_from_files, store=demo_store,
+                jd_files=jd_files, resume_files=resume_files,
+            )
+        except DemoError as exc:
+            raise HTTPException(400, str(exc))
+        finally:
+            demo_run_sem.release()
+            jd_files = []
+            resume_files = []
+            for p in jd_parts + resume_parts:
                 try:
                     await p.close()
                 except Exception as exc:  # noqa: BLE001
