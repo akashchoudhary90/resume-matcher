@@ -239,6 +239,8 @@ async function showAudit(){
       ${p.computable?`<p>AUC <b>${p.auc}</b> · accuracy ${p.classifier_accuracy} vs baseline ${p.baseline_accuracy}</p>`
         :`<p class="muted">${esc(p.reason)}</p>`}</div>` : '';
   el.innerHTML = `<div class="muted" style="margin-bottom:10px">${a.n_selected} of ${a.n_pool} candidates shortlisted somewhere. Protected attributes are read aggregate-only and never feed scoring.</div>
+    <div style="margin-bottom:12px"><button onclick="location.href='/api/compliance-pack.json'">⬇ Download compliance pack (signed)</button>
+      <span class="muted" style="margin-left:8px;font-size:12px">Continuous monitoring + audit-ready evidence — verifiable like any signed file; NOT an independent LL144 audit.</span></div>
     <div class="cards">${Object.entries(a.attributes).map(([k,v])=>attrTable(k,v)).join('')}${homoCard}${proxyCard}</div>`;
 }
 

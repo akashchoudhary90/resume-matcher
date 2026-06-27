@@ -317,6 +317,21 @@ def create_app():
     def audit() -> dict:
         return state.audit()
 
+    @app.get("/api/compliance-pack.json")
+    def compliance_pack():
+        # The bias audit as a signed, tamper-evident, audit-ready deliverable (continuous internal
+        # monitoring + evidence — NOT an independent LL144 audit). Streamed; verifiable like any signed file.
+        audit_result = state.audit()
+        if not audit_result.get("available"):
+            raise HTTPException(400, audit_result.get("reason", "Load data with self-ID first."))
+        from ..audit.compliance_pack import build_compliance_pack
+
+        pack = build_compliance_pack(audit_result, generated_at=time.time())
+        return JSONResponse(
+            content=pack,
+            headers={"Content-Disposition": 'attachment; filename="compliance-pack.json"'},
+        )
+
     @app.post("/api/score")
     def score(candidate: CandidateProfile, job: JobSpec) -> dict:
         # NOTE: in deployment, run redaction + consent checks before this point.
