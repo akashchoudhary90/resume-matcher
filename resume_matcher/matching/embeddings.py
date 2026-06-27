@@ -78,6 +78,13 @@ class Embedder:
     """Backend-agnostic embedder. Prefers sentence-transformers; falls back to TF-IDF."""
 
     def __init__(self, model_name: str = "all-MiniLM-L6-v2", prefer_semantic: bool = True):
+        import os
+
+        # RM_EMBEDDINGS=tfidf forces the dependency-free, fully deterministic backend regardless of
+        # whether sentence-transformers is installed — used by the fairness gate so the audit metrics
+        # are reproducible across environments (CI vs local).
+        if os.environ.get("RM_EMBEDDINGS", "").strip().lower() == "tfidf":
+            prefer_semantic = False
         self.backend = "tfidf"
         self._impl: _TfidfEmbedder | _StEmbedder
         if prefer_semantic:

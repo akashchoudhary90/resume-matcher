@@ -53,5 +53,9 @@ jobs:
         run: pytest -q --cov=resume_matcher --cov-report=term-missing --cov-fail-under=80
       - name: Accuracy regression gate (mock baseline; realistic + smoke sets)
         run: python scripts/eval_accuracy.py --all --check
+      - name: Fairness regression gate (synthetic cohort; blocks a scoring change that worsens bias audit)
+        env:
+          RM_EMBEDDINGS: tfidf
+        run: python scripts/eval_fairness.py --check
       - name: Dependency vulnerability audit (advisory — does not block merge yet)
         run: pip-audit || true

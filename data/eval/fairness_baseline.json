@@ -1,0 +1,28 @@
+{
+  "note": "Committed fairness FLOORS for the synthetic cohort (seed 42, mock, tfidf). A scoring change that regresses past these (minus tolerance) fails CI. Synthetic, not outcomes.",
+  "cohort": {
+    "seed": 42,
+    "n_students": 200,
+    "n_jobs": 12,
+    "embeddings": "tfidf",
+    "backend": "mock"
+  },
+  "tolerance": 0.03,
+  "current": {
+    "race_min_impact_ratio": 0.646,
+    "gender_min_impact_ratio": 0.787,
+    "exposure_parity_ratio": 0.741,
+    "homophily_disparity_ratio": 1.205,
+    "proxy_leakage_auc": 0.546,
+    "proxy_leaks": false,
+    "n_selected": 71,
+    "n_pool": 200
+  },
+  "floors": {
+    "min_race_min_impact_ratio": 0.646,
+    "min_gender_min_impact_ratio": 0.787,
+    "min_exposure_parity_ratio": 0.741,
+    "min_homophily_disparity_ratio": 0.8,
+    "max_proxy_leakage_auc": 0.7
+  }
+}
