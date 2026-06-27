@@ -9,7 +9,8 @@ COPY requirements.txt .
 # Version-constrained to match requirements-extra.txt (reproducible builds; no bare/unpinned deps).
 RUN pip install --no-cache-dir -r requirements.txt \
     "fastapi>=0.110" "uvicorn>=0.29" "python-multipart>=0.0.9" \
-    "pdfplumber>=0.11" "pypdf>=4.0" "python-docx>=1.1"
+    "pdfplumber>=0.11" "pypdf>=4.0" "python-docx>=1.1" \
+    "cryptography>=42.0"   # Ed25519 signing for the Defense File (falls back to HMAC if absent)
 
 # OPTIONAL Claude backend (RM_DEMO_BACKEND=claude_cli): the Claude Code CLI native binary, used to
 # score via your SUBSCRIPTION (CLAUDE_CODE_OAUTH_TOKEN from `claude setup-token`) — no API key/bill.

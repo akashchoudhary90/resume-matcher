@@ -10,6 +10,8 @@ scikit-learn>=1.4
 ollama>=0.2          # RM_INFERENCE_BACKEND=ollama
 openai>=1.30         # RM_INFERENCE_BACKEND=openai_compat
 mcp>=1.2             # stdio MCP score_resume server (inference/server.py)
+# Ed25519 signatures for the Defense File (audit/defense_file.py falls back to HMAC-SHA256 without it):
+cryptography>=42.0
 # Real PDF/DOCX resume parsing (parser falls back to plain-text ingestion without these):
 pdfplumber>=0.11
 pypdf>=4.0

@@ -604,7 +604,8 @@ function renderGrid(d){
   }).join('');
   const head = `<div class="card"><h2>Fit grid <span class="muted" style="font-weight:400">— ${cands.length} candidate(s) × ${jobs.length} role(s)</span> ${engine}</h2>
     <div class="muted">Each cell is the candidate's fit for that role; the best role per candidate is outlined. Click any cell for the point-by-point breakdown. Scores are fit-readiness, not a hire prediction.</div>
-    ${SAVED_VIEW?'':`<div style="margin-top:10px">${saveBtnHtml()}</div>`}</div>`;
+    ${SAVED_VIEW?'':`<div style="margin-top:10px;display:flex;gap:8px;flex-wrap:wrap">${saveBtnHtml()}
+      <button class="ghost" title="A tamper-evident, reproducible, signed record of every decision — verifiable by anyone, no trust required." onclick="location.href='/api/demo/session/${encodeURIComponent(d.session_id)}/defense-file.json'">🔒 Defense File</button></div>`}</div>`;
   $('#results').innerHTML = warn + dup + head +
     `<div class="card" style="overflow-x:auto"><table class="grid"><thead>${thead}</thead><tbody>${rows||`<tr><td class="muted">No candidates scored.</td></tr>`}</tbody></table></div><div id="cellDetail"></div>`;
   $('#results').querySelectorAll('.cellbtn').forEach(b=> b.onclick = ()=> showCell(b.dataset.cid, +b.dataset.j));
@@ -795,6 +796,7 @@ function renderResults(d){
         ${saveBtnHtml()}
         <button class="ghost" onclick="location.href='/api/demo/session/${encodeURIComponent(d.session_id)}/export.csv'">⬇ Download shortlist (CSV)</button>
         <button class="ghost" onclick="location.href='/api/demo/session/${encodeURIComponent(d.session_id)}/export.json'">⬇ Download full results (JSON)</button>
+        <button class="ghost" title="A tamper-evident, reproducible, signed record of every decision — verifiable by anyone, no trust required." onclick="location.href='/api/demo/session/${encodeURIComponent(d.session_id)}/defense-file.json'">🔒 Defense File</button>
       </div>`}
     </div>`;
   $('#results').innerHTML = warn + dup + head + (d.results||[]).map((r,i)=>resultCard(r,i+1)).join('');

@@ -528,6 +528,22 @@ def create_app():
             headers={"Content-Disposition": 'attachment; filename="shortlist.json"'},
         )
 
+    @app.get("/api/demo/session/{session_id}/defense-file.json")
+    def demo_defense_file(session_id: str):
+        # The Defense File: a signed, hash-chained, reproducible record of every decision in the
+        # session — "the AI you can verify, not trust". De-identified (salted evidence hashes), streamed.
+        _require_demo()
+        sess = demo_store.get(session_id)
+        if sess is None:
+            raise HTTPException(404, "Session not found — it was deleted or expired.")
+        from ..audit.defense_file import build_defense_file
+
+        file = build_defense_file(sess.to_dict(), generated_at=time.time())
+        return JSONResponse(
+            content=file,
+            headers={"Content-Disposition": 'attachment; filename="defense-file.json"'},
+        )
+
     # Multi-job fit grid: score the same résumés against several roles (job_text repeated). Same DoS
     # guards + match quota as /run (one grid = one match); each role is scored via the normal run_demo.
     @app.post("/api/demo/run-grid")
