@@ -72,15 +72,37 @@
   .total { font-weight:700; }
   .pill { font-size:12px; padding:3px 9px; border-radius:999px; border:1px solid var(--line); color:var(--muted); }
   .step { font-size:12px; color:var(--accent); font-weight:700; letter-spacing:.04em; }
+  .rank { font-weight:700; color:var(--muted); font-size:14px; min-width:30px; }
+  .ibadge { font-size:11.5px; padding:2px 9px; border-radius:999px; border:1px solid var(--line); white-space:nowrap; }
+  .ibadge.ok { color:var(--green); border-color:rgba(63,185,80,.4); background:rgba(63,185,80,.10); }
+  .ibadge.warn { color:var(--amber); border-color:rgba(210,153,34,.4); background:rgba(210,153,34,.10); }
+  .ibadge.bad { color:#ffd9d6; border-color:rgba(248,81,73,.5); background:rgba(248,81,73,.10); }
+  .meter { font-size:12.5px; padding:5px 12px; border-radius:999px; border:1px solid var(--line); color:var(--muted); white-space:nowrap; }
+  .meter.low { color:var(--amber); border-color:rgba(210,153,34,.45); background:rgba(210,153,34,.07); }
+  .meter.out { color:var(--red); border-color:rgba(248,81,73,.45); background:rgba(248,81,73,.07); }
+  .upgrade { border:1px solid var(--accent); background:#10243a; }
+  table.grid th, table.grid td { text-align:center; vertical-align:middle; }
+  table.grid th:first-child, table.grid td:first-child { text-align:left; }
+  .cellbtn { background:var(--panel2); border:1px solid var(--line); border-radius:6px; padding:5px 10px;
+             font-weight:700; cursor:pointer; min-width:58px; }
+  .cellbtn:hover { filter:brightness(1.12); } .cellbtn.best { outline:2px solid var(--accent); outline-offset:1px; }
+  .cellbtn.g-A{ color:var(--green);} .cellbtn.g-B{ color:var(--blue);} .cellbtn.g-C{ color:var(--amber);} .cellbtn.g-D{ color:var(--red);}
+  .bestrole { font-size:12px; color:var(--green); }
 </style>
 </head>
 <body>
-<header>
-  <h1>Resume <span>Matcher</span> — try it with your own data</h1>
-  <div class="muted" style="margin-top:5px;font-size:12.5px">
-    Upload one job posting and up to <b id="maxN">10</b> resumes. Every score is broken down skill-by-skill
-    with the exact quote from each resume — nothing is a black box.
-    <a href="/">Coordinator dashboard →</a>
+<header style="display:flex;justify-content:space-between;align-items:flex-start;gap:14px;flex-wrap:wrap">
+  <div>
+    <h1>Resume <span>Matcher</span> — try it with your own data</h1>
+    <div class="muted" style="margin-top:5px;font-size:12.5px">
+      Upload one job posting and up to <b id="maxN">10</b> resumes. Every score is broken down skill-by-skill
+      with the exact quote from each resume — nothing is a black box.
+      <a href="/">Coordinator dashboard →</a>
+    </div>
+  </div>
+  <div style="display:flex;gap:10px;align-items:center;flex-wrap:wrap">
+    <span id="quotaMeter" class="meter hidden" title="The demo gives you a few free matches so you can try every feature. Re-running the same files is free."></span>
+    <span id="acctWidget"></span>
   </div>
 </header>
 
@@ -95,6 +117,29 @@
 
 <main>
   <div id="banner" class="card hidden"></div>
+
+  <!-- Accounts: sign in to save shortlists/grids and reopen them later -->
+  <div id="authPanel" class="card hidden">
+    <h2 id="authTitle">Sign in to save your work</h2>
+    <div class="muted" style="margin-bottom:8px">Saved projects let you reopen your shortlists and fit-grids any time. Your free demo matches are unaffected.</div>
+    <div class="row2">
+      <div><label>Email</label><input id="authEmail" type="text" autocomplete="username" placeholder="you@company.com" /></div>
+      <div><label>Password</label><input id="authPass" type="password" autocomplete="current-password" placeholder="at least 8 characters" /></div>
+    </div>
+    <div style="margin-top:10px;display:flex;gap:8px;align-items:center;flex-wrap:wrap">
+      <button id="loginBtn">Sign in</button>
+      <button id="registerBtn" class="ghost">Create account</button>
+      <button id="authCancel" class="ghost">Cancel</button>
+      <span id="authMsg" class="muted"></span>
+    </div>
+  </div>
+
+  <div id="projectsPanel" class="card hidden">
+    <div style="display:flex;justify-content:space-between;align-items:center;gap:10px">
+      <h2 style="margin:0">My saved projects</h2><button id="projClose" class="ghost">Close</button>
+    </div>
+    <div id="projectsList" style="margin-top:10px"></div>
+  </div>
 
   <!-- STEP 1: JOB -->
   <div class="card" id="jobCard">
@@ -140,8 +185,19 @@
     <div id="fileList" class="filelist"></div>
   </div>
 
-  <div style="display:flex;gap:10px;align-items:center;margin-bottom:18px">
+  <!-- OPTIONAL: compare the same resumes across several roles -->
+  <div class="card">
+    <div class="step">OPTIONAL</div>
+    <h2>Compare across multiple roles <span class="muted" style="font-weight:400">— score the same resumes against several openings and see each candidate's best-fit role (up to <span id="maxJobs">3</span> roles)</span></h2>
+    <div class="muted" style="font-size:12.5px;margin-bottom:6px">Role 1 is the posting in Step 1. Add more roles below, then use <b>Compare across roles</b>. Skills are auto-detected from each posting.</div>
+    <div id="extraRoles"></div>
+    <button id="addRoleBtn" class="ghost" style="margin-top:8px">+ Add another role</button>
+    <span id="roleHint" class="muted" style="margin-left:8px"></span>
+  </div>
+
+  <div style="display:flex;gap:10px;align-items:center;margin-bottom:18px;flex-wrap:wrap">
     <button id="runBtn">Score the resumes</button>
+    <button id="gridBtn" class="hidden">Compare across roles</button>
     <span id="runStatus" class="muted"></span>
   </div>
 
@@ -151,7 +207,7 @@
 
 <script>
 const $ = s => document.querySelector(s);
-let CFG = {max_resumes:10, max_file_mb:4, ttl_minutes:30, supported_exts:[".pdf",".docx",".txt"]};
+let CFG = {max_resumes:10, max_file_mb:4, ttl_minutes:30, max_jobs:3, supported_exts:[".pdf",".docx",".txt"]};
 let SKILLS = [];            // [{id,name,bucket:'required'|'preferred'}]
 let FILES = [];             // File objects
 let SESSION = null;         // session id
@@ -167,7 +223,131 @@ async function loadConfig(){
     const r = await fetch('/api/demo/config'); CFG = await r.json();
     $('#maxN').textContent = CFG.max_resumes;
     document.querySelectorAll('.maxN').forEach(e=>e.textContent=CFG.max_resumes);
+    if(CFG.max_jobs) $('#maxJobs').textContent = CFG.max_jobs;
+    if(CFG.free_runs>0) updateQuota({limit:CFG.free_runs, remaining:CFG.runs_remaining});
   }catch(e){}
+}
+
+/* ---------- usage meter (full functionality, limited quantity) ---------- */
+function updateQuota(q){
+  const el = $('#quotaMeter');
+  if(!q || q.remaining==null){ el.classList.add('hidden'); return; }
+  el.classList.remove('hidden','low','out');
+  const rem = q.remaining, lim = q.limit;
+  if(rem<=0){ el.classList.add('out'); el.textContent='No free matches left — upgrade for full access'; return; }
+  if(rem <= Math.max(1, Math.ceil(lim/3))) el.classList.add('low');
+  el.textContent = `${rem} of ${lim} free matches left`;
+}
+function showUpgrade(info){
+  updateQuota({limit:info.limit, remaining:0});
+  $('#results').innerHTML = `<div class="card upgrade">
+    <h2>${esc(info.error||'Free demo limit reached')}</h2>
+    <div class="muted" style="margin:8px 0 14px;max-width:560px">${esc(info.message||'')}</div>
+    <button onclick="location.href='mailto:?subject='+encodeURIComponent('Resume Matcher — full access')">Get full access</button>
+    <span class="muted" style="margin-left:10px;font-size:12px">Re-running the same files you already scored is always free.</span>
+  </div>`;
+}
+/* Promote the existing anti-gaming flags into a single headline badge (detail stays below the card). */
+function integrityBadge(res){
+  const flags = res.flags_explained||[];
+  if(flags.some(f=>f.severity==='bad')) return `<span class="ibadge bad" title="Anti-gaming flags raised — advisory only, details below">⚠ Flagged</span>`;
+  if(flags.some(f=>f.severity==='warn')) return `<span class="ibadge warn" title="Minor anti-gaming signals — advisory only, details below">⚠ Review</span>`;
+  return `<span class="ibadge ok" title="No anti-gaming signals detected">✓ Clean</span>`;
+}
+
+/* ---------- accounts + saved projects (persistence tier) ---------- */
+let USER = null;          // {email} when signed in
+let SAVED_VIEW = false;   // true while viewing a reopened saved project (a read-only snapshot)
+function renderAcct(){
+  const w = $('#acctWidget');
+  if(USER){
+    w.innerHTML = `<span class="muted" style="font-size:12.5px">${esc(USER.email)}</span>
+      <button class="ghost" style="padding:5px 10px" onclick="openProjects()">My projects</button>
+      <button class="ghost" style="padding:5px 10px" onclick="logout()">Sign out</button>`;
+  } else {
+    w.innerHTML = `<button class="ghost" style="padding:5px 10px" onclick="openAuth()">Sign in / Save work</button>`;
+  }
+}
+async function refreshAuth(){
+  try{ USER = (await (await fetch('/api/account/me')).json()).user; }catch(e){ USER=null; }
+  renderAcct();
+}
+function openAuth(msg){
+  $('#authPanel').classList.remove('hidden');
+  $('#authMsg').textContent = msg||''; $('#authMsg').className = msg?'warn':'muted';
+  $('#authPanel').scrollIntoView({behavior:'smooth', block:'center'});
+}
+$('#authCancel').onclick = ()=> $('#authPanel').classList.add('hidden');
+async function doAuth(path){
+  const email=$('#authEmail').value.trim(), password=$('#authPass').value;
+  $('#authMsg').textContent='Working…'; $('#authMsg').className='muted';
+  try{
+    const r = await fetch('/api/account/'+path, {method:'POST', headers:{'Content-Type':'application/json'}, body:JSON.stringify({email,password})});
+    const d = await r.json();
+    if(!r.ok){ $('#authMsg').textContent = (d.detail||'Could not sign in.'); $('#authMsg').className='err'; return; }
+    USER = {email:d.email}; renderAcct();
+    $('#authPanel').classList.add('hidden'); $('#authPass').value='';
+    banner(`Signed in as ${d.email}. You can now save your shortlists and grids.`, 'ok');
+  }catch(e){ $('#authMsg').textContent='Request failed: '+e; $('#authMsg').className='err'; }
+}
+$('#loginBtn').onclick = ()=> doAuth('login');
+$('#registerBtn').onclick = ()=> doAuth('register');
+async function logout(){
+  try{ await fetch('/api/account/logout', {method:'POST'}); }catch(e){}
+  USER=null; renderAcct(); $('#projectsPanel').classList.add('hidden');
+  banner('Signed out.', 'ok');
+}
+function saveBtnHtml(){
+  return USER
+    ? `<button class="ghost" onclick="saveCurrentProject()">★ Save project</button>`
+    : `<button class="ghost" onclick="openAuth('Sign in to save this project.')">★ Save project</button>`;
+}
+async function saveCurrentProject(){
+  if(!USER){ openAuth('Sign in to save this project.'); return; }
+  if(!SESSION){ banner('Nothing to save yet — score some resumes first.', 'warn'); return; }
+  const name = prompt('Name this project (e.g. “Backend Dev — June”):', '');
+  if(name===null) return;
+  try{
+    const r = await fetch('/api/demo/session/'+encodeURIComponent(SESSION)+'/save', {method:'POST', headers:{'Content-Type':'application/json'}, body:JSON.stringify({name})});
+    const d = await r.json();
+    if(!r.ok){ banner(d.detail||'Could not save.', 'err'); return; }
+    banner(`Saved as “${d.name}”. Reopen it any time from “My projects”.`, 'ok');
+  }catch(e){ banner('Save failed: '+e, 'err'); }
+}
+async function openProjects(){
+  if(!USER){ openAuth(); return; }
+  $('#projectsPanel').classList.remove('hidden');
+  $('#projectsList').innerHTML = '<span class="muted">Loading…</span>';
+  try{
+    const list = await (await fetch('/api/projects')).json();
+    if(!Array.isArray(list) || !list.length){ $('#projectsList').innerHTML = '<span class="muted">No saved projects yet. Score some resumes, then “★ Save project”.</span>'; return; }
+    $('#projectsList').innerHTML = list.map(p=>`
+      <div style="display:flex;align-items:center;gap:10px;padding:8px;border-bottom:1px solid var(--line)">
+        <div style="flex:1"><b>${esc(p.name)}</b> <span class="pill">${p.mode==='grid'?'fit grid':'shortlist'}</span>
+          <div class="muted" style="font-size:12px">${p.n_resumes} candidate(s) · ${new Date(p.created_at*1000).toLocaleString()}</div></div>
+        <button class="ghost" onclick="openProject('${esc(p.id)}')">Open</button>
+        <button class="ghost danger" onclick="deleteProject('${esc(p.id)}')">Delete</button>
+      </div>`).join('');
+  }catch(e){ $('#projectsList').innerHTML = '<span class="err">Could not load projects.</span>'; }
+}
+$('#projClose').onclick = ()=> $('#projectsPanel').classList.add('hidden');
+async function openProject(pid){
+  try{
+    const p = await (await fetch('/api/projects/'+encodeURIComponent(pid))).json();
+    if(p.detail){ banner(p.detail, 'err'); return; }
+    SAVED_VIEW = true; SESSION = null;
+    const payload = p.payload||{};
+    if(payload.mode==='grid') renderGrid(payload); else renderResults(payload);
+    $('#deleteBtn').classList.add('hidden');
+    $('#results').insertAdjacentHTML('afterbegin', `<div class="card" style="border-color:var(--accent)">📁 Viewing saved project: <b>${esc(p.name)}</b> <span class="muted">(snapshot saved ${new Date(p.created_at*1000).toLocaleDateString()})</span></div>`);
+    $('#projectsPanel').classList.add('hidden');
+    window.scrollTo({top:0, behavior:'smooth'});
+  }catch(e){ banner('Could not open project: '+e, 'err'); }
+}
+async function deleteProject(pid){
+  if(!confirm('Delete this saved project? This cannot be undone.')) return;
+  try{ await fetch('/api/projects/'+encodeURIComponent(pid), {method:'DELETE'}); openProjects(); }
+  catch(e){ banner('Delete failed: '+e, 'err'); }
 }
 
 /* ---------- skills ---------- */
@@ -284,11 +464,104 @@ $('#runBtn').onclick = async () => {
   try{
     const r = await fetch('/api/demo/run', {method:'POST', body:fd});
     const d = await r.json();
-    if(!r.ok){ banner(d.detail||'Scoring failed.', 'err'); }
-    else { SESSION = d.session_id; renderResults(d); }
+    if(!r.ok){
+      if(r.status===402 && d.detail && d.detail.upgrade){ showUpgrade(d.detail); }
+      else { banner((d.detail&&d.detail.error)||d.detail||'Scoring failed.', 'err'); }
+    }
+    else { SESSION = d.session_id; SAVED_VIEW=false; renderResults(d); }
   }catch(e){ banner('Request failed: '+e, 'err'); }
   $('#runBtn').disabled=false; $('#runStatus').textContent='';
 };
+
+/* ---------- multi-job fit grid ---------- */
+function roleCount(){ return 1 + $('#extraRoles').querySelectorAll('[data-role]').length; }
+function updateRoleHint(){
+  const n = roleCount();
+  $('#roleHint').textContent = n>1 ? `${n} roles ready — use “Compare across roles”.` : '';
+  $('#gridBtn').classList.toggle('hidden', n<2);
+  $('#addRoleBtn').disabled = n >= (CFG.max_jobs||3);
+}
+function addExtraRole(){
+  if(roleCount() >= (CFG.max_jobs||3)){ banner(`You can compare up to ${CFG.max_jobs||3} roles.`, 'warn'); return; }
+  const idx = roleCount(); // this new role's 1-based number
+  const div = document.createElement('div');
+  div.className='card'; div.style.background='var(--panel2)'; div.dataset.role='1';
+  div.innerHTML = `<div class="row2">
+      <div><label>Role ${idx} title</label><input class="er-title" type="text" placeholder="e.g. Data Engineer" /></div>
+      <div><label>Employer</label><input class="er-employer" type="text" placeholder="optional" /></div></div>
+    <label>Paste this role's description</label>
+    <textarea class="er-text" placeholder="Paste the job posting; skills are auto-detected for the grid."></textarea>
+    <div style="margin-top:6px"><span class="x muted" style="cursor:pointer" data-rm="1">✕ remove this role</span></div>`;
+  div.querySelector('[data-rm]').onclick = ()=>{ div.remove(); updateRoleHint(); };
+  $('#extraRoles').appendChild(div);
+  updateRoleHint();
+}
+$('#addRoleBtn').onclick = addExtraRole;
+
+function collectRoles(){
+  const roles=[];
+  if($('#jobText').value.trim()) roles.push({title:$('#jobTitle').value, employer:$('#jobEmployer').value, text:$('#jobText').value});
+  $('#extraRoles').querySelectorAll('[data-role]').forEach(d=>{
+    const text=d.querySelector('.er-text').value.trim();
+    if(text) roles.push({title:d.querySelector('.er-title').value, employer:d.querySelector('.er-employer').value, text});
+  });
+  return roles;
+}
+$('#gridBtn').onclick = async () => {
+  if(!FILES.length){ banner('Add at least one resume in Step 2.', 'warn'); return; }
+  const roles = collectRoles();
+  if(roles.length<2){ banner('Add at least two roles to compare (the Step 1 posting plus one more, each with a description).', 'warn'); return; }
+  const fd = new FormData();
+  roles.forEach(r=>{ fd.append('job_title', r.title||''); fd.append('job_employer', r.employer||''); fd.append('job_text', r.text); });
+  FILES.forEach(f=> fd.append('resumes', f, f.name));
+  $('#gridBtn').disabled=true; $('#runStatus').textContent=`Scoring ${FILES.length} resume(s) across ${roles.length} roles… (each resume is matched to each role)`;
+  try{
+    const r = await fetch('/api/demo/run-grid', {method:'POST', body:fd});
+    const d = await r.json();
+    if(!r.ok){
+      if(r.status===402 && d.detail && d.detail.upgrade){ showUpgrade(d.detail); }
+      else { banner((d.detail&&d.detail.error)||d.detail||'Scoring failed.', 'err'); }
+    } else { SESSION = d.session_id; SAVED_VIEW=false; renderGrid(d); }
+  }catch(e){ banner('Request failed: '+e, 'err'); }
+  $('#gridBtn').disabled=false; $('#runStatus').textContent='';
+};
+
+let GRID = null;
+function renderGrid(d){
+  if(!SAVED_VIEW) $('#deleteBtn').classList.remove('hidden');
+  if(!SAVED_VIEW && d.quota) updateQuota(d.quota);
+  GRID = d.grid || {jobs:[], candidates:[]};
+  const jobs = GRID.jobs||[], cands = GRID.candidates||[];
+  const warn = (d.warnings&&d.warnings.length)? `<div class="card warn">⚠ ${d.warnings.map(esc).join('<br>')}</div>`:'';
+  const dup = (d.duplicates_removed>0)? `<div class="card warn">⎘ ${d.duplicates_removed} duplicate resume(s) detected and skipped.</div>`:'';
+  const engine = (jobs[0]&&jobs[0].engine==='claude_cli')
+    ? `<span class="pill" style="color:var(--green)">engine: NDR AI</span>` : `<span class="pill">engine: deterministic (keyword)</span>`;
+  const thead = `<tr><th>Candidate</th>${jobs.map(j=>`<th>${esc(j.title||'Role')}${(j.employer&&j.employer!=='Unspecified employer')?`<div class="muted" style="font-weight:400">${esc(j.employer)}</div>`:''}</th>`).join('')}<th>Best fit</th></tr>`;
+  const rows = cands.map(c=>{
+    const cells = jobs.map((j,ji)=>{
+      const cell=(c.cells||[])[ji];
+      if(!cell) return `<td class="muted">—</td>`;
+      const best = ji===c.best_job_index;
+      return `<td><button class="cellbtn ${gradeClass(scoreGrade(cell.fit_score))}${best?' best':''}" data-cid="${esc(c.candidate_id)}" data-j="${ji}" title="Click for the full breakdown">${cell.fit_score}<span class="muted" style="font-weight:400"> ${esc(cell.grade)}</span></button></td>`;
+    }).join('');
+    const role = (c.best_job_index!=null && jobs[c.best_job_index]) ? (jobs[c.best_job_index].title||`Role ${c.best_job_index+1}`) : '—';
+    return `<tr><td><b>${esc(c.label)}</b></td>${cells}<td class="bestrole">${esc(role)}</td></tr>`;
+  }).join('');
+  const head = `<div class="card"><h2>Fit grid <span class="muted" style="font-weight:400">— ${cands.length} candidate(s) × ${jobs.length} role(s)</span> ${engine}</h2>
+    <div class="muted">Each cell is the candidate's fit for that role; the best role per candidate is outlined. Click any cell for the point-by-point breakdown. Scores are fit-readiness, not a hire prediction.</div>
+    ${SAVED_VIEW?'':`<div style="margin-top:10px">${saveBtnHtml()}</div>`}</div>`;
+  $('#results').innerHTML = warn + dup + head +
+    `<div class="card" style="overflow-x:auto"><table class="grid"><thead>${thead}</thead><tbody>${rows||`<tr><td class="muted">No candidates scored.</td></tr>`}</tbody></table></div><div id="cellDetail"></div>`;
+  $('#results').querySelectorAll('.cellbtn').forEach(b=> b.onclick = ()=> showCell(b.dataset.cid, +b.dataset.j));
+  if(!SAVED_VIEW) startTTL(d.privacy && d.privacy.seconds_until_auto_delete);
+}
+function showCell(cid, j){
+  const c = (GRID.candidates||[]).find(x=>x.candidate_id===cid); if(!c) return;
+  const cell = (c.cells||[])[j]; if(!cell || !cell.result) return;
+  const role = (GRID.jobs||[])[j] || {};
+  $('#cellDetail').innerHTML = `<div class="card"><div class="muted"><b>${esc(c.label)}</b> — breakdown for <b>${esc(role.title||('Role '+(j+1)))}</b></div></div>` + resultCard(cell.result, null);
+  $('#cellDetail').scrollIntoView({behavior:'smooth', block:'start'});
+}
 
 /* ---------- delete ---------- */
 $('#deleteBtn').onclick = async () => {
@@ -365,7 +638,7 @@ function gapView(res){
     ${col('+ Also brings',extra,'var(--muted)','—')}</div>`;
 }
 
-function resultCard(res){
+function resultCard(res, rank){
   const ex = res.explanation;
   const flags = (res.flags_explained||[]).map(f=>`<div class="flag ${f.severity}">${esc(f.text)}</div>`).join('');
   const gaps = (res.blocking_gaps||[]).map(g=>`<div>• <b>${esc(g.skill)}</b> (${esc(g.difficulty)}) — ${esc(g.action)}</div>`).join('')
@@ -377,10 +650,12 @@ function resultCard(res){
   return `
   <div class="resultcard">
     <div class="resulthead">
+      ${rank?`<span class="rank">#${rank}</span>`:''}
       <span class="who">${esc(res.label)}</span>
       <span class="score ${gradeClass(res.grade)}">${res.fit_score}</span>
       <span class="pill">grade ${esc(res.grade)}</span>
       <span class="pill">confidence: ${esc(res.confidence)}</span>
+      ${integrityBadge(res)}
       <span class="muted" style="flex:1"></span>
     </div>
     ${meta.length?`<div class="muted" style="margin-top:6px">${meta.join(' · ')}</div>`:''}
@@ -396,8 +671,11 @@ function resultCard(res){
 }
 
 function renderResults(d){
-  $('#deleteBtn').classList.remove('hidden');
+  if(!SAVED_VIEW) $('#deleteBtn').classList.remove('hidden');
+  if(!SAVED_VIEW && d.quota) updateQuota(d.quota);
   const warn = (d.warnings&&d.warnings.length)? `<div class="card warn">⚠ ${d.warnings.map(esc).join('<br>')}</div>`:'';
+  const dup = (d.duplicates_removed>0)
+    ? `<div class="card warn">⎘ ${d.duplicates_removed} duplicate resume(s) detected and skipped — the same file was uploaded more than once.</div>` : '';
   const job = d.job||{};
   const reqList = (job.required_skills||[]).map(s=>esc(s.name)).join(', ')||'—';
   const prefList = (job.preferred_skills||[]).map(s=>esc(s.name)).join(', ')||'—';
@@ -409,9 +687,14 @@ function renderResults(d){
       <h2>${esc(job.title||'Role')} <span class="muted" style="font-weight:400">@ ${esc(job.employer||'')}</span> ${engine}</h2>
       <div class="muted">${mustList?`<b style="color:var(--red)">Must-have: ${mustList}</b> &nbsp;·&nbsp; `:''}Required: ${reqList} &nbsp;·&nbsp; Preferred: ${prefList}${job.min_education?` &nbsp;·&nbsp; min education: ${esc(eduLabel(job.min_education))}`:''}${job.min_years?` &nbsp;·&nbsp; min experience: ${esc(String(job.min_years))} yrs`:''}</div>
       <div class="muted" style="margin-top:6px">${d.n_resumes} resume(s) scored. ${esc((d.privacy&&d.privacy.note)||'')}</div>
+      ${SAVED_VIEW?'':`<div style="margin-top:10px;display:flex;gap:8px;flex-wrap:wrap">
+        ${saveBtnHtml()}
+        <button class="ghost" onclick="location.href='/api/demo/session/${encodeURIComponent(d.session_id)}/export.csv'">⬇ Download shortlist (CSV)</button>
+        <button class="ghost" onclick="location.href='/api/demo/session/${encodeURIComponent(d.session_id)}/export.json'">⬇ Download full results (JSON)</button>
+      </div>`}
     </div>`;
-  $('#results').innerHTML = warn + head + (d.results||[]).map(resultCard).join('');
-  startTTL(d.privacy && d.privacy.seconds_until_auto_delete);
+  $('#results').innerHTML = warn + dup + head + (d.results||[]).map((r,i)=>resultCard(r,i+1)).join('');
+  if(!SAVED_VIEW) startTTL(d.privacy && d.privacy.seconds_until_auto_delete);
 }
 
 /* ---------- ttl countdown ---------- */
@@ -430,6 +713,7 @@ function startTTL(secs){
 function clearTTL(){ if(ttlTimer){ clearInterval(ttlTimer); ttlTimer=null; } $('#ttlInfo').classList.add('hidden'); }
 
 loadConfig();
+refreshAuth();
 </script>
 </body>
 </html>

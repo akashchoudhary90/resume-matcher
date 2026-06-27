@@ -1,0 +1,60 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>Resume Matcher — sign in</title>
+<style>
+  :root { --bg:#0f1419; --panel:#1a2029; --panel2:#222b36; --line:#2c3744; --text:#e6edf3;
+          --muted:#9aa7b4; --accent:#4f9dde; --red:#f85149; }
+  * { box-sizing:border-box; }
+  body { margin:0; min-height:100vh; display:flex; align-items:center; justify-content:center;
+         font:14px/1.55 -apple-system,Segoe UI,Roboto,Helvetica,Arial,sans-serif;
+         background:var(--bg); color:var(--text); }
+  .card { background:var(--panel); border:1px solid var(--line); border-radius:10px; padding:26px;
+          width:340px; max-width:92vw; }
+  h1 { margin:0 0 4px; font-size:19px; } h1 span { color:var(--accent); }
+  .sub { color:var(--muted); font-size:12.5px; margin-bottom:18px; }
+  label { display:block; font-size:12px; color:var(--muted); margin:12px 0 4px; text-transform:uppercase; letter-spacing:.03em; }
+  input { width:100%; background:var(--panel2); border:1px solid var(--line); color:var(--text);
+          border-radius:6px; padding:10px 11px; font:inherit; }
+  button { width:100%; margin-top:18px; background:var(--accent); color:#06121f; border:0; padding:11px;
+           border-radius:6px; font-weight:600; font-size:14px; cursor:pointer; }
+  button:hover { filter:brightness(1.08); } button:disabled { opacity:.6; cursor:not-allowed; }
+  .err { color:var(--red); font-size:12.5px; margin-top:12px; min-height:16px; }
+  .hint { color:var(--muted); font-size:11.5px; margin-top:14px; text-align:center; }
+</style>
+</head>
+<body>
+  <form class="card" id="form">
+    <h1>Resume <span>Matcher</span></h1>
+    <div class="sub">Sign in to continue to the demo.</div>
+    <label for="u">Username</label>
+    <input id="u" name="username" type="text" autocomplete="username" value="admin" autofocus />
+    <label for="p">Password</label>
+    <input id="p" name="password" type="password" autocomplete="current-password" placeholder="••••••" />
+    <button id="go" type="submit">Sign in</button>
+    <div class="err" id="err"></div>
+    <div class="hint">Access is shared for this preview. Inside, you can create a personal account to save your work.</div>
+  </form>
+<script>
+const $ = s => document.querySelector(s);
+const params = new URLSearchParams(location.search);
+const next = params.get('next') || '/demo';
+$('#form').addEventListener('submit', async e => {
+  e.preventDefault();
+  $('#go').disabled = true; $('#err').textContent = '';
+  try {
+    const r = await fetch('/api/login', {
+      method:'POST', headers:{'Content-Type':'application/json'},
+      body: JSON.stringify({ username: $('#u').value, password: $('#p').value })
+    });
+    if (r.ok) { location.href = next; return; }
+    const d = await r.json().catch(()=>({}));
+    $('#err').textContent = (d && d.detail) || 'Wrong username or password.';
+  } catch (err) { $('#err').textContent = 'Sign-in failed: ' + err; }
+  $('#go').disabled = false;
+});
+</script>
+</body>
+</html>

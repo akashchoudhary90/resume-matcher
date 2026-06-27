@@ -71,6 +71,33 @@ def test_results_labelled_by_filename_with_candidate_meta():
     assert row["skills_found"] >= 2
 
 
+def test_dedupe_identical_uploads():
+    # Byte-identical résumés (same file dropped twice) are scored once; the count surfaces in the UI.
+    store = SessionStore(ttl_seconds=600)
+    same = b"Python and SQL developer with REST experience. " * 4
+    sess = run_demo(
+        store=store, required_skills=["python", "sql"],
+        files=[("a.txt", same), ("b.txt", same), ("c.txt", b"Java and Docker developer. " * 4)],
+    )
+    assert sess.duplicates_removed == 1
+    assert sess.n_resumes == 2
+    assert sess.to_dict()["duplicates_removed"] == 1
+
+
+def test_leaderboard_sort_is_stable_on_ties():
+    # Equal-scoring résumés must order deterministically (by label) so the leaderboard never reshuffles.
+    store = SessionStore(ttl_seconds=600)
+    body = b"Python developer. " * 4
+    sess = run_demo(
+        store=store, required_skills=["python"],
+        files=[("zeta.txt", body + b" z"), ("alpha.txt", body + b" a"), ("mike.txt", body + b" m")],
+    )
+    scores = [r["fit_score"] for r in sess.results]
+    labels = [r["label"] for r in sess.results]
+    if len(set(scores)) == 1:  # all tied -> labels must be ascending
+        assert labels == sorted(labels)
+
+
 def test_gap_view_extra_skills():
     # The gap view shows skills the candidate has that the job didn't ask for.
     store = SessionStore(ttl_seconds=600)

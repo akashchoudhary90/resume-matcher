@@ -7,6 +7,13 @@ from resume_matcher.inference.schema import CandidateProfile, JobSpec
 from resume_matcher.matching.taxonomy import normalize_skills
 
 
+@pytest.fixture(autouse=True)
+def _isolate_accounts_db(tmp_path, monkeypatch):
+    """Point the accounts SQLite DB at a per-test temp file so the suite never writes to the repo and
+    each test gets a fresh, isolated accounts store."""
+    monkeypatch.setenv("RM_ACCOUNTS_DB", str(tmp_path / "accounts.db"))
+
+
 def make_candidate(cid: str, text: str, **kw) -> CandidateProfile:
     return CandidateProfile(
         candidate_id=cid,

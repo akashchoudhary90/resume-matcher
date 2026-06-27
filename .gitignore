@@ -16,9 +16,16 @@ data/real/
 *.csv
 *.pdf
 
+# Accounts / saved-projects SQLite DB (runtime data — may hold real applicant breakdowns)
+*.db
+data/accounts.db
+
 # Generated schema is derived from code; keep the canonical copy only if intentionally committed.
 # (run `make schema` to regenerate)
 
 # Env / secrets
 .env
 *.key
+
+# Local Claude Code config (machine-specific paths, dev creds)
+.claude/

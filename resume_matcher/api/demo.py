@@ -52,6 +52,7 @@ MAX_RESUMES = _CFG.max_resumes
 MAX_FILE_MB = _CFG.max_file_mb
 TTL_MINUTES = _CFG.ttl_minutes
 MAX_SESSIONS = _CFG.max_sessions
+MAX_JOBS = _CFG.max_jobs                 # roles in the multi-job fit grid
 # Matching engine: "claude_cli" (NDR AI on your subscription via the local Claude Code CLI — no API
 # key; DEFAULT) or "mock" (deterministic). claude_cli falls back to mock when the CLI/token is absent.
 DEMO_BACKEND = _CFG.backend
@@ -114,6 +115,8 @@ class DemoSession:
     n_resumes: int = 0
     warnings: list[str] = field(default_factory=list)
     engine: str = "mock"  # which matching engine actually ran ("mock" | "claude_cli")
+    duplicates_removed: int = 0  # byte-identical uploads skipped (same résumé dropped twice)
+    grid: dict | None = None  # multi-job fit grid (candidate×role); None for a single-job session
     # NB: raw resume text is intentionally NOT a field here — it is dropped after scoring.
 
     @property
@@ -124,9 +127,12 @@ class DemoSession:
         now = time.time() if now is None else now
         return {
             "session_id": self.session_id,
+            "mode": "grid" if self.grid else "single",
             "job": self.job,
             "results": self.results,
+            "grid": self.grid,
             "n_resumes": self.n_resumes,
+            "duplicates_removed": self.duplicates_removed,
             "warnings": self.warnings,
             "engine": self.engine,
             "score_kind": "fit_readiness_not_hire_probability",
@@ -157,7 +163,7 @@ class SessionStore:
         self._lock = threading.Lock()
 
     def create(self, job: dict, results: list[dict], n_resumes: int, warnings: list[str],
-               engine: str = "mock") -> DemoSession:
+               engine: str = "mock", duplicates_removed: int = 0) -> DemoSession:
         now = time.time()
         sid = secrets.token_urlsafe(24)
         sess = DemoSession(
@@ -170,6 +176,22 @@ class SessionStore:
             n_resumes=n_resumes,
             warnings=warnings,
             engine=engine,
+            duplicates_removed=duplicates_removed,
+        )
+        with self._lock:
+            self._evict_if_needed_locked(now)
+            self._sessions[sid] = sess
+        return sess
+
+    def create_grid(self, *, n_resumes: int, warnings: list[str], engine: str, grid: dict,
+                    duplicates_removed: int = 0) -> DemoSession:
+        """Persist a multi-job fit-grid session (de-identified grid only; no per-job sessions kept)."""
+        now = time.time()
+        sid = secrets.token_urlsafe(24)
+        sess = DemoSession(
+            session_id=sid, created_at=now, last_seen=now, ttl_seconds=self.ttl_seconds,
+            job={}, results=[], n_resumes=n_resumes, warnings=warnings, engine=engine,
+            duplicates_removed=duplicates_removed, grid=grid,
         )
         with self._lock:
             self._evict_if_needed_locked(now)
@@ -213,6 +235,7 @@ class SessionStore:
         # Best-effort scrub so references don't linger in memory after removal.
         sess.results = []
         sess.job = {}
+        sess.grid = None
         return True
 
     def _evict_if_needed_locked(self, now: float) -> None:
@@ -234,6 +257,23 @@ def validate_uploads(files: list[tuple[str, bytes]]) -> None:
     for name, data in files:
         if len(data) > limit:
             raise DemoError(f"'{name}' is larger than the {MAX_FILE_MB} MB limit.")
+
+
+def _dedupe_files(files: list[tuple[str, bytes]]) -> tuple[list[tuple[str, bytes]], int]:
+    """Drop byte-identical duplicate uploads (the same résumé dropped twice), keeping the first
+    occurrence. Returns (deduped_files, n_removed) — saves a match slot + an LLM call, and surfaces in
+    the UI as a headline count ("N duplicates detected")."""
+    seen: set[str] = set()
+    out: list[tuple[str, bytes]] = []
+    removed = 0
+    for name, data in files:
+        digest = hashlib.sha256(data).hexdigest()
+        if digest in seen:
+            removed += 1
+            continue
+        seen.add(digest)
+        out.append((name, data))
+    return out, removed
 
 
 def _label_for(filename: str, idx: int) -> str:
@@ -273,6 +313,7 @@ def run_demo(
     `files` is a list of (filename, raw_bytes). Returns the created DemoSession. The raw bytes and
     parsed resume text exist only as locals here and are discarded on return."""
     validate_uploads(files)
+    files, duplicates_removed = _dedupe_files(files)
     if not (job_text or "").strip() and not (required_skills or preferred_skills or must_have_skills):
         raise DemoError("Paste a job posting or provide at least one required skill.")
 
@@ -436,7 +477,9 @@ def run_demo(
         raise DemoError("None of the uploaded files could be scored. " + " ".join(warnings[-3:]))
 
     job_skill_set = set(job.required_skills) | set(job.preferred_skills)
-    scored.sort(key=lambda t: t[0].fit_score, reverse=True)
+    # Sort by fit desc, then label asc as a STABLE tiebreak so identical inputs never reshuffle the
+    # leaderboard between runs (rank stability is a trust signal for the recruiter).
+    scored.sort(key=lambda t: (-t[0].fit_score, t[2]))
     results = []
     for res, cand, label in scored:
         row = result_to_dict(res, coaching_mod.coach(res, job), label=label)
@@ -462,7 +505,91 @@ def run_demo(
     # Local resume text / bytes go out of scope here and are garbage-collected; only `results`
     # (the score breakdown) is persisted in the session.
     return store.create(
-        job=job_summary, results=results, n_resumes=len(scored), warnings=warnings, engine=engine
+        job=job_summary, results=results, n_resumes=len(scored), warnings=warnings, engine=engine,
+        duplicates_removed=duplicates_removed,
+    )
+
+
+def run_demo_grid(
+    *,
+    store: SessionStore,
+    jobs: list[dict],
+    files: list[tuple[str, bytes]],
+    backend: str | None = None,
+) -> DemoSession:
+    """Score the SAME résumés against MULTIPLE roles and assemble a candidate×role fit grid.
+
+    Each role is scored via the normal `run_demo` (into a throwaway store), so every scoring, caching,
+    anti-gaming and privacy guarantee is identical to the single-job flow — only the de-identified grid
+    is persisted. The grid is ranked by each candidate's BEST fit across the roles, and every cell keeps
+    the full point-by-point breakdown for that (candidate, role) so the UI can drill in.
+
+    `jobs` is a list of {title, employer, job_text}. A role with no matchable skills is skipped with a
+    warning rather than failing the whole grid."""
+    if not jobs:
+        raise DemoError("Add at least one role to compare.")
+    if len(jobs) > MAX_JOBS:
+        raise DemoError(f"Too many roles: {len(jobs)} (max {MAX_JOBS}).")
+    validate_uploads(files)
+
+    scratch = SessionStore(ttl_seconds=store.ttl_seconds, max_sessions=len(jobs) + 1)
+    job_cols: list[dict] = []
+    warnings: list[str] = []
+    duplicates_removed = 0
+    by_cid: "OrderedDict[str, dict]" = OrderedDict()
+    for spec in jobs:
+        try:
+            sess_j = run_demo(
+                store=scratch,
+                job_text=spec.get("job_text", ""),
+                title=spec.get("title", ""),
+                employer=spec.get("employer", ""),
+                files=files,
+                backend=backend,
+            )
+        except DemoError as exc:
+            warnings.append(f"Role '{spec.get('title') or 'untitled'}' skipped: {exc}")
+            continue
+        col = len(job_cols)
+        job_cols.append({**sess_j.job, "engine": sess_j.engine})
+        duplicates_removed = max(duplicates_removed, sess_j.duplicates_removed)
+        warnings.extend(sess_j.warnings)
+        for row in sess_j.results:
+            cid = row["candidate_id"]
+            entry = by_cid.setdefault(cid, {"candidate_id": cid, "label": row["label"], "cells": []})
+            while len(entry["cells"]) < col:           # pad earlier roles this candidate missed
+                entry["cells"].append(None)
+            entry["cells"].append({
+                "job_index": col,
+                "fit_score": row["fit_score"],
+                "grade": row["grade"],
+                "confidence": row["confidence"],
+                "result": row,                          # full de-identified breakdown for drill-in
+            })
+        scratch.delete(sess_j.session_id)               # never retain the intermediate single-job sessions
+
+    if not job_cols:
+        raise DemoError("None of the roles had skills to match against. " + " ".join(warnings[-2:]))
+
+    n_cols = len(job_cols)
+    candidates: list[dict] = []
+    for entry in by_cid.values():
+        while len(entry["cells"]) < n_cols:
+            entry["cells"].append(None)
+        scored = [(c["fit_score"], c["job_index"]) for c in entry["cells"] if c]
+        best = max(scored) if scored else (0.0, None)
+        entry["best_fit_score"], entry["best_job_index"] = best[0], best[1]
+        candidates.append(entry)
+    # Rank candidates by their best fit across roles; label as a stable tiebreak.
+    candidates.sort(key=lambda e: (-e["best_fit_score"], e["label"]))
+
+    grid = {"jobs": job_cols, "candidates": candidates}
+    return store.create_grid(
+        n_resumes=len(candidates),
+        warnings=list(dict.fromkeys(warnings)),         # de-dup repeated per-résumé parse warnings
+        engine=job_cols[0].get("engine", "mock"),
+        grid=grid,
+        duplicates_removed=duplicates_removed,
     )
 
 

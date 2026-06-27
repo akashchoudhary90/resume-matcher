@@ -11,6 +11,12 @@ api/app.py. This module is the ONE documented place for them. Two access styles,
 NB: the inference-backend knobs (RM_CLAUDE_CLI_MODEL / _TIMEOUT / _FILE_TIMEOUT / _CONCURRENCY,
 RM_INFERENCE_BACKEND, RM_OLLAMA_HOST) are read in inference/adapters/* close to where they are used;
 they are listed here for discoverability but not re-homed, to keep the adapter boundary self-contained.
+
+The request-time demo DoS/gate knobs (RM_DEMO_RATE_BURST, RM_DEMO_RATE_PER_MIN,
+RM_DEMO_MAX_CONCURRENT_RUNS, and the "full functionality, limited quantity" usage gate
+RM_DEMO_FREE_RUNS / RM_DEMO_QUOTA_WINDOW_MIN) are read in api/app.py via env_int at construction time,
+next to where they are enforced. RM_DEMO_FREE_RUNS=0 (default) disables the quota; the public demo
+sets it in deploy/cohost/docker-compose.cohost.yml.
 """
 from __future__ import annotations
 
@@ -50,6 +56,7 @@ class DemoConfig:
     concurrency: int
     send_file: bool
     cache_max: int
+    max_jobs: int
 
     @classmethod
     def from_env(cls) -> "DemoConfig":
@@ -62,4 +69,5 @@ class DemoConfig:
             concurrency=max(1, env_int("RM_DEMO_CONCURRENCY", 4)),
             send_file=env_flag("RM_DEMO_SEND_FILE", True),
             cache_max=env_int("RM_DEMO_CACHE_MAX", 512),
+            max_jobs=max(1, env_int("RM_DEMO_MAX_JOBS", 3)),  # roles in the multi-job fit grid
         )
