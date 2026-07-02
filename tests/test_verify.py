@@ -50,9 +50,12 @@ def _client():
 
 
 def _make_file_via_api(client):
+    from conftest import finish_demo_run
+
     files = [("resumes", ("Alice.txt", io.BytesIO(b"Python and SQL developer. Bachelor. " * 4), "text/plain"))]
-    sid = client.post("/api/demo/run", data={"required_skills": "python;sql"}, files=files).json()["session_id"]
-    return client.get(f"/api/demo/session/{sid}/defense-file.json").json()
+    r = finish_demo_run(client, client.post(
+        "/api/demo/run", data={"required_skills": "python;sql"}, files=files))
+    return client.get(f"/api/demo/session/{r.json()['session_id']}/defense-file.json").json()
 
 
 def test_pubkey_endpoint_is_public():

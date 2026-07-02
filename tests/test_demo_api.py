@@ -36,7 +36,7 @@ def test_parse_job_endpoint(client):
     assert d["min_education"] == "bachelor"
 
 
-def test_run_results_and_delete(client):
+def test_run_results_and_delete(client, demo_finish):
     files = [
         _file("alice.txt", b"Alice alice@x.com\nPython and SQL expert. Built REST APIs. Bachelor. " * 4),
         _file("bob.txt", b"Bob\nJava and Docker and Python. React user. Master degree. " * 4),
@@ -47,9 +47,12 @@ def test_run_results_and_delete(client):
         "required_skills": "python;sql;docker", "preferred_skills": "react",
         "min_education": "bachelor",
     }
-    r = client.post("/api/demo/run", data=data, files=files)
+    accepted = client.post("/api/demo/run", data=data, files=files)
+    assert accepted.status_code == 202, accepted.text  # async contract: accepted now, scored behind
+    r = demo_finish(client, accepted)
     assert r.status_code == 200, r.text
     body = r.json()
+    assert body["status"] == "done"
     sid = body["session_id"]
     assert body["n_resumes"] == 2
     assert body["privacy"]["stored_on_disk"] is False
@@ -84,6 +87,7 @@ def test_demo_run_rate_limited(monkeypatch):
     files = [_file("a.txt", b"python developer")]
     codes = [throttled.post("/api/demo/run", data={"required_skills": "python"}, files=files).status_code
              for _ in range(3)]
+    assert codes[:2] == [202, 202]  # accepted (async)
     assert codes[2] == 429  # burst of 2 exhausted -> third request rejected
 
 
@@ -91,14 +95,15 @@ def test_demo_page_served(client):
     assert client.get("/demo").status_code == 200
 
 
-def test_large_resume_over_1mb_accepted(client):
+def test_large_resume_over_1mb_accepted(client, demo_finish):
     # Starlette's default 1 MB per-part limit would reject this; the demo raises it to the file cap.
     big = b"Python developer with SQL experience. " + b" word" * 250_000  # ~1.3 MB
-    r = client.post(
+    r = demo_finish(client, client.post(
         "/api/demo/run", data={"required_skills": "python;sql"},
         files=[("resumes", ("big.txt", io.BytesIO(big), "text/plain"))],
-    )
+    ))
     assert r.status_code == 200, r.text
+    assert r.json()["status"] == "done"
 
 
 def test_uploads_configured_to_stay_in_memory():

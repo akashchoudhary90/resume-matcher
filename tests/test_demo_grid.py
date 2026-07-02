@@ -66,6 +66,7 @@ def test_grid_endpoint():
     pytest.importorskip("fastapi")
     pytest.importorskip("httpx")
     pytest.importorskip("multipart")
+    from conftest import finish_demo_run
     from fastapi.testclient import TestClient
 
     from resume_matcher.api.app import create_app
@@ -78,9 +79,12 @@ def test_grid_endpoint():
         "job_employer": ["Acme", "Acme"],
         "job_text": ["Python developer with SQL and Docker.", "Data analyst with SQL and Excel."],
     }
-    r = client.post("/api/demo/run-grid", data=data, files=files)
+    accepted = client.post("/api/demo/run-grid", data=data, files=files)
+    assert accepted.status_code == 202, accepted.text
+    r = finish_demo_run(client, accepted)
     assert r.status_code == 200, r.text
     body = r.json()
+    assert body["status"] == "done"
     assert body["mode"] == "grid"
     assert len(body["grid"]["jobs"]) == 2
     assert len(body["grid"]["candidates"]) == 2

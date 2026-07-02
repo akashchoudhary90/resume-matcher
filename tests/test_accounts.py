@@ -91,9 +91,12 @@ def test_account_api_save_and_reopen_flow():
     assert r.status_code == 200
     assert client.get("/api/account/me").json()["user"]["email"] == "r@b.com"
 
+    from conftest import finish_demo_run
+
     files = [("resumes", ("alice.txt", io.BytesIO(b"Python and SQL developer. " * 4), "text/plain"))]
-    run = client.post("/api/demo/run", data={"required_skills": "python;sql", "job_text": "Python with SQL."},
-                      files=files)
+    run = finish_demo_run(client, client.post(
+        "/api/demo/run", data={"required_skills": "python;sql", "job_text": "Python with SQL."},
+        files=files))
     sid = run.json()["session_id"]
     save = client.post(f"/api/demo/session/{sid}/save", json={"name": "Round 1"})
     assert save.status_code == 200
@@ -109,9 +112,12 @@ def test_account_api_save_and_reopen_flow():
 
 
 def test_save_requires_login():
+    from conftest import finish_demo_run
+
     client = _api_client()
     files = [("resumes", ("a.txt", io.BytesIO(b"Python SQL developer. " * 4), "text/plain"))]
-    sid = client.post("/api/demo/run", data={"required_skills": "python"}, files=files).json()["session_id"]
+    sid = finish_demo_run(client, client.post(
+        "/api/demo/run", data={"required_skills": "python"}, files=files)).json()["session_id"]
     assert client.post(f"/api/demo/session/{sid}/save", json={"name": "x"}).status_code == 401
 
 

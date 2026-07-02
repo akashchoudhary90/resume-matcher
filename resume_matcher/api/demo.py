@@ -16,6 +16,7 @@ from __future__ import annotations
 import glob
 import hashlib
 import json
+import logging
 import os
 import secrets
 import shutil
@@ -106,6 +107,9 @@ class DemoError(Exception):
     """A client-correctable problem (too many files, empty job, etc.) -> HTTP 400."""
 
 
+_log = logging.getLogger("resume_matcher.api.demo")
+
+
 @dataclass
 class DemoSession:
     session_id: str
@@ -120,6 +124,12 @@ class DemoSession:
     duplicates_removed: int = 0  # byte-identical uploads skipped (same résumé dropped twice)
     grid: dict | None = None  # multi-job fit grid (candidate×role); None for a single-job session
     jd_audit: dict | None = None  # reverse-audit of how the posting's requirements shape the pool
+    # Async scoring lifecycle: runs are accepted with 202 and scored in a background thread, so a
+    # long NDR-AI batch never has to survive a single browser request. The client polls the session.
+    status: str = "done"  # "running" | "done" | "error"
+    progress: dict = field(default_factory=dict)  # {"done": int, "total": int} while running
+    error: str | None = None  # client-facing message when status == "error"
+    mode_hint: str = "single"  # what this session WILL be once done ("single" | "grid")
     # NB: raw resume text is intentionally NOT a field here — it is dropped after scoring.
 
     @property
@@ -130,7 +140,10 @@ class DemoSession:
         now = time.time() if now is None else now
         return {
             "session_id": self.session_id,
-            "mode": "grid" if self.grid else "single",
+            "mode": "grid" if self.grid else self.mode_hint,
+            "status": self.status,
+            "progress": self.progress,
+            "error": self.error,
             "job": self.job,
             "results": self.results,
             "grid": self.grid,
@@ -203,6 +216,71 @@ class SessionStore:
             self._sessions[sid] = sess
         return sess
 
+    def create_pending(self, mode: str, total: int) -> DemoSession:
+        """Placeholder for an async run: status='running' now, filled by complete()/fail() later.
+        The client gets its session_id immediately (202) and polls until the status flips."""
+        now = time.time()
+        sid = secrets.token_urlsafe(24)
+        sess = DemoSession(
+            session_id=sid, created_at=now, last_seen=now, ttl_seconds=self.ttl_seconds,
+            job={}, status="running", progress={"done": 0, "total": max(0, int(total))},
+            mode_hint=mode,
+        )
+        with self._lock:
+            self._evict_if_needed_locked(now)
+            self._sessions[sid] = sess
+        return sess
+
+    def update_progress(self, sid: str, done_inc: int = 0, total: int | None = None) -> bool:
+        """Advance a running session's progress counter (thread-safe; called from scoring workers).
+        Also refreshes last_seen so a long in-flight run is never TTL-reaped mid-scoring."""
+        with self._lock:
+            sess = self._sessions.get(sid)
+            if sess is None:
+                return False
+            prog = sess.progress or {"done": 0, "total": 0}
+            if total is not None:
+                prog["total"] = max(0, int(total))
+            if done_inc:
+                prog["done"] = int(prog.get("done", 0)) + int(done_inc)
+            sess.progress = prog
+            sess.last_seen = time.time()
+            return True
+
+    def complete(self, sid: str, finished: DemoSession) -> bool:
+        """Fill a pending session with a finished run's content and mark it done. Returns False when
+        the placeholder is gone (deleted mid-run / expired) — the results are then simply discarded,
+        which is exactly what "Delete my data now" during a run should mean."""
+        with self._lock:
+            sess = self._sessions.get(sid)
+            if sess is None:
+                return False
+            sess.job = finished.job
+            sess.results = finished.results
+            sess.n_resumes = finished.n_resumes
+            sess.warnings = finished.warnings
+            sess.engine = finished.engine
+            sess.duplicates_removed = finished.duplicates_removed
+            sess.grid = finished.grid
+            sess.jd_audit = finished.jd_audit
+            sess.status = "done"
+            sess.error = None
+            if sess.progress.get("total"):
+                sess.progress["done"] = sess.progress["total"]
+            sess.last_seen = time.time()
+            return True
+
+    def fail(self, sid: str, message: str) -> bool:
+        """Mark a pending session as failed with a client-correctable message."""
+        with self._lock:
+            sess = self._sessions.get(sid)
+            if sess is None:
+                return False
+            sess.status = "error"
+            sess.error = message
+            sess.last_seen = time.time()
+            return True
+
     def get(self, sid: str) -> DemoSession | None:
         now = time.time()
         with self._lock:
@@ -246,8 +324,14 @@ class SessionStore:
     def _evict_if_needed_locked(self, now: float) -> None:
         if len(self._sessions) < self.max_sessions:
             return
-        # Drop the least-recently-seen session to make room (also clears anything expired).
-        oldest = min(self._sessions.values(), key=lambda s: s.last_seen, default=None)
+        # Drop the least-recently-seen session to make room — but never sacrifice an in-flight run
+        # while a finished/errored one can go instead (evicting a RUNNING session would 404 its
+        # poller mid-run and discard results the worker is still paying LLM calls to produce). The
+        # concurrent-runs semaphore bounds how many sessions can be 'running', so the fallback to
+        # evicting a running session only triggers in pathological states.
+        pool = ([s for s in self._sessions.values() if s.status != "running"]
+                or list(self._sessions.values()))
+        oldest = min(pool, key=lambda s: s.last_seen, default=None)
         if oldest is not None:
             self._purge_locked(oldest.session_id)
 
@@ -321,11 +405,16 @@ def run_demo(
     min_years: float | None = None,
     files: list[tuple[str, bytes]],
     backend: str | None = None,
+    on_progress=None,
+    set_total=None,
 ) -> DemoSession:
     """Parse uploads in memory, score them against the job, store ONLY the de-identified results.
 
     `files` is a list of (filename, raw_bytes). Returns the created DemoSession. The raw bytes and
-    parsed resume text exist only as locals here and are discarded on return."""
+    parsed resume text exist only as locals here and are discarded on return.
+
+    `on_progress(n)` / `set_total(n)` are optional async-run hooks: set_total is called once with the
+    number of resumes that will actually be scored (post-dedupe), on_progress after each one."""
     validate_uploads(files)
     files, duplicates_removed = _dedupe_files(files)
     if not (job_text or "").strip() and not (required_skills or preferred_skills or must_have_skills):
@@ -476,9 +565,22 @@ def run_demo(
             )
         return score_with_antigaming(_text_extraction(cand), cand, job), cand, label, note
 
+    if set_total is not None:
+        set_total(len(items))
+
+    def _score_and_tick(item):
+        try:
+            return _score_upload(item)
+        finally:
+            if on_progress is not None:
+                try:
+                    on_progress(1)
+                except Exception:  # noqa: BLE001 - progress reporting must never break scoring
+                    pass
+
     workers = min(len(items), CONCURRENCY) or 1
     with ThreadPoolExecutor(max_workers=workers) as pool:
-        outcomes = list(pool.map(_score_upload, items))
+        outcomes = list(pool.map(_score_and_tick, items))
 
     scored = []
     for res, cand, label, note in outcomes:
@@ -536,6 +638,8 @@ def run_demo_grid(
     jobs: list[dict],
     files: list[tuple[str, bytes]],
     backend: str | None = None,
+    on_progress=None,
+    set_total=None,
 ) -> DemoSession:
     """Score the SAME résumés against MULTIPLE roles and assemble a candidate×role fit grid.
 
@@ -551,6 +655,8 @@ def run_demo_grid(
     if len(jobs) > MAX_JOBS:
         raise DemoError(f"Too many roles: {len(jobs)} (max {MAX_JOBS}).")
     validate_uploads(files)
+    if set_total is not None:
+        set_total(len(jobs) * len(files))  # pre-dedupe estimate; complete() snaps done to total
 
     scratch = SessionStore(ttl_seconds=store.ttl_seconds, max_sessions=len(jobs) + 1)
     job_cols: list[dict] = []
@@ -566,6 +672,7 @@ def run_demo_grid(
                 employer=spec.get("employer", ""),
                 files=files,
                 backend=backend,
+                on_progress=on_progress,
             )
         except DemoError as exc:
             warnings.append(f"Role '{spec.get('title') or 'untitled'}' skipped: {exc}")
@@ -619,6 +726,8 @@ def run_demo_grid_from_files(
     jd_files: list[tuple[str, bytes]],
     resume_files: list[tuple[str, bytes]],
     backend: str | None = None,
+    on_progress=None,
+    set_total=None,
 ) -> DemoSession:
     """Bulk match: a folder of JD FILES × a folder of résumé files -> a candidate×role fit grid.
 
@@ -649,10 +758,82 @@ def run_demo_grid_from_files(
         jobs.append({"title": _label_for(filename, 0), "employer": "", "job_text": text})
     if not jobs:
         raise DemoError("None of the uploaded JD files were readable. Use text-based PDF/DOCX/TXT.")
+    if set_total is not None:
+        set_total(len(jobs) * len(resume_files))
 
-    sess = run_demo_grid(store=store, jobs=jobs, files=resume_files, backend=backend)
+    sess = run_demo_grid(store=store, jobs=jobs, files=resume_files, backend=backend,
+                         on_progress=on_progress)
     sess.warnings = list(dict.fromkeys(warnings + sess.warnings))  # surface the cap/skip notes too
     return sess
+
+
+# Async run targets, resolved by name at CALL time (so tests can monkeypatch the module functions).
+_ASYNC_TARGETS = {
+    "single": "run_demo",
+    "grid": "run_demo_grid",
+    "grid_files": "run_demo_grid_from_files",
+}
+
+
+def start_async_run(
+    *,
+    store: SessionStore,
+    kind: str,
+    total_estimate: int,
+    on_finish=None,
+    **kwargs,
+) -> DemoSession:
+    """Accept a scoring run NOW, score it in a background thread, and let the client poll.
+
+    Returns a placeholder session (status='running') immediately — the HTTP layer answers 202 with
+    its session_id and the browser polls GET /api/demo/session/{id} until status flips to 'done' or
+    'error'. This is what lets a 30-call NDR-AI grid survive: no browser/proxy has to hold a
+    connection open for the whole run, and a finished run is reachable even after a client hiccup.
+
+    `kind` picks the scoring function ('single' | 'grid' | 'grid_files'); `kwargs` are its arguments
+    (minus store/on_progress/set_total, which this wires up). `on_finish(success)` is always called
+    exactly once from the worker thread, BEFORE the session is marked done — so by the time a poller
+    sees status='done', the quota charge has already landed (no stale quota reads). The HTTP layer
+    uses it to release its concurrency slot and charge only on success (= scoring produced results;
+    a run whose placeholder was deleted mid-run is still charged, but its results are discarded)."""
+    if kind not in _ASYNC_TARGETS:
+        raise ValueError(f"unknown async run kind: {kind!r}")
+    pending = store.create_pending(mode="single" if kind == "single" else "grid",
+                                   total=total_estimate)
+    sid = pending.session_id
+
+    def _tick(n: int = 1) -> None:
+        store.update_progress(sid, done_inc=n)
+
+    def _set_total(n: int) -> None:
+        store.update_progress(sid, total=n)
+
+    def _work() -> None:
+        finished = None
+        try:
+            target = globals()[_ASYNC_TARGETS[kind]]
+            # Score into a throwaway store; only the de-identified content is copied into the
+            # pending session on success (same privacy posture as the sync path).
+            scratch = SessionStore(ttl_seconds=store.ttl_seconds, max_sessions=8)
+            finished = target(store=scratch, on_progress=_tick, set_total=_set_total, **kwargs)
+        except DemoError as exc:
+            store.fail(sid, str(exc))
+        except Exception:  # noqa: BLE001 - never let a worker die silently; surface a generic error
+            _log.exception("async demo run failed (kind=%s)", kind)
+            store.fail(sid, "Unexpected error while scoring — please retry.")
+        finally:
+            if on_finish is not None:
+                try:
+                    on_finish(finished is not None)
+                except Exception:  # noqa: BLE001
+                    _log.exception("async demo on_finish callback failed")
+        if finished is not None:
+            # Marked done LAST: a poller that sees 'done' can rely on on_finish having run. If the
+            # placeholder was deleted mid-run, complete() is a no-op and the results are discarded.
+            store.complete(sid, finished)
+
+    threading.Thread(target=_work, name="rm-demo-run", daemon=True).start()
+    return pending
 
 
 def _resolve_adapter(name: str):

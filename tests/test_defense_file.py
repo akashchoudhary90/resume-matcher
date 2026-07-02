@@ -107,10 +107,13 @@ def test_defense_file_endpoint():
     pytest.importorskip("multipart")
     from fastapi.testclient import TestClient
 
+    from conftest import finish_demo_run
+
     from resume_matcher.api.app import create_app
     client = TestClient(create_app())
     files = [("resumes", ("Alice.txt", io.BytesIO(b"Python and SQL developer. Bachelor. " * 4), "text/plain"))]
-    sid = client.post("/api/demo/run", data={"required_skills": "python;sql"}, files=files).json()["session_id"]
+    sid = finish_demo_run(client, client.post(
+        "/api/demo/run", data={"required_skills": "python;sql"}, files=files)).json()["session_id"]
     r = client.get(f"/api/demo/session/{sid}/defense-file.json")
     assert r.status_code == 200
     assert "attachment" in r.headers.get("content-disposition", "")

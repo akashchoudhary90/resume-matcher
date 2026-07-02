@@ -1,6 +1,8 @@
 """Shared test fixtures/helpers. `pythonpath = ["."]` in pyproject makes `resume_matcher` importable."""
 from __future__ import annotations
 
+import time
+
 import pytest
 
 from resume_matcher.inference.schema import CandidateProfile, JobSpec
@@ -12,6 +14,29 @@ def _isolate_accounts_db(tmp_path, monkeypatch):
     """Point the accounts SQLite DB at a per-test temp file so the suite never writes to the repo and
     each test gets a fresh, isolated accounts store."""
     monkeypatch.setenv("RM_ACCOUNTS_DB", str(tmp_path / "accounts.db"))
+
+
+def finish_demo_run(client, response, timeout: float = 30.0):
+    """Follow the async demo contract: the scoring endpoints answer 202 and run in the background.
+    Polls the session until it leaves 'running' and returns that FINAL GET response (status 200,
+    body['status'] in {'done','error'}). Non-202 responses (400/402/403/413/429) are returned
+    unchanged so error-path assertions keep working."""
+    if response.status_code != 202:
+        return response
+    sid = response.json()["session_id"]
+    deadline = time.time() + timeout
+    while time.time() < deadline:
+        g = client.get(f"/api/demo/session/{sid}")
+        if g.status_code != 200 or g.json().get("status") != "running":
+            return g
+        time.sleep(0.02)
+    raise AssertionError("async demo run did not finish in time")
+
+
+@pytest.fixture
+def demo_finish():
+    """The finish_demo_run helper as a fixture (conftest isn't importable from test modules)."""
+    return finish_demo_run
 
 
 def make_candidate(cid: str, text: str, **kw) -> CandidateProfile:

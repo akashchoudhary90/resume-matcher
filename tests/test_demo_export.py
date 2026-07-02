@@ -8,6 +8,7 @@ pytest.importorskip("fastapi")
 pytest.importorskip("httpx")
 pytest.importorskip("multipart")  # python-multipart, required for file uploads
 
+from conftest import finish_demo_run  # noqa: E402
 from fastapi.testclient import TestClient  # noqa: E402
 
 from resume_matcher.api.app import create_app  # noqa: E402
@@ -23,14 +24,15 @@ def _file(name, body):
 
 
 def _make_session(client):
-    r = client.post(
+    r = finish_demo_run(client, client.post(
         "/api/demo/run",
         data={"job_text": "Python developer with SQL.", "title": "Backend Dev",
               "employer": "Acme", "required_skills": "python;sql"},
         files=[_file("alice.txt", b"Python and SQL developer. Built REST APIs. Bachelor. " * 4),
                _file("bob.txt", b"Java and Docker developer. Some Python. Master. " * 4)],
-    )
+    ))
     assert r.status_code == 200, r.text
+    assert r.json()["status"] == "done"
     return r.json()["session_id"]
 
 

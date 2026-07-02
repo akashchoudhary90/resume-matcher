@@ -77,6 +77,8 @@ def test_parse_job_file_endpoint():
 
 
 def test_run_grid_files_endpoint():
+    from conftest import finish_demo_run
+
     client = _api_client()
     files = [
         ("jds", ("Python Dev.txt", io.BytesIO(b"Python developer with SQL and Docker."), "text/plain")),
@@ -84,9 +86,13 @@ def test_run_grid_files_endpoint():
         ("resumes", ("Alice.txt", io.BytesIO(b"Python SQL Docker developer. Bachelor. " * 4), "text/plain")),
         ("resumes", ("Bob.txt", io.BytesIO(b"Excel and SQL analyst. Diploma. " * 4), "text/plain")),
     ]
-    r = client.post("/api/demo/run-grid-files", files=files)
+    accepted = client.post("/api/demo/run-grid-files", files=files)
+    assert accepted.status_code == 202, accepted.text
+    assert accepted.json()["mode"] == "grid"
+    r = finish_demo_run(client, accepted)
     assert r.status_code == 200, r.text
     d = r.json()
+    assert d["status"] == "done"
     assert d["mode"] == "grid"
     assert len(d["grid"]["jobs"]) == 2
     assert len(d["grid"]["candidates"]) == 2

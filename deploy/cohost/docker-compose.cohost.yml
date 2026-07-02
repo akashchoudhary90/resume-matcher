@@ -33,6 +33,10 @@ services:
       # key). Falls back to the deterministic engine automatically if the token below is unset.
       RM_DEMO_BACKEND: "${RM_DEMO_BACKEND:-claude_cli}"
       RM_CLAUDE_CLI_MODEL: "${RM_CLAUDE_CLI_MODEL:-opus}"
+      # Cap concurrent `claude` CLI processes: each is a Node process (~200-300MB); 4 at once inside
+      # this container's memory cap risked an OOM kill mid-grid (which surfaced to the browser as an
+      # empty 502 -> "no result"). Runs are async now, so slower-but-stable wins.
+      RM_CLAUDE_CLI_CONCURRENCY: "${RM_CLAUDE_CLI_CONCURRENCY:-2}"
       # Demo gate: full functionality, limited quantity. Each client gets RM_DEMO_FREE_RUNS scored
       # matches per RM_DEMO_QUOTA_WINDOW_MIN window (re-running the SAME batch is free); a spent client
       # gets a 402 + upgrade prompt. Set RM_DEMO_FREE_RUNS=0 to disable the gate (unlimited).
@@ -54,7 +58,10 @@ services:
       - rmdemo
     volumes:
       - rmdemo_accounts:/data  # persist accounts + saved projects across redeploys (own volume)
-    mem_limit: 512m            # hard caps: the demo cannot starve the trading bot on the same host
+    # Hard caps: the demo cannot starve the trading bot on the same host. 512m proved too tight for
+    # the Python app + 2 concurrent Claude CLI (Node) processes during a bulk grid; 768m + the
+    # RM_CLAUDE_CLI_CONCURRENCY=2 cap above keeps headroom without meaningfully squeezing the host.
+    mem_limit: 768m
     cpus: 0.5
     # Let an in-flight scoring call finish on redeploy/stop before SIGKILL (vision calls run up to
     # RM_CLAUDE_CLI_FILE_TIMEOUT=150s); default 10s would cut them off. Scoped to THIS service only.

@@ -252,10 +252,74 @@ function esc(s){ return (s==null?'':String(s)).replace(/[&<>"]/g,c=>({'&':'&amp;
 function gradeClass(g){ return 'g-'+g; }
 const EDU_LABELS={none:'No minimum',diploma:'Diploma',certificate:'Certificate',associate:'Associate',bachelor:"Bachelor's",master:"Master's",phd:'PhD'};
 function eduLabel(k){ if(k==null||k==='') return ''; const key=String(k).toLowerCase(); return EDU_LABELS[key]||(key.charAt(0).toUpperCase()+key.slice(1)); }
+const sleep = ms => new Promise(r=>setTimeout(r,ms));
+
+/* Parse a response body defensively. A proxy error while the app restarts (e.g. a bare 502) has an
+   empty or non-JSON body — r.json() would throw "Unexpected end of JSON input"; surface a readable
+   message instead. Returns null when there is no usable JSON. */
+async function jsonOf(r){
+  let t = '';
+  try{ t = await r.text(); }catch(_){ return null; }
+  if(!t) return null;
+  try{ return JSON.parse(t); }catch(_){ return null; }
+}
+function errText(d, fallback, status){
+  const det = d && d.detail;
+  if(typeof det === 'string' && det) return det;
+  if(det && typeof det.error === 'string') return det.error;
+  if(d && typeof d.error === 'string') return d.error;
+  return fallback + (status ? ` (HTTP ${status})` : ' (no response from the server)');
+}
+
+/* Submit a scoring run and poll the session until it finishes. The server answers 202 immediately
+   and scores in a background worker, so a long NDR-AI batch never depends on one long-lived HTTP
+   request surviving the browser, the proxy, or a container hiccup. Returns the finished session
+   payload, or null after reporting the problem. */
+async function submitAndPoll(url, fd, setStatus){
+  let r;
+  try{ r = await fetch(url, {method:'POST', body:fd}); }
+  catch(e){ banner('Could not reach the server — check your connection and retry.', 'err'); return null; }
+  const d = await jsonOf(r);
+  if(r.status===402 && d && d.detail && d.detail.upgrade){ showUpgrade(d.detail); return null; }
+  if(!r.ok){ banner(errText(d, 'Scoring failed', r.status), 'err'); return null; }
+  if(!d || !d.session_id){ banner('Unexpected server response — please retry.', 'err'); return null; }
+  if(d.status === 'error'){ banner(d.error || 'Scoring failed.', 'err'); return null; }
+  // Only treat the POST body as final when it actually carries results (a legacy synchronous 200);
+  // any other shape falls through to the poll loop, whose first GET fetches the authoritative state.
+  if(d.status !== 'running' && (d.results || d.grid)) return d;
+  const sid = d.session_id, t0 = Date.now();
+  let misses = 0;
+  for(;;){
+    await sleep(1500);
+    let pr = null, pd = null;
+    try{ pr = await fetch('/api/demo/session/'+encodeURIComponent(sid)); pd = await jsonOf(pr); }catch(_){}
+    if(pr && pr.status===404){
+      banner('The scoring session expired or was deleted before it finished — please run it again.', 'err');
+      return null;
+    }
+    if(!pr || !pr.ok || !pd){
+      if(++misses >= 20){ banner('Lost contact with the server while scoring — reload the page and retry.', 'err'); return null; }
+      setStatus('Connection hiccup — retrying…');
+      continue;
+    }
+    misses = 0;
+    if(pd.status === 'error'){ banner(pd.error || 'Scoring failed.', 'err'); return null; }
+    if(pd.status === 'running'){
+      const p = pd.progress || {};
+      const secs = Math.round((Date.now()-t0)/1000), m = Math.floor(secs/60), s = String(secs%60).padStart(2,'0');
+      const frac = p.total ? `${Math.min(p.done||0, p.total)} of ${p.total} resume×role pair(s) scored` : 'scoring';
+      setStatus(`Still working — ${frac} · ${m}:${s} elapsed. Keep this tab open (processed in memory, discarded after).`);
+      continue;
+    }
+    return pd;  // done
+  }
+}
 
 async function loadConfig(){
   try{
-    const r = await fetch('/api/demo/config'); CFG = await r.json();
+    const r = await fetch('/api/demo/config');
+    const cfg = await jsonOf(r); if(!r.ok || !cfg) return;
+    CFG = cfg;
     $('#maxN').textContent = CFG.max_resumes;
     document.querySelectorAll('.maxN').forEach(e=>e.textContent=CFG.max_resumes);
     if(CFG.max_jobs){ $('#maxJobs').textContent = CFG.max_jobs; $('#maxJobs2').textContent = CFG.max_jobs; }
@@ -304,7 +368,8 @@ function renderAcct(){
   }
 }
 async function refreshAuth(){
-  try{ USER = (await (await fetch('/api/account/me')).json()).user; }catch(e){ USER=null; }
+  try{ const d = await jsonOf(await fetch('/api/account/me')); USER = d ? d.user : null; }
+  catch(e){ USER=null; }
   renderAcct();
 }
 function openAuth(msg){
@@ -318,8 +383,8 @@ async function doAuth(path){
   $('#authMsg').textContent='Working…'; $('#authMsg').className='muted';
   try{
     const r = await fetch('/api/account/'+path, {method:'POST', headers:{'Content-Type':'application/json'}, body:JSON.stringify({email,password})});
-    const d = await r.json();
-    if(!r.ok){ $('#authMsg').textContent = (d.detail||'Could not sign in.'); $('#authMsg').className='err'; return; }
+    const d = await jsonOf(r) || {};
+    if(!r.ok){ $('#authMsg').textContent = errText(d, 'Could not sign in.', r.status); $('#authMsg').className='err'; return; }
     USER = {email:d.email}; renderAcct();
     $('#authPanel').classList.add('hidden'); $('#authPass').value='';
     banner(`Signed in as ${d.email}. You can now save your shortlists and grids.`, 'ok');
@@ -344,8 +409,8 @@ async function saveCurrentProject(){
   if(name===null) return;
   try{
     const r = await fetch('/api/demo/session/'+encodeURIComponent(SESSION)+'/save', {method:'POST', headers:{'Content-Type':'application/json'}, body:JSON.stringify({name})});
-    const d = await r.json();
-    if(!r.ok){ banner(d.detail||'Could not save.', 'err'); return; }
+    const d = await jsonOf(r) || {};
+    if(!r.ok){ banner(errText(d, 'Could not save.', r.status), 'err'); return; }
     banner(`Saved as “${d.name}”. Reopen it any time from “My projects”.`, 'ok');
   }catch(e){ banner('Save failed: '+e, 'err'); }
 }
@@ -354,7 +419,7 @@ async function openProjects(){
   $('#projectsPanel').classList.remove('hidden');
   $('#projectsList').innerHTML = '<span class="muted">Loading…</span>';
   try{
-    const list = await (await fetch('/api/projects')).json();
+    const list = await jsonOf(await fetch('/api/projects'));
     if(!Array.isArray(list) || !list.length){ $('#projectsList').innerHTML = '<span class="muted">No saved projects yet. Score some resumes, then “★ Save project”.</span>'; return; }
     $('#projectsList').innerHTML = list.map(p=>`
       <div style="display:flex;align-items:center;gap:10px;padding:8px;border-bottom:1px solid var(--line)">
@@ -368,8 +433,8 @@ async function openProjects(){
 $('#projClose').onclick = ()=> $('#projectsPanel').classList.add('hidden');
 async function openProject(pid){
   try{
-    const p = await (await fetch('/api/projects/'+encodeURIComponent(pid))).json();
-    if(p.detail){ banner(p.detail, 'err'); return; }
+    const p = await jsonOf(await fetch('/api/projects/'+encodeURIComponent(pid)));
+    if(!p || p.detail){ banner((p && p.detail) || 'Could not open the project.', 'err'); return; }
     SAVED_VIEW = true; SESSION = null;
     const payload = p.payload||{};
     if(payload.mode==='grid') renderGrid(payload); else renderResults(payload);
@@ -428,7 +493,7 @@ $('#addSkill').addEventListener('input', e=>{
   if(q.length<2) return;
   suggestTimer=setTimeout(async()=>{
     try{
-      const list=await (await fetch('/api/demo/skills?q='+encodeURIComponent(q))).json();
+      const list=await jsonOf(await fetch('/api/demo/skills?q='+encodeURIComponent(q))) || [];
       SUGGEST={}; list.forEach(s=>SUGGEST[s.name.toLowerCase()]=s);
       $('#skillSuggest').innerHTML=list.map(s=>`<option value="${esc(s.name)}">`).join('');
     }catch(_){}
@@ -444,7 +509,7 @@ async function detectSkills(silent){
   if(!silent){ $('#detectBtn').disabled = true; $('#detectBtn').textContent='Detecting…'; }
   try{
     const r = await fetch('/api/demo/parse-job', {method:'POST', body:fd});
-    const d = await r.json();
+    const d = await jsonOf(r) || {};
     const all = d.detected_skills||[];
     const have = new Set(SKILLS.map(s=>s.id));
     all.forEach(s=>{ if(!have.has(s.id)){ SKILLS.push({id:s.id, name:s.name, bucket:'required'}); have.add(s.id); } });
@@ -467,8 +532,8 @@ $('#jdFile').addEventListener('change', async e => {
   const fd = new FormData(); fd.append('jd', f, f.name);
   try{
     const r = await fetch('/api/demo/parse-job-file', {method:'POST', body:fd});
-    const d = await r.json();
-    if(!r.ok){ $('#jdFileStatus').textContent=''; banner(d.detail||'Could not read the JD file.', 'err'); return; }
+    const d = await jsonOf(r) || {};
+    if(!r.ok){ $('#jdFileStatus').textContent=''; banner(errText(d, 'Could not read the JD file.', r.status), 'err'); return; }
     $('#jobText').value = d.text || '';
     if(d.title && !$('#jobTitle').value) $('#jobTitle').value = d.title;
     if(d.min_education && !$('#minEdu').value) $('#minEdu').value = d.min_education;
@@ -480,11 +545,45 @@ $('#jdFile').addEventListener('change', async e => {
 });
 
 /* ---------- files ---------- */
+const DOC_RE = /\.(pdf|docx|txt|text|md)$/i;
+/* Drag-and-drop can hand us DIRECTORIES (a dropped folder). Traverse them into their files — a
+   dropped folder used to silently yield an empty selection. The DataTransfer must be snapshotted
+   synchronously (before any await) or the browser neuters it. */
+function collectDropped(dt){
+  const items = dt && dt.items ? [...dt.items] : [];
+  const entries = items.map(it => (it && typeof it.webkitGetAsEntry === 'function') ? it.webkitGetAsEntry() : null);
+  const plain = dt && dt.files ? [...dt.files] : [];
+  if(!entries.some(Boolean)) return Promise.resolve(plain);
+  const out = [];
+  async function walk(en){
+    if(!en) return;
+    if(en.isFile){
+      const f = await new Promise(res => en.file(res, () => res(null)));
+      if(f) out.push(f);
+    } else if(en.isDirectory){
+      const rd = en.createReader();
+      for(;;){
+        const batch = await new Promise(res => rd.readEntries(res, () => res([])));
+        if(!batch.length) break;
+        for(const child of batch) await walk(child);
+      }
+    }
+  }
+  return (async ()=>{ for(const en of entries) await walk(en); return out.length ? out : plain; })();
+}
+
 const drop = $('#drop'), fileInput = $('#fileInput');
 drop.onclick = ()=> fileInput.click();
 ['dragover','dragenter'].forEach(ev=>drop.addEventListener(ev, e=>{e.preventDefault();drop.classList.add('hot');}));
 ['dragleave','drop'].forEach(ev=>drop.addEventListener(ev, e=>{e.preventDefault();drop.classList.remove('hot');}));
-drop.addEventListener('drop', e=> addFiles(e.dataTransfer.files));
+drop.addEventListener('drop', async e=>{
+  // Folder traversal can surface junk (.DS_Store, thumbnails); without this filter such files would
+  // silently displace real resumes at the max-resumes cap.
+  const dropped = await collectDropped(e.dataTransfer);
+  const docs = dropped.filter(f => DOC_RE.test(f.name));
+  if(dropped.length && !docs.length){ banner('No .pdf/.docx/.txt files in that selection.', 'warn'); return; }
+  addFiles(docs);
+});
 fileInput.addEventListener('change', e=> addFiles(e.target.files));
 function addFiles(list){
   for(const f of list){
@@ -515,16 +614,10 @@ $('#runBtn').onclick = async () => {
   fd.append('min_education', $('#minEdu').value);
   fd.append('min_years', $('#minYears').value.trim());
   FILES.forEach(f=> fd.append('resumes', f, f.name));
-  $('#runBtn').disabled=true; $('#runStatus').textContent='Scoring… (processed in memory, discarded after; NDR AI matching can take a bit for several resumes)';
-  try{
-    const r = await fetch('/api/demo/run', {method:'POST', body:fd});
-    const d = await r.json();
-    if(!r.ok){
-      if(r.status===402 && d.detail && d.detail.upgrade){ showUpgrade(d.detail); }
-      else { banner((d.detail&&d.detail.error)||d.detail||'Scoring failed.', 'err'); }
-    }
-    else { SESSION = d.session_id; SAVED_VIEW=false; renderResults(d); }
-  }catch(e){ banner('Request failed: '+e, 'err'); }
+  $('#runBtn').disabled=true;
+  $('#runStatus').textContent='Scoring… (processed in memory, discarded after; NDR AI matching can take a few minutes for several resumes)';
+  const d = await submitAndPoll('/api/demo/run', fd, t=>{ $('#runStatus').textContent=t; });
+  if(d){ SESSION = d.session_id; SAVED_VIEW=false; renderResults(d); }
   $('#runBtn').disabled=false; $('#runStatus').textContent='';
 };
 
@@ -570,14 +663,8 @@ $('#gridBtn').onclick = async () => {
   roles.forEach(r=>{ fd.append('job_title', r.title||''); fd.append('job_employer', r.employer||''); fd.append('job_text', r.text); });
   FILES.forEach(f=> fd.append('resumes', f, f.name));
   $('#gridBtn').disabled=true; $('#runStatus').textContent=`Scoring ${FILES.length} resume(s) across ${roles.length} roles… (each resume is matched to each role)`;
-  try{
-    const r = await fetch('/api/demo/run-grid', {method:'POST', body:fd});
-    const d = await r.json();
-    if(!r.ok){
-      if(r.status===402 && d.detail && d.detail.upgrade){ showUpgrade(d.detail); }
-      else { banner((d.detail&&d.detail.error)||d.detail||'Scoring failed.', 'err'); }
-    } else { SESSION = d.session_id; SAVED_VIEW=false; renderGrid(d); }
-  }catch(e){ banner('Request failed: '+e, 'err'); }
+  const d = await submitAndPoll('/api/demo/run-grid', fd, t=>{ $('#runStatus').textContent=t; });
+  if(d){ SESSION = d.session_id; SAVED_VIEW=false; renderGrid(d); }
   $('#gridBtn').disabled=false; $('#runStatus').textContent='';
 };
 
@@ -621,44 +708,48 @@ function showCell(cid, j){
 
 /* ---------- bulk: a folder of JDs × a folder of resumes ---------- */
 let JD_FILES = [], RES_FILES = [];
-const DOC_RE = /\.(pdf|docx|txt|text|md)$/i;
 function setupBulkDrop(dropId, inputId, which){
   const drop = $('#'+dropId), input = $('#'+inputId);
   drop.onclick = () => input.click();
   ['dragover','dragenter'].forEach(ev=>drop.addEventListener(ev, e=>{e.preventDefault(); drop.classList.add('hot');}));
   ['dragleave','drop'].forEach(ev=>drop.addEventListener(ev, e=>{e.preventDefault(); drop.classList.remove('hot');}));
-  drop.addEventListener('drop', e => addBulk(which, e.dataTransfer.files));
+  drop.addEventListener('drop', async e => addBulk(which, await collectDropped(e.dataTransfer)));
   input.addEventListener('change', e => addBulk(which, e.target.files));
 }
+/* Persistent, inline (next to the zone it concerns) — a top-of-page banner that self-erases made an
+   empty selection look like "Match all does nothing". Owned by renderBulk so a drop on the OTHER
+   zone can't wipe it; it clears once this zone gets a valid selection. */
+const BULK_EMPTY_ERR = { jd: false, res: false };
+const EMPTY_SEL_MSG = '<span class="err">No .pdf/.docx/.txt files in that selection — drop the files (or a folder of them), or click the box to pick a folder.</span>';
 function addBulk(which, list){
   const docs = [...list].filter(f => DOC_RE.test(f.name));
   if(which==='jd') JD_FILES = docs; else RES_FILES = docs;
+  BULK_EMPTY_ERR[which] = !!(list.length && !docs.length);
   renderBulk();
-  if(list.length && !docs.length) banner('No .pdf/.docx/.txt files found in that selection.', 'warn');
 }
 function renderBulk(){
-  $('#jdList').textContent  = JD_FILES.length  ? `${JD_FILES.length} JD file(s) selected`     : '';
-  $('#resList').textContent = RES_FILES.length ? `${RES_FILES.length} resume file(s) selected` : '';
+  // Counts are code-generated numbers; no user text is interpolated into this HTML.
+  $('#jdList').innerHTML  = JD_FILES.length  ? `${JD_FILES.length} JD file(s) selected`
+                                             : (BULK_EMPTY_ERR.jd ? EMPTY_SEL_MSG : '');
+  $('#resList').innerHTML = RES_FILES.length ? `${RES_FILES.length} resume file(s) selected`
+                                             : (BULK_EMPTY_ERR.res ? EMPTY_SEL_MSG : '');
+}
+function setBulkStatus(msg, isErr){
+  const el = $('#bulkStatus'); el.textContent = msg || ''; el.className = isErr ? 'err' : 'muted';
 }
 setupBulkDrop('jdDrop','jdFolder','jd');
 setupBulkDrop('resDrop','resFolder','res');
 $('#bulkBtn').onclick = async () => {
-  if(!JD_FILES.length){ banner('Choose a folder (or files) of job descriptions.', 'warn'); return; }
-  if(!RES_FILES.length){ banner('Choose a folder (or files) of resumes.', 'warn'); return; }
+  if(!JD_FILES.length){ setBulkStatus('Choose the JD folder (or drag JD files onto the left box) first.', true); return; }
+  if(!RES_FILES.length){ setBulkStatus('Choose the resume folder (or drag resume files onto the right box) first.', true); return; }
   const fd = new FormData();
   JD_FILES.forEach(f => fd.append('jds', f, f.name));
   RES_FILES.forEach(f => fd.append('resumes', f, f.name));
   $('#bulkBtn').disabled = true;
-  $('#bulkStatus').textContent = `Matching ${RES_FILES.length} resume(s) × ${JD_FILES.length} JD(s)… (each resume is scored against each role)`;
-  try{
-    const r = await fetch('/api/demo/run-grid-files', {method:'POST', body:fd});
-    const d = await r.json();
-    if(!r.ok){
-      if(r.status===402 && d.detail && d.detail.upgrade){ showUpgrade(d.detail); }
-      else { banner((d.detail&&d.detail.error)||d.detail||'Matching failed.', 'err'); }
-    } else { SESSION = d.session_id; SAVED_VIEW = false; renderGrid(d); }
-  }catch(e){ banner('Request failed: ' + e, 'err'); }
-  $('#bulkBtn').disabled = false; $('#bulkStatus').textContent = '';
+  setBulkStatus(`Matching ${RES_FILES.length} resume(s) × ${JD_FILES.length} JD(s)… (each resume is scored against each role)`);
+  const d = await submitAndPoll('/api/demo/run-grid-files', fd, setBulkStatus);
+  if(d){ SESSION = d.session_id; SAVED_VIEW = false; renderGrid(d); }
+  $('#bulkBtn').disabled = false; setBulkStatus('');
 };
 
 /* ---------- delete ---------- */
@@ -667,7 +758,7 @@ $('#deleteBtn').onclick = async () => {
   $('#deleteBtn').disabled=true;
   try{
     const r = await fetch('/api/demo/session/'+encodeURIComponent(SESSION), {method:'DELETE'});
-    const d = await r.json();
+    const d = await jsonOf(r) || {};
     SESSION=null; clearTTL();
     $('#results').innerHTML = `<div class="card"><b>✅ ${esc(d.message||'Your data has been deleted.')}</b>
       <div class="muted" style="margin-top:6px">The in-memory session was wiped. Nothing was ever written to disk.</div></div>`;

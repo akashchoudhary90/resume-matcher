@@ -27,7 +27,7 @@ from ..inference.schema import CandidateProfile, JobSpec
 from ..matching.evaluator import evaluate
 from . import demo as demo_mod
 from .accounts import AccountError, AccountStore, cookie_max_age
-from .demo import DemoError, get_demo_store, run_demo
+from .demo import DemoError, get_demo_store
 from .service import get_state
 
 _STATIC = Path(__file__).with_name("static")
@@ -170,7 +170,6 @@ def _start_sweeper() -> None:
 def create_app():
     try:
         from fastapi import Depends, FastAPI, Form, HTTPException, Request
-        from fastapi.concurrency import run_in_threadpool
         from fastapi.responses import FileResponse, JSONResponse, Response
     except ImportError as exc:  # pragma: no cover - optional dep
         raise RuntimeError("FastAPI not installed. pip install -r requirements-extra.txt") from exc
@@ -408,11 +407,31 @@ def create_app():
             "detected_skills": skill_options(detected),
         }
 
+    def _accepted_response(pending) -> JSONResponse:
+        """202 for an async scoring run: the client polls the session until status flips.
+
+        SNAPSHOT, not the live session: a fast worker (e.g. a batch that fails validation instantly)
+        can flip the session to done/error before this response serializes — the body must still say
+        'running' so the client goes to the poll endpoint, which is the single source of truth and
+        carries the full payload (results or the error message) that this body lacks."""
+        return JSONResponse(status_code=202, content={
+            "session_id": pending.session_id,
+            "status": "running",
+            "mode": pending.mode_hint,
+            "progress": {"done": 0, "total": int((pending.progress or {}).get("total", 0))},
+            "poll": f"/api/demo/session/{pending.session_id}",
+            "score_kind": "fit_readiness_not_hire_probability",
+        })
+
     @app.post("/api/demo/run")
-    async def demo_run(request: Request) -> dict:
+    async def demo_run(request: Request):
         # Parse multipart ourselves so we can (a) accept files up to RM_DEMO_MAX_FILE_MB instead of
         # Starlette's 1 MB default, and (b) cap the upload (count + per-file size) at the framework
         # edge. Combined with _ensure_in_memory_uploads(), nothing spills to disk.
+        #
+        # Scoring is ASYNC: cheap validation answers 400/402/413/429 immediately, then the run is
+        # accepted with 202 + session_id and scored in a background thread (an NDR-AI batch can take
+        # many minutes — no browser/proxy connection has to survive that). The UI polls the session.
         _require_demo()
         if not demo_rate.allow(_client_key(request), time.time()):
             raise HTTPException(429, "Too many requests — please slow down and retry shortly.")
@@ -470,16 +489,33 @@ def create_app():
                 "remaining": 0,
             })
 
+        # Cheap, client-correctable validation answers 400 NOW (before burning a concurrency slot);
+        # the authoritative checks still run inside run_demo, which is the single source of truth.
+        try:
+            demo_mod.validate_uploads(files)
+        except DemoError as exc:
+            raise HTTPException(400, str(exc))
+        if not field("job_text").strip() and not (
+                _split_ids(field("required_skills")) or _split_ids(field("preferred_skills"))
+                or _split_ids(field("must_have_skills"))):
+            raise HTTPException(400, "Paste a job posting or provide at least one required skill.")
+
         # Cap concurrent scoring runs (each does parsing + LLM calls) so a burst can't exhaust the
-        # box; reject fast with 429 rather than queueing unbounded work.
+        # box; reject fast with 429 rather than queueing unbounded work. The slot is held by the
+        # background worker and released in its on_finish hook.
         if not demo_run_sem.acquire(blocking=False):
             raise HTTPException(429, "The demo is busy scoring other uploads — please retry in a moment.")
+
+        def _finish(success: bool) -> None:
+            # Always runs exactly once, from the worker thread. Charge only on success (a failed run
+            # never burns a match); a known batch_sig is a free re-score.
+            demo_run_sem.release()
+            if success:
+                demo_quota.charge(ckey, batch_sig, now)
+
         try:
-            # run_demo is synchronous + CPU-bound (PDF/DOCX parse, matching); keep it off the event
-            # loop so one upload doesn't stall other requests on this worker.
-            sess = await run_in_threadpool(
-                run_demo,
-                store=demo_store,
+            pending = demo_mod.start_async_run(
+                store=demo_store, kind="single", total_estimate=len(files), on_finish=_finish,
                 job_text=field("job_text"),
                 title=field("title"),
                 employer=field("employer"),
@@ -490,31 +526,38 @@ def create_app():
                 min_years=num("min_years"),
                 files=files,
             )
-        except DemoError as exc:
-            raise HTTPException(400, str(exc))
+        except BaseException:
+            demo_run_sem.release()  # the worker never started; don't leak the slot
+            raise
         finally:
-            demo_run_sem.release()
-            files = []  # drop the uploaded bytes promptly
             for p in resume_parts:
                 try:
-                    await p.close()  # release the in-memory spool for each upload
+                    await p.close()  # release the in-memory spool (bytes now live in `files`)
                 except Exception as exc:  # noqa: BLE001
                     _log.debug("upload part close failed: %s", exc)
-        # Charge only on success (a failed run never burns a match); a known batch_sig is a free re-score.
-        demo_quota.charge(ckey, batch_sig, now)
-        body = sess.to_dict()
-        if demo_quota.enabled:
-            body["quota"] = {"limit": demo_quota.limit,
-                             "remaining": demo_quota.remaining(ckey, time.time())}
-        return body
+        return _accepted_response(pending)
 
     @app.get("/api/demo/session/{session_id}")
-    def demo_session(session_id: str) -> dict:
+    def demo_session(request: Request, session_id: str) -> dict:
+        # Also the POLL endpoint for async runs: status flips 'running' -> 'done' | 'error', and
+        # `progress` counts scored resume×role pairs. Polling touches last_seen, keeping the session
+        # alive while the client waits.
         _require_demo()
         sess = demo_store.get(session_id)
         if sess is None:
             raise HTTPException(404, "Session not found — it was deleted or expired.")
-        return sess.to_dict()
+        body = sess.to_dict()
+        if demo_quota.enabled and sess.status == "done":
+            body["quota"] = {"limit": demo_quota.limit,
+                             "remaining": demo_quota.remaining(_client_key(request), time.time())}
+        return body
+
+    def _require_finished(sess) -> None:
+        """Exports/saves need results; a running or failed session has none (yet)."""
+        if sess.status != "done":
+            raise HTTPException(
+                409, f"This session isn't finished (status: {sess.status}) — results are only "
+                     f"available once scoring completes.")
 
     @app.delete("/api/demo/session/{session_id}")
     def demo_delete(session_id: str) -> dict:
@@ -532,6 +575,7 @@ def create_app():
         sess = demo_store.get(session_id)
         if sess is None:
             raise HTTPException(404, "Session not found — it was deleted or expired.")
+        _require_finished(sess)
         from .serialize import shortlist_csv
 
         return Response(
@@ -546,6 +590,7 @@ def create_app():
         sess = demo_store.get(session_id)
         if sess is None:
             raise HTTPException(404, "Session not found — it was deleted or expired.")
+        _require_finished(sess)
         return JSONResponse(
             content=sess.to_dict(),
             headers={"Content-Disposition": 'attachment; filename="shortlist.json"'},
@@ -559,6 +604,7 @@ def create_app():
         sess = demo_store.get(session_id)
         if sess is None:
             raise HTTPException(404, "Session not found — it was deleted or expired.")
+        _require_finished(sess)
         from ..audit.defense_file import build_defense_file
 
         file = build_defense_file(sess.to_dict(), generated_at=time.time())
@@ -570,7 +616,7 @@ def create_app():
     # Multi-job fit grid: score the same résumés against several roles (job_text repeated). Same DoS
     # guards + match quota as /run (one grid = one match); each role is scored via the normal run_demo.
     @app.post("/api/demo/run-grid")
-    async def demo_run_grid(request: Request) -> dict:
+    async def demo_run_grid(request: Request):
         _require_demo()
         if not demo_rate.allow(_client_key(request), time.time()):
             raise HTTPException(429, "Too many requests — please slow down and retry shortly.")
@@ -615,32 +661,43 @@ def create_app():
                 "limit": demo_quota.limit, "remaining": 0,
             })
 
-        if not demo_run_sem.acquire(blocking=False):
-            raise HTTPException(429, "The demo is busy scoring other uploads — please retry in a moment.")
+        # Cheap validation now (fast 400); the authoritative checks re-run inside run_demo_grid.
         try:
-            sess = await run_in_threadpool(
-                demo_mod.run_demo_grid, store=demo_store, jobs=jobs, files=files
-            )
+            demo_mod.validate_uploads(files)
         except DemoError as exc:
             raise HTTPException(400, str(exc))
-        finally:
+        if not jobs:
+            raise HTTPException(400, "Add at least one role to compare.")
+        if len(jobs) > demo_mod.MAX_JOBS:
+            raise HTTPException(400, f"Too many roles: {len(jobs)} (max {demo_mod.MAX_JOBS}).")
+
+        if not demo_run_sem.acquire(blocking=False):
+            raise HTTPException(429, "The demo is busy scoring other uploads — please retry in a moment.")
+
+        def _finish(success: bool) -> None:
             demo_run_sem.release()
-            files = []
+            if success:
+                demo_quota.charge(ckey, batch_sig, now)
+
+        try:
+            pending = demo_mod.start_async_run(
+                store=demo_store, kind="grid", total_estimate=len(jobs) * len(files),
+                on_finish=_finish, jobs=jobs, files=files,
+            )
+        except BaseException:
+            demo_run_sem.release()
+            raise
+        finally:
             for p in resume_parts:
                 try:
                     await p.close()
                 except Exception as exc:  # noqa: BLE001
                     _log.debug("upload part close failed: %s", exc)
-        demo_quota.charge(ckey, batch_sig, now)
-        body = sess.to_dict()
-        if demo_quota.enabled:
-            body["quota"] = {"limit": demo_quota.limit,
-                             "remaining": demo_quota.remaining(ckey, time.time())}
-        return body
+        return _accepted_response(pending)
 
     # Bulk match: a folder of JD files × a folder of résumé files -> a candidate×role grid.
     @app.post("/api/demo/run-grid-files")
-    async def demo_run_grid_files(request: Request) -> dict:
+    async def demo_run_grid_files(request: Request):
         _require_demo()
         if not demo_rate.allow(_client_key(request), time.time()):
             raise HTTPException(429, "Too many requests — please slow down and retry shortly.")
@@ -678,30 +735,38 @@ def create_app():
                 "limit": demo_quota.limit, "remaining": 0,
             })
 
+        # Cheap validation now (fast 400); over-cap folders are truncated with an honest warning
+        # inside run_demo_grid_from_files, so only emptiness is a hard error here.
+        if not jd_files:
+            raise HTTPException(400, "Upload at least one job-description file.")
+        if not resume_files:
+            raise HTTPException(400, "Upload at least one résumé file.")
+
         if not demo_run_sem.acquire(blocking=False):
             raise HTTPException(429, "The demo is busy scoring other uploads — please retry in a moment.")
-        try:
-            sess = await run_in_threadpool(
-                demo_mod.run_demo_grid_from_files, store=demo_store,
-                jd_files=jd_files, resume_files=resume_files,
-            )
-        except DemoError as exc:
-            raise HTTPException(400, str(exc))
-        finally:
+
+        def _finish(success: bool) -> None:
             demo_run_sem.release()
-            jd_files = []
-            resume_files = []
+            if success:
+                demo_quota.charge(ckey, batch_sig, now)
+
+        total_estimate = (min(len(jd_files), demo_mod.MAX_JOBS)
+                          * min(len(resume_files), demo_mod.MAX_RESUMES))
+        try:
+            pending = demo_mod.start_async_run(
+                store=demo_store, kind="grid_files", total_estimate=total_estimate,
+                on_finish=_finish, jd_files=jd_files, resume_files=resume_files,
+            )
+        except BaseException:
+            demo_run_sem.release()
+            raise
+        finally:
             for p in jd_parts + resume_parts:
                 try:
                     await p.close()
                 except Exception as exc:  # noqa: BLE001
                     _log.debug("upload part close failed: %s", exc)
-        demo_quota.charge(ckey, batch_sig, now)
-        body = sess.to_dict()
-        if demo_quota.enabled:
-            body["quota"] = {"limit": demo_quota.limit,
-                             "remaining": demo_quota.remaining(ckey, time.time())}
-        return body
+        return _accepted_response(pending)
 
     # ---- Accounts + saved projects (the "free forgets, paid remembers" persistence tier) --------
     @app.post("/api/account/register")
@@ -749,6 +814,7 @@ def create_app():
         sess = demo_store.get(session_id)
         if sess is None:
             raise HTTPException(404, "Session not found — it was deleted or expired.")
+        _require_finished(sess)
         data = await request.json()
         payload = sess.to_dict()
         pid = _acct().save_project(user["id"], data.get("name", ""),
