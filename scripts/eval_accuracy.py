@@ -36,6 +36,7 @@ from resume_matcher.matching.benchmark import (  # noqa: E402
     load_examples,
     resolve_dataset,
     run_benchmark_repeated,
+    stratum_breakdown,
 )
 
 _BASELINE = pathlib.Path(__file__).resolve().parent.parent / "data" / "eval" / "baseline_metrics.json"
@@ -118,6 +119,12 @@ def _print_report(out: dict) -> None:
             for sd, rid in wob:
                 if sd > 0:
                     print(f"  {str(rid)[:28]:28} stdev {sd}")
+    strata = stratum_breakdown(out["rows"])
+    if len(strata) > 1:
+        print("\nper-stratum (last run) — which failure mode needs work:")
+        print(f"  {'stratum':12} {'n':>3} {'label_acc':>10} {'mae':>7}")
+        for s in strata:
+            print(f"  {s['stratum']:12} {s['n']:>3} {str(s['label_accuracy']):>10} {str(s['mae']):>7}")
     print("\nper-example (last run):")
     print(f"  {'id':22} {'job':16} {'fit':>5} {'tool':6} {'human':6} {'hscore':>6}")
     for r in out["rows"]:

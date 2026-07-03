@@ -3,14 +3,14 @@
   "datasets": {
     "coordinator": {
       "mock": {
-        "role": "primary realistic regression target",
-        "min_label_accuracy": 0.2,
-        "min_within_one_bucket": 0.5,
-        "min_spearman": -0.15,
-        "max_mae": 52.0
+        "role": "primary realistic regression target (keyword-mock floor - NOT a quality claim; poor on realistic resumes by design). Re-floored 2026-07-03 for the grown 63-example set (mock measured: acc 0.155 / within1 0.552 / spearman -0.321 / mae 52.67 pre-anchor merge; floors carry slack).",
+        "min_label_accuracy": 0.125,
+        "min_within_one_bucket": 0.49,
+        "min_spearman": -0.289,
+        "max_mae": 56.1
       },
       "claude_cli": {
-        "role": "measured real-engine floor (claude_cli, 3 run(s))",
+        "role": "measured real-engine floor (claude_cli, 3 run(s)) - MEASURED ON THE ORIGINAL 24-EXAMPLE SET (2026-07-03). The set has since grown to 63 stratified examples; re-measure on a token box (`eval_accuracy.py --backend claude_cli --runs 3 --write-baseline`) before trusting these floors against the grown set.",
         "measured": {
           "label_accuracy": {
             "mean": 0.611,
@@ -44,7 +44,8 @@
         "min_label_accuracy": 0.521,
         "min_within_one_bucket": 0.833,
         "min_spearman": 0.474,
-        "max_mae": 17.8
+        "max_mae": 17.8,
+        "measured_on_examples": 24
       }
     },
     "labeled": {

@@ -155,10 +155,39 @@ def run_benchmark(
         h = ex.get("human", {})
         rows.append({
             "id": ex.get("id"), "job": ex.get("job", {}).get("title"),
+            "stratum": example_stratum(ex),
             "tool_fit": fit, "tool_grade": grade, "tool_label": fit_to_label(fit),
             "human_label": h.get("label"), "human_score": h.get("score"),
         })
     return {"rows": rows, "metrics": _metrics(rows)}
+
+
+def example_stratum(ex: dict) -> str:
+    """The example's failure-mode stratum: the explicit `stratum` field when present (new examples),
+    else the id's leading token (the original 24 group naturally by domain prefix: swe, ds, ...)."""
+    s = ex.get("stratum")
+    if s:
+        return str(s)
+    return str(ex.get("id") or "unknown").split("_")[0] or "unknown"
+
+
+def stratum_breakdown(rows: list[dict]) -> list[dict]:
+    """Per-stratum agreement (n, label accuracy, MAE) — the 'which improvement pays?' view. Computed
+    over whichever rows the caller passes (typically one run)."""
+    groups: dict[str, list[dict]] = {}
+    for r in rows:
+        groups.setdefault(r.get("stratum") or "unknown", []).append(r)
+    out = []
+    for name in sorted(groups):
+        rs = groups[name]
+        labeled = [r for r in rs if r.get("human_label") in _LABEL_ORDER]
+        acc = (round(sum(r["tool_label"] == r["human_label"] for r in labeled) / len(labeled), 3)
+               if labeled else None)
+        scored = [(r["tool_fit"], r["human_score"]) for r in rs
+                  if isinstance(r.get("human_score"), (int, float))]
+        mae = round(sum(abs(a - b) for a, b in scored) / len(scored), 2) if scored else None
+        out.append({"stratum": name, "n": len(rs), "label_accuracy": acc, "mae": mae})
+    return out
 
 
 def _agg(values: list) -> dict | None:
