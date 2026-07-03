@@ -33,13 +33,12 @@ services:
       # key). Falls back to the deterministic engine automatically if the token below is unset.
       RM_DEMO_BACKEND: "${RM_DEMO_BACKEND:-claude_cli}"
       RM_CLAUDE_CLI_MODEL: "${RM_CLAUDE_CLI_MODEL:-opus}"
-      # Cap concurrent `claude` CLI processes: each is a Node process (~200-300MB); 4 at once inside
-      # this container's memory cap risked an OOM kill mid-grid (which surfaced to the browser as an
-      # empty 502 -> "no result"). Runs are async now, so slower-but-stable wins.
-      # SPEED LEVER (opt-in): if the HOST has ~500MB free headroom next to the trading stack, set
-      # RM_CLAUDE_CLI_CONCURRENCY=4 in .env AND raise mem_limit below to 1g — roughly halves grid
-      # wall time on top of the batched fast path. Check `free -m` on the VPS first.
-      RM_CLAUDE_CLI_CONCURRENCY: "${RM_CLAUDE_CLI_CONCURRENCY:-2}"
+      # Concurrent `claude` CLI processes — each is a Node process (~200-300MB). Default 4 (paired
+      # with mem_limit 1g below) roughly halves grid wall time on top of the batched fast path.
+      # DIAL BACK WITHOUT A CODE PUSH if the host turns out tight: set RM_CLAUDE_CLI_CONCURRENCY=2
+      # (and RM_MEM_LIMIT=768m) in deploy/cohost/.env and re-`up -d`. Check `free -m` on the VPS
+      # first — want ~400MB+ available beyond the trading stack's normal usage.
+      RM_CLAUDE_CLI_CONCURRENCY: "${RM_CLAUDE_CLI_CONCURRENCY:-4}"
       # Grid fast path kill-switch: RM_DEMO_BATCH_ROLES=0 restores one extraction call per
       # resume×role cell (for A/B'ing extraction quality). Default on.
       RM_DEMO_BATCH_ROLES: "${RM_DEMO_BATCH_ROLES:-1}"
@@ -64,10 +63,12 @@ services:
       - rmdemo
     volumes:
       - rmdemo_accounts:/data  # persist accounts + saved projects across redeploys (own volume)
-    # Hard caps: the demo cannot starve the trading bot on the same host. 512m proved too tight for
-    # the Python app + 2 concurrent Claude CLI (Node) processes during a bulk grid; 768m + the
-    # RM_CLAUDE_CLI_CONCURRENCY=2 cap above keeps headroom without meaningfully squeezing the host.
-    mem_limit: 768m
+    # Hard cap so the demo cannot starve the trading bot on the same host. 1g pairs with
+    # RM_CLAUDE_CLI_CONCURRENCY=4 above (Python app + up to 4 Claude CLI Node processes during a
+    # bulk grid). This is a CEILING, not a reservation — the container only climbs toward it under a
+    # full grid. If `free -m` on the host shows tight headroom next to the trading stack, set
+    # RM_MEM_LIMIT=768m (and RM_CLAUDE_CLI_CONCURRENCY=2) in deploy/cohost/.env — no code change.
+    mem_limit: ${RM_MEM_LIMIT:-1g}
     cpus: 0.5
     # Let an in-flight scoring call finish on redeploy/stop before SIGKILL (vision calls run up to
     # RM_CLAUDE_CLI_FILE_TIMEOUT=150s); default 10s would cut them off. Scoped to THIS service only.
