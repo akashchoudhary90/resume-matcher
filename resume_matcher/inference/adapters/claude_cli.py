@@ -87,7 +87,10 @@ def _run_cli(prompt: str, *, extra_args: list[str], cwd: str | None, timeout: fl
         except FileNotFoundError as exc:
             raise InferenceError("claude CLI not found") from exc
     if proc.returncode != 0:
-        raise InferenceError(f"claude -p exited {proc.returncode}: {(proc.stderr or '')[:300]}")
+        # The CLI writes some failures (notably auth: "401 Invalid authentication credentials") to
+        # STDOUT, not stderr — fall back to stdout so the real reason isn't swallowed into a blank.
+        detail = (proc.stderr or "").strip() or (proc.stdout or "").strip() or "(no output)"
+        raise InferenceError(f"claude -p exited {proc.returncode}: {detail[:300]}")
     return proc.stdout or ""
 
 

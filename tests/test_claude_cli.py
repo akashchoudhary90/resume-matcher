@@ -103,6 +103,16 @@ def test_run_cli_nonzero_exit_and_timeout_raise(monkeypatch):
     with pytest.raises(InferenceError, match="exited 2"):
         claude_cli._run_cli("p", extra_args=[], cwd=None, timeout=5)
 
+    # The CLI writes auth failures to STDOUT (not stderr); the error must surface that, not a blank.
+    class _Auth:
+        returncode = 1
+        stdout = "Failed to authenticate. API Error: 401 Invalid authentication credentials"
+        stderr = ""
+
+    monkeypatch.setattr(subprocess, "run", lambda *a, **k: _Auth())
+    with pytest.raises(InferenceError, match="401 Invalid authentication"):
+        claude_cli._run_cli("p", extra_args=[], cwd=None, timeout=5)
+
     def _timeout(*a, **k):
         raise subprocess.TimeoutExpired(cmd="claude", timeout=5)
 
