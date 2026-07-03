@@ -36,6 +36,10 @@ _STOPWORDS = {
     "astro", "prism", "ping", "elm", "nim", "pike", "io", "hugo", "spark",
     # bare "node" matches "three-node cluster"/"each node"; Node.js still matches via node.js/nodejs.
     "node",
+    # bare "http"/"https" match every URL printed in a posting/resume (a junk "skill" that polluted
+    # JD auto-detection); the protocols stay reachable via their qualified aliases (e.g. "http
+    # protocol", "http over tls").
+    "http", "https",
 }
 
 # Curated transferable/behavioral aliases: distinctive phrasings that DEMONSTRATE a skill without

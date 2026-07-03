@@ -678,6 +678,12 @@ function renderGrid(d){
   const dup = (d.duplicates_removed>0)? `<div class="card warn">⎘ ${d.duplicates_removed} duplicate resume(s) detected and skipped.</div>`:'';
   const engine = (jobs[0]&&jobs[0].engine==='claude_cli')
     ? `<span class="pill" style="color:var(--green)">engine: NDR AI</span>` : `<span class="pill">engine: deterministic (keyword)</span>`;
+  // Provenance across ALL roles (a per-role LLM failure falls back to the keyword scan for that
+  // role only, so a grid can be mixed — say so instead of over-claiming from the first column).
+  const srcs = new Set(jobs.map(j=>j.skills_source).filter(Boolean));
+  const jdPill = srcs.size>1 ? `<span class="pill" title="Some postings were read by NDR AI; the others fell back to the keyword scan.">requirements: NDR AI + keyword</span>`
+               : srcs.has('ndr_ai') ? `<span class="pill" style="color:var(--green)" title="NDR AI read each posting and extracted the requirements a recruiter would screen for.">requirements: read by NDR AI</span>`
+               : srcs.has('keyword') ? `<span class="pill" title="Requirements were auto-detected by a keyword scan of each posting — review them via the single-role flow for better results.">requirements: keyword scan</span>` : '';
   const thead = `<tr><th>Candidate</th>${jobs.map(j=>`<th>${esc(j.title||'Role')}${(j.employer&&j.employer!=='Unspecified employer')?`<div class="muted" style="font-weight:400">${esc(j.employer)}</div>`:''}</th>`).join('')}<th>Best fit</th></tr>`;
   const rows = cands.map(c=>{
     const cells = jobs.map((j,ji)=>{
@@ -689,7 +695,7 @@ function renderGrid(d){
     const role = (c.best_job_index!=null && jobs[c.best_job_index]) ? (jobs[c.best_job_index].title||`Role ${c.best_job_index+1}`) : '—';
     return `<tr><td><b>${esc(c.label)}</b></td>${cells}<td class="bestrole">${esc(role)}</td></tr>`;
   }).join('');
-  const head = `<div class="card"><h2>Fit grid <span class="muted" style="font-weight:400">— ${cands.length} candidate(s) × ${jobs.length} role(s)</span> ${engine}</h2>
+  const head = `<div class="card"><h2>Fit grid <span class="muted" style="font-weight:400">— ${cands.length} candidate(s) × ${jobs.length} role(s)</span> ${engine} ${jdPill}</h2>
     <div class="muted">Each cell is the candidate's fit for that role; the best role per candidate is outlined. Click any cell for the point-by-point breakdown. Scores are fit-readiness, not a hire prediction.</div>
     ${SAVED_VIEW?'':`<div style="margin-top:10px;display:flex;gap:8px;flex-wrap:wrap">${saveBtnHtml()}
       <button class="ghost" title="A tamper-evident, reproducible, signed record of every decision — verifiable by anyone, no trust required." onclick="location.href='/api/demo/session/${encodeURIComponent(d.session_id)}/defense-file.json'">🔒 Defense File</button></div>`}</div>`;
@@ -893,8 +899,10 @@ function renderResults(d){
   const engine = d.engine==='claude_cli'
     ? `<span class="pill" style="color:var(--green)">engine: NDR AI</span>`
     : `<span class="pill">engine: deterministic (keyword)</span>`;
+  const jdPill = job.skills_source==='ndr_ai' ? `<span class="pill" style="color:var(--green)" title="NDR AI read the posting and extracted the requirements a recruiter would screen for.">requirements: read by NDR AI</span>`
+               : job.skills_source==='keyword' ? `<span class="pill" title="Requirements were auto-detected by a keyword scan of the posting — edit the skill chips in Step 1 for better results.">requirements: keyword scan</span>` : '';
   const head = `<div class="card">
-      <h2>${esc(job.title||'Role')} <span class="muted" style="font-weight:400">@ ${esc(job.employer||'')}</span> ${engine}</h2>
+      <h2>${esc(job.title||'Role')} <span class="muted" style="font-weight:400">@ ${esc(job.employer||'')}</span> ${engine} ${jdPill}</h2>
       <div class="muted">${mustList?`<b style="color:var(--red)">Must-have: ${mustList}</b> &nbsp;·&nbsp; `:''}Required: ${reqList} &nbsp;·&nbsp; Preferred: ${prefList}${job.min_education?` &nbsp;·&nbsp; min education: ${esc(eduLabel(job.min_education))}`:''}${job.min_years?` &nbsp;·&nbsp; min experience: ${esc(String(job.min_years))} yrs`:''}</div>
       <div class="muted" style="margin-top:6px">${d.n_resumes} resume(s) scored. ${esc((d.privacy&&d.privacy.note)||'')}</div>
       ${SAVED_VIEW?'':`<div style="margin-top:10px;display:flex;gap:8px;flex-wrap:wrap">

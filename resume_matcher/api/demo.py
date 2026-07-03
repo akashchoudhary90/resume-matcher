@@ -18,11 +18,13 @@ import hashlib
 import json
 import logging
 import os
+import re
 import secrets
 import shutil
 import tempfile
 import threading
 import time
+import unicodedata
 from collections import OrderedDict
 from concurrent.futures import ThreadPoolExecutor
 from dataclasses import dataclass, field
@@ -44,7 +46,7 @@ from ..matching import coaching as coaching_mod
 from ..matching import counterfactual as counterfactual_mod
 from ..matching import jd_audit as jd_audit_mod
 from ..matching.evaluator import score_with_antigaming
-from ..matching.taxonomy import canonical_name
+from ..matching.taxonomy import canonical_name, normalize_skills
 from .serialize import result_to_dict
 
 # Demo config now lives in resume_matcher/config.py (one documented home for the RM_* knobs). The
@@ -382,6 +384,79 @@ def extract_job_text(filename: str, data: bytes) -> str:
         return ""
 
 
+# --- JD-side requirement extraction (NDR AI reads the posting; keyword scan is the fallback) -----
+_JD_EDU_LEVELS = {"highschool", "high school", "diploma", "certificate", "associate",
+                  "bachelor", "master", "phd", "doctorate"}
+_JD_MAX_REQUIRED, _JD_MAX_PREFERRED, _JD_MAX_MUST = 12, 8, 4
+# Unicode-aware: an accented/CJK skill name ("Résumé Writing", "机器学习") must survive as a
+# matchable id, not be mangled to an ASCII stub or dropped.
+_SLUG_RE = re.compile(r"[^\w+#.]+")
+
+
+def _skill_ids_from_names(names) -> list[str]:
+    """LLM skill NAMES -> skill ids. A name containing a known taxonomy surface resolves to the
+    canonical id (so synonyms collapse, same as everywhere else); anything the taxonomy doesn't
+    know gets a conservative slug (the same rule as the UI's manual skill-add), because the ranker
+    and both extraction engines match skills against the resume TEXT, not against the taxonomy."""
+    out: list[str] = []
+    for name in names if isinstance(names, list) else []:
+        if not isinstance(name, str) or not name.strip():
+            continue
+        ids = normalize_skills(name)
+        if not ids:
+            slug = _SLUG_RE.sub("_", unicodedata.normalize("NFKC", name.strip()).lower()).strip("_")
+            ids = [slug] if 2 <= len(slug) <= 40 else []
+        for sid in ids:
+            if sid not in out:
+                out.append(sid)
+    return out
+
+
+def _llm_job_requirements(job_text: str, title: str = "") -> dict | None:
+    """Ask NDR AI to read the posting and extract what a recruiter would screen for. Returns
+    {required_skills, preferred_skills, must_have_skills (ids), min_education, min_years} or None
+    (engine unavailable / call failed / nothing usable) — the caller then falls back to the keyword
+    scan, so the demo always works. Cached like resume extractions: re-running the same posting is
+    instant and consistent, and only the de-identified requirement list is stored (a posting is not
+    PII anyway)."""
+    if not _claude_cli.available():
+        return None
+    # The title is a real input to the extraction prompt (it steers which duties read as
+    # requirements), so it MUST be part of the cache key — otherwise the first title to score a
+    # given posting text would poison every later run of the same text under a different title.
+    title_key = " ".join((title or "").lower().split())
+    key = _cache_key("jd", _claude_cli.model_name(), title_key, (job_text or "").encode("utf-8"))
+    cached = _cache_get(key)
+    if cached is not None:
+        return cached or None  # {} is the cached "nothing usable" sentinel -> keyword fallback
+    try:
+        raw = _claude_cli.extract_job_requirements(job_text, title=title)
+    except Exception:  # noqa: BLE001 - JD extraction is best-effort; keyword detection still works
+        _log.warning("NDR AI job-requirement extraction failed; using keyword detection",
+                     exc_info=True)
+        return None
+    req = _skill_ids_from_names(raw.get("required_skills"))[:_JD_MAX_REQUIRED]
+    req_set = set(req)
+    pref = [s for s in _skill_ids_from_names(raw.get("preferred_skills"))
+            if s not in req_set][:_JD_MAX_PREFERRED]
+    must = [s for s in _skill_ids_from_names(raw.get("must_have_skills"))
+            if s in req_set][:_JD_MAX_MUST]
+    if not req and not pref:
+        # Nothing usable — let the keyword path have a go. Cache the negative (as {}) so a re-run
+        # of the same posting doesn't re-pay the LLM call; CLI FAILURES above stay uncached so
+        # transient errors are retried.
+        _cache_put(key, {})
+        return None
+    edu = raw.get("min_education")
+    edu = edu.strip().lower() if isinstance(edu, str) and edu.strip().lower() in _JD_EDU_LEVELS else None
+    yrs = raw.get("min_years")
+    yrs = float(yrs) if isinstance(yrs, (int, float)) and 0 < float(yrs) <= 30 else None
+    result = {"required_skills": req, "preferred_skills": pref, "must_have_skills": must,
+              "min_education": edu, "min_years": yrs}
+    _cache_put(key, result)
+    return result
+
+
 def _candidate_from_text(cid: str, text: str) -> CandidateProfile:
     """Build a CandidateProfile from extracted/transcribed text.
 
@@ -420,10 +495,28 @@ def run_demo(
     if not (job_text or "").strip() and not (required_skills or preferred_skills or must_have_skills):
         raise DemoError("Paste a job posting or provide at least one required skill.")
 
-    # If no explicit skills were tagged, auto-detect them from the pasted posting (so skipping the
-    # "Detect skills" step still yields a meaningful match) and infer the minimum education.
+    adapter, engine = _resolve_adapter(backend or DEMO_BACKEND)
+
+    # If no explicit skills were tagged, auto-detect them from the posting (so skipping the "Detect
+    # skills" step still yields a meaningful match). With the NDR AI engine active the posting is
+    # READ by the model — real postings describe duties in prose and name few skills literally, so
+    # the keyword scan alone yields junk/soft-skill-only requirements; it remains the fallback so
+    # the demo always works. Skills the user tagged explicitly are never overridden.
+    jd_source = "user"
     if not required_skills and not preferred_skills and not must_have_skills and (job_text or "").strip():
-        required_skills = detect_job_skills(job_text)
+        jd = _llm_job_requirements(job_text, title=title) if engine == "claude_cli" else None
+        if jd is not None:
+            required_skills = jd["required_skills"]
+            preferred_skills = jd["preferred_skills"]
+            must_have_skills = jd["must_have_skills"]
+            if min_education is None:
+                min_education = jd["min_education"]
+            if min_years is None:
+                min_years = jd["min_years"]
+            jd_source = "ndr_ai"
+        else:
+            required_skills = detect_job_skills(job_text)
+            jd_source = "keyword"
         if min_education is None:
             min_education = infer_education_level(job_text)
 
@@ -459,7 +552,6 @@ def run_demo(
         seen_labels.add(label)
         items.append((f"R{idx + 1:02d}", label, filename, data))
 
-    adapter, engine = _resolve_adapter(backend or DEMO_BACKEND)
     # File-direct (Claude reads the actual PDF/image) is on only when the Claude engine is active.
     send_file = SEND_FILE and engine == "claude_cli"
     model = _claude_cli.model_name() if engine == "claude_cli" else engine
@@ -619,6 +711,10 @@ def run_demo(
         "must_have_skills": skill_options(job.must_have_skills),
         "min_education": job.min_education,
         "min_years": job.min_years,
+        # Provenance of the requirement list: "user" (explicitly tagged), "ndr_ai" (model read the
+        # posting), or "keyword" (taxonomy scan fallback) — so the results header is honest about
+        # where the score's inputs came from.
+        "skills_source": jd_source,
     }
     # Reverse-audit the posting's own requirements (how they shape the qualified pool) — exact re-scores
     # on the same ranker. None when there's nothing to say (too few candidates / no relaxable requirement).
