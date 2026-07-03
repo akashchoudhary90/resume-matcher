@@ -19,6 +19,7 @@ Runs on the deterministic mock backend by default, so results are reproducible (
 from __future__ import annotations
 
 import json
+import math
 from pathlib import Path
 
 from ..inference.adapter import InferenceAdapter, get_adapter
@@ -130,6 +131,56 @@ def run_benchmark(examples: list[dict], adapter: InferenceAdapter | None = None)
             "human_label": h.get("label"), "human_score": h.get("score"),
         })
     return {"rows": rows, "metrics": _metrics(rows)}
+
+
+def _agg(values: list) -> dict | None:
+    """Aggregate a metric across runs: mean/stdev/min/max over the finite, non-None values (None
+    when a metric was undefined every run, e.g. spearman with <3 scored examples, or nan from a
+    constant-input correlation). Population stdev computed directly (statistics.pstdev has a
+    float/Fraction edge case on plain floats), so a single run honestly reports 0.0 spread."""
+    nums = [float(v) for v in values
+            if isinstance(v, (int, float)) and math.isfinite(float(v))]
+    if not nums:
+        return None
+    mean = sum(nums) / len(nums)
+    sd = math.sqrt(sum((x - mean) ** 2 for x in nums) / len(nums))
+    return {"mean": round(mean, 3), "stdev": round(sd, 3),
+            "min": round(min(nums), 3), "max": round(max(nums), 3), "n": len(nums)}
+
+
+_AGG_METRICS = ("label_accuracy", "within_one_bucket", "spearman", "mae")
+
+
+def run_benchmark_repeated(
+    examples: list[dict], adapter: InferenceAdapter | None = None, runs: int = 3
+) -> dict:
+    """Run the SAME benchmark `runs` times and report per-metric mean/stdev/min/max.
+
+    The whole point of measuring the REAL engine: an LLM backend is non-deterministic (no
+    temperature/seed pinning yet), so a single run's number is a point estimate with unknown spread.
+    Running N times and reporting the spread tells you whether a metric is trustworthy and how tight
+    a regression floor can honestly be. Deterministic backends (mock) report stdev 0 across runs —
+    which is exactly how the tests verify the aggregation without needing the model."""
+    adapter = adapter or get_adapter("mock")
+    runs = max(1, int(runs))
+    per_run = [run_benchmark(examples, adapter) for _ in range(runs)]
+    aggregate = {k: _agg([r["metrics"].get(k) for r in per_run]) for k in _AGG_METRICS}
+    # Per-example fit-score spread across runs — surfaces WHICH resumes the engine is unstable on.
+    fit_by_id: dict = {}
+    for r in per_run:
+        for row in r["rows"]:
+            fit_by_id.setdefault(row["id"], []).append(row["tool_fit"])
+    per_example_fit = {rid: _agg(vals) for rid, vals in fit_by_id.items()}
+    return {
+        "runs": runs,
+        "n": per_run[0]["metrics"]["n"],
+        "n_labeled": per_run[0]["metrics"]["n_labeled"],
+        "metrics_by_run": [r["metrics"] for r in per_run],
+        "aggregate": aggregate,
+        "per_example_fit": per_example_fit,
+        "last_rows": per_run[-1]["rows"],
+        "confusion": per_run[-1]["metrics"]["confusion"],
+    }
 
 
 def load_examples(path: str | Path | None = None) -> list[dict]:
