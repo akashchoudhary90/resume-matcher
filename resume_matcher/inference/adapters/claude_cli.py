@@ -71,14 +71,19 @@ def _run_cli(prompt: str, *, extra_args: list[str], cwd: str | None, timeout: fl
         raise InferenceError("claude CLI not on PATH (install it, or use RM_DEMO_BACKEND=mock).")
     if not os.environ.get("CLAUDE_CODE_OAUTH_TOKEN"):
         raise InferenceError("CLAUDE_CODE_OAUTH_TOKEN not set (run `claude setup-token`).")
-    argv = [exe, "-p", prompt, "--model", _MODEL, "--output-format", "text", *extra_args]
+    # Pass the prompt on STDIN, not as a `-p "<prompt>"` argv element. On Windows `claude` resolves to
+    # claude.CMD (a batch shim), so an argv prompt is re-parsed by cmd.exe — its embedded newlines
+    # terminate the argument and its quotes get mangled, so the model receives only the first line
+    # (it then replies "please provide the job and candidate"). stdin has no such parsing and no
+    # length limit; `-p`/--print reads the prompt from a pipe on every platform.
+    argv = [exe, "-p", "--model", _MODEL, "--output-format", "text", *extra_args]
     with _SEM:
         try:
             proc = subprocess.run(
-                argv, stdin=subprocess.DEVNULL, capture_output=True, text=True,
-                # Force UTF-8 for stdout/stderr (default is the OS locale codec — cp1252 on Windows —
-                # which mojibakes or raises UnicodeDecodeError on accented names / CJK / smart quotes).
-                # errors="replace" guarantees we never crash on an undecodable byte.
+                argv, input=prompt, capture_output=True, text=True,
+                # Force UTF-8 for stdin/stdout/stderr (default is the OS locale codec — cp1252 on
+                # Windows — which mojibakes or raises UnicodeDecodeError on accented names / CJK /
+                # smart quotes). errors="replace" guarantees we never crash on an undecodable byte.
                 encoding="utf-8", errors="replace",
                 timeout=timeout, cwd=cwd or tempfile.gettempdir(),
             )

@@ -42,13 +42,18 @@ def test_run_cli_decodes_stdout_as_utf8(monkeypatch):
         stderr = ""
 
     def fake_run(argv, **kw):
+        captured["argv"] = argv
         captured.update(kw)
         return _Proc()
 
     monkeypatch.setattr(subprocess, "run", fake_run)
-    out = claude_cli._run_cli("prompt", extra_args=[], cwd=None, timeout=5)
+    out = claude_cli._run_cli("a multi-line\nprompt\nwith newlines", extra_args=[], cwd=None, timeout=5)
     assert "José" in out
     assert captured.get("encoding") == "utf-8" and captured.get("errors") == "replace"
+    # The prompt goes on STDIN, never as an argv element — an argv prompt is mangled by cmd.exe on
+    # Windows (newlines terminate the argument), which silently truncates the model's input.
+    assert captured.get("input") == "a multi-line\nprompt\nwith newlines"
+    assert "a multi-line\nprompt\nwith newlines" not in captured["argv"]
 
 
 def test_offbox_adapter_strips_contacts_before_transmission(monkeypatch):
