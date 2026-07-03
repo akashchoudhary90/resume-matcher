@@ -127,6 +127,60 @@ def _parse_json_object(raw: str) -> dict:
     return extract_json_object(raw)
 
 
+# --- Multi-job extraction (the grid fast path) ---------------------------------------------------
+
+def extract_multi(candidate: CandidateProfile, jobs: list[JobSpec]) -> dict[str, MatchExtraction]:
+    """ONE text-mode call that extracts a candidate against SEVERAL jobs.
+
+    The grid used to pay one full extraction per resume×role cell — the same resume read N times.
+    This reads it once and returns {job_id: MatchExtraction} for every job the model answered
+    validly; the caller falls back to the normal per-job extraction for anything missing or
+    malformed, so a partial answer degrades gracefully instead of failing the resume."""
+    from ..prompt import RESUME_FENCE, SYSTEM
+
+    if not jobs:
+        return {}
+    schema = json.dumps(match_extraction_schema(), indent=2)
+    job_blocks = "\n".join(_job_block(j) for j in jobs)
+    prompt = (
+        f"{SYSTEM}\n\n"
+        f"You will compare ONE candidate against {len(jobs)} SEPARATE jobs, listed below.\n"
+        f"{job_blocks}\n"
+        f"candidate_id: {candidate.candidate_id}\n"
+        f"known canonical skills (from taxonomy): {candidate.skills}\n"
+        f"education_level: {candidate.education_level}   "
+        f"years_experience: {candidate.years_experience}\n\n"
+        f"{RESUME_FENCE}\n{candidate.text}\n{RESUME_FENCE}\n\n"
+        f'Return ONLY one JSON object of the form {{"extractions": [ ... ]}} whose array holds '
+        f"EXACTLY one MatchExtraction per job above, each conforming to this JSON Schema:\n{schema}\n"
+        f"Each extraction MUST carry the matching job_id from the list above and "
+        f"candidate_id='{candidate.candidate_id}'. Assess each job independently."
+    )
+    # Output grows with the number of jobs; scale the ceiling instead of tripping the single-job one.
+    timeout = _TIMEOUT_S + 60.0 * max(0, len(jobs) - 1)
+    raw = _run_cli(prompt, extra_args=_TEXT_ARGS, cwd=None, timeout=timeout)
+    data = _parse_json_object(raw)
+    items = data.get("extractions")
+    if not isinstance(items, list):
+        raise InferenceError("multi-job output missing the 'extractions' array")
+    wanted = {j.job_id for j in jobs}
+    out: dict[str, MatchExtraction] = {}
+    for item in items:
+        if not isinstance(item, dict):
+            continue
+        item.setdefault("candidate_id", candidate.candidate_id)
+        try:
+            ex = MatchExtraction.model_validate(item)
+        except Exception:  # noqa: BLE001 - one malformed extraction must not sink the others
+            continue
+        ex.candidate_id = candidate.candidate_id
+        # Strictly match by job_id — positionally guessing could score a resume against the wrong
+        # role. Anything unmatched simply falls back to a per-job extraction.
+        if ex.job_id in wanted and ex.job_id not in out:
+            out[ex.job_id] = ex
+    return out
+
+
 # --- JD-side requirement extraction (text mode) -------------------------------------------------
 # The keyword scan over the taxonomy can only find skills a posting NAMES literally — real postings
 # describe duties in prose ("design and maintain software applications") and name none, so keyword

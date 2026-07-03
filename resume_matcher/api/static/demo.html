@@ -307,7 +307,7 @@ async function submitAndPoll(url, fd, setStatus){
     if(pd.status === 'running'){
       const p = pd.progress || {};
       const secs = Math.round((Date.now()-t0)/1000), m = Math.floor(secs/60), s = String(secs%60).padStart(2,'0');
-      const frac = p.total ? `${Math.min(p.done||0, p.total)} of ${p.total} resume×role pair(s) scored` : 'scoring';
+      const frac = p.total ? `${Math.min(p.done||0, p.total)} of ${p.total} scoring steps done` : 'scoring';
       setStatus(`Still working — ${frac} · ${m}:${s} elapsed. Keep this tab open (processed in memory, discarded after).`);
       continue;
     }

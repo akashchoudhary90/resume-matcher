@@ -57,6 +57,8 @@ class DemoConfig:
     send_file: bool
     cache_max: int
     max_jobs: int
+    batch_roles: bool
+    vision_min_text: int
 
     @classmethod
     def from_env(cls) -> "DemoConfig":
@@ -70,4 +72,11 @@ class DemoConfig:
             send_file=env_flag("RM_DEMO_SEND_FILE", True),
             cache_max=env_int("RM_DEMO_CACHE_MAX", 512),
             max_jobs=max(1, env_int("RM_DEMO_MAX_JOBS", 3)),  # roles in the multi-job fit grid
+            # Grid fast path: ONE LLM call per resume covering ALL roles (instead of one per
+            # resume×role cell). Kill switch for A/B'ing extraction quality on real traffic.
+            batch_roles=env_flag("RM_DEMO_BATCH_ROLES", True),
+            # Vision (file-direct) only pays off when the model can see something the text layer
+            # doesn't: use it when the locally-extracted text is shorter than this many chars
+            # (scans/images); text-layer PDFs take the faster, more reliable text path.
+            vision_min_text=env_int("RM_DEMO_VISION_MIN_TEXT", 200),
         )

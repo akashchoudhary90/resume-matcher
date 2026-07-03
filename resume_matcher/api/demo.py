@@ -29,7 +29,7 @@ from collections import OrderedDict
 from concurrent.futures import ThreadPoolExecutor
 from dataclasses import dataclass, field
 
-from ..antigaming.hidden_text import cross_modal_diff, scan_pdf
+from ..antigaming.hidden_text import cross_modal_diff, scan_pdf, scan_pdf_bytes
 from ..config import DemoConfig, env_int
 from ..ingestion.job_posting import build_job_spec, detect_job_skills, skill_options
 from ..ingestion.parser import (
@@ -64,6 +64,8 @@ DEMO_BACKEND = _CFG.backend
 CONCURRENCY = _CFG.concurrency           # parallel extractions per upload batch
 SEND_FILE = _CFG.send_file               # send PDFs/images to NDR AI directly (vision) vs text-first
 CACHE_MAX = _CFG.cache_max               # in-memory extraction cache (consistency + speed)
+BATCH_ROLES = _CFG.batch_roles           # grid fast path: ONE extraction call per resume × ALL roles
+VISION_MIN_TEXT = _CFG.vision_min_text   # vision only when the local text layer is thinner than this
 
 # Cache the LLM EXTRACTION keyed by (content, job, model). The LLM is non-deterministic, so this makes
 # re-scoring the SAME resume against the SAME job IDENTICAL (and instant). In-memory only (no disk),
@@ -457,6 +459,86 @@ def _llm_job_requirements(job_text: str, title: str = "") -> dict | None:
     return result
 
 
+def _resolve_job_inputs(
+    *,
+    engine: str,
+    job_text: str = "",
+    title: str = "",
+    required_skills: list[str] | None = None,
+    preferred_skills: list[str] | None = None,
+    must_have_skills: list[str] | None = None,
+    min_education: str | None = None,
+    min_years: float | None = None,
+) -> tuple[dict, str]:
+    """THE single place that decides a demo job's requirement inputs (user > NDR AI > keyword).
+
+    Both run_demo and the grid prefetcher use this, so a prefetched cache key can never drift from
+    the job the scoring path actually builds. Returns (kwargs for build_job_spec, jd_source)."""
+    jd_source = "user"
+    if not required_skills and not preferred_skills and not must_have_skills and (job_text or "").strip():
+        jd = _llm_job_requirements(job_text, title=title) if engine == "claude_cli" else None
+        if jd is not None:
+            required_skills = jd["required_skills"]
+            preferred_skills = jd["preferred_skills"]
+            must_have_skills = jd["must_have_skills"]
+            if min_education is None:
+                min_education = jd["min_education"]
+            if min_years is None:
+                min_years = jd["min_years"]
+            jd_source = "ndr_ai"
+        else:
+            required_skills = detect_job_skills(job_text)
+            jd_source = "keyword"
+        if min_education is None:
+            min_education = infer_education_level(job_text)
+    return {
+        "required_skills": required_skills,
+        "preferred_skills": preferred_skills,
+        "must_have_skills": must_have_skills,
+        "min_education": min_education,
+        "min_years": min_years,
+    }, jd_source
+
+
+def _pdf_has_unreadable_page(data: bytes) -> bool:
+    """True when some page carries image content but NO text layer — a hybrid text+scan PDF.
+
+    The whole-document text threshold can't see this case: one text page clears the threshold and
+    the scanned pages would silently never be read at all (scored on the text pages alone, with
+    full confidence). Such files must stay on the vision path."""
+    try:
+        import io
+
+        import pdfplumber
+
+        with pdfplumber.open(io.BytesIO(data)) as pdf:
+            for page in pdf.pages:
+                if page.images and not (page.extract_text() or "").strip():
+                    return True
+    except Exception:  # noqa: BLE001 - best-effort; the text-length rule below still applies
+        return False
+    return False
+
+
+def _vision_candidate(filename: str, ext: str, data: bytes) -> tuple[bool, str]:
+    """(use_vision, independent_text): vision (file-direct) only where it can see something the
+    local text extraction can't — scans, photos, PDFs with a thin/absent text layer, and hybrid
+    PDFs where any page is image-only. A pure text-layer PDF gains nothing from vision: the model
+    would read the same text, slower and via the less reliable multi-turn file path. Callers still
+    AND this with their send_file switch."""
+    independent = ""
+    if ext == ".pdf":
+        try:
+            independent = extract_bytes_text(filename or "resume.pdf", data) or ""
+        except ParseError:
+            independent = ""
+    use_vision = _claude_cli.supports_file(filename or "") and (
+        len(independent.strip()) < VISION_MIN_TEXT
+        or (ext == ".pdf" and _pdf_has_unreadable_page(data))
+    )
+    return use_vision, independent
+
+
 def _candidate_from_text(cid: str, text: str) -> CandidateProfile:
     """Build a CandidateProfile from extracted/transcribed text.
 
@@ -497,39 +579,22 @@ def run_demo(
 
     adapter, engine = _resolve_adapter(backend or DEMO_BACKEND)
 
-    # If no explicit skills were tagged, auto-detect them from the posting (so skipping the "Detect
-    # skills" step still yields a meaningful match). With the NDR AI engine active the posting is
-    # READ by the model — real postings describe duties in prose and name few skills literally, so
-    # the keyword scan alone yields junk/soft-skill-only requirements; it remains the fallback so
-    # the demo always works. Skills the user tagged explicitly are never overridden.
-    jd_source = "user"
-    if not required_skills and not preferred_skills and not must_have_skills and (job_text or "").strip():
-        jd = _llm_job_requirements(job_text, title=title) if engine == "claude_cli" else None
-        if jd is not None:
-            required_skills = jd["required_skills"]
-            preferred_skills = jd["preferred_skills"]
-            must_have_skills = jd["must_have_skills"]
-            if min_education is None:
-                min_education = jd["min_education"]
-            if min_years is None:
-                min_years = jd["min_years"]
-            jd_source = "ndr_ai"
-        else:
-            required_skills = detect_job_skills(job_text)
-            jd_source = "keyword"
-        if min_education is None:
-            min_education = infer_education_level(job_text)
+    # Requirement inputs: user-tagged skills win; otherwise NDR AI reads the posting (real postings
+    # describe duties in prose and name few skills literally, so the keyword scan alone yields
+    # junk/soft-skill-only requirements); the keyword scan remains the fallback so the demo always
+    # works. Shared with the grid prefetcher via _resolve_job_inputs (single source of truth).
+    inputs, jd_source = _resolve_job_inputs(
+        engine=engine, job_text=job_text, title=title,
+        required_skills=required_skills, preferred_skills=preferred_skills,
+        must_have_skills=must_have_skills, min_education=min_education, min_years=min_years,
+    )
 
     job = build_job_spec(
         job_id="DEMO_JOB",
         title=title,
         employer=employer,
         description=job_text or "",
-        required_skills=required_skills,
-        preferred_skills=preferred_skills,
-        must_have_skills=must_have_skills,
-        min_education=min_education,
-        min_years=min_years,
+        **inputs,
     )
 
     # Without any job skills, every resume scores 0 — that's not a useful result. Refuse with a clear
@@ -576,8 +641,12 @@ def run_demo(
         cid, label, filename, data = item
         ext = os.path.splitext(filename or "")[1].lower()
         note = None
-        # --- File-direct: Claude reads the actual PDF/image (best fidelity, reads scans) ---
-        if send_file and _claude_cli.supports_file(filename or ""):
+        # `independent` is the local parse of a PDF's text layer: it decides whether vision is worth
+        # paying for AND (in the vision branch) verifies the model's quotes against text the model
+        # didn't produce. Text-layer PDFs skip vision entirely — same text, faster, single-turn.
+        use_vision, independent = _vision_candidate(filename or "", ext, data)
+        # --- File-direct: Claude reads the actual PDF/image (scans/photos/thin text layers) ---
+        if send_file and use_vision:
             key = _cache_key("file", model, job_sig, data)
             # The cache holds ONLY the de-identified extraction (stable, consistent re-scores) — never
             # the full resume text/transcription, so nothing PII outlives the session in this global
@@ -590,12 +659,6 @@ def run_demo(
                 # could fabricate a skill identically in its transcription and its quote and "verify"
                 # itself). Only a PDF with a real text layer has independent text here; true scans /
                 # images yield nothing and fall back to the transcription (flagged below).
-                independent = ""
-                if ext == ".pdf":
-                    try:
-                        independent = extract_bytes_text(filename or f"{cid}.pdf", data) or ""
-                    except ParseError:
-                        independent = ""
                 hidden_flags: list[str] = []
                 if cached_extraction is not None and independent.strip():
                     extraction = cached_extraction          # identical re-score: no LLM, no PII cached
@@ -641,7 +704,7 @@ def run_demo(
             finally:
                 if tmpdir:
                     shutil.rmtree(tmpdir, ignore_errors=True)
-        # --- Text path (default for .txt/.docx; also the fallback for the above) ---
+        # --- Text path (text-layer PDFs, .txt/.docx; also the fallback for the above) ---
         # Consented demo: keep the resume body + the applicant NAME (identifiable, by consent) but
         # still strip CONTACT identifiers (email/phone/url/address) before the text is scored, sent
         # to the LLM, or quoted in the breakdown (boundary #3) — auto_redact_name=False keeps the
@@ -655,7 +718,17 @@ def run_demo(
                 f"{label}: no readable text. If it's a scanned/photo PDF, the NDR AI engine can read "
                 f"it — otherwise upload a text-based PDF, a .docx, or a .txt."
             )
-        return score_with_antigaming(_text_extraction(cand), cand, job), cand, label, note
+        # PDFs keep the hidden-text scan on this path too: white-on-white / tiny-font stuffing is a
+        # text-LAYER artifact, so detecting it never needed vision (best-effort, in memory only).
+        text_flags: list[str] = []
+        if ext == ".pdf":
+            try:
+                text_flags = [f for f in scan_pdf_bytes(data)
+                              if not f.startswith("hidden_text:scan_skipped")]
+            except Exception:  # noqa: BLE001 - anti-gaming scan is advisory, never fatal
+                text_flags = []
+        return (score_with_antigaming(_text_extraction(cand), cand, job, extra_flags=text_flags),
+                cand, label, note)
 
     if set_total is not None:
         set_total(len(items))
@@ -728,6 +801,96 @@ def run_demo(
     )
 
 
+def _prefetch_grid_extractions(
+    jobs: list[dict],
+    files: list[tuple[str, bytes]],
+    engine: str,
+    on_progress=None,
+) -> int:
+    """Grid fast path: ONE NDR-AI call per resume covering ALL roles, instead of one per cell.
+
+    Every result lands in the shared extraction cache under exactly the key the per-role scoring
+    will compute (job inputs come from the same _resolve_job_inputs, resume text from the same
+    parse), so run_demo stays the single scoring path — no drift — and ANY miss (failed call,
+    malformed per-job answer, scanned resume with no text layer) simply falls back to the normal
+    per-cell extraction. Role requirements are resolved up front IN PARALLEL here, which also
+    parallelizes the per-role JD reads that the sequential role loop used to pay one at a time.
+    Returns the number of resumes batch-extracted (for logging/tests)."""
+    if engine != "claude_cli" or not BATCH_ROLES or len(jobs) < 2:
+        return 0
+    model = _claude_cli.model_name()
+
+    def _spec(idx_role):
+        idx, role = idx_role
+        inputs, _src = _resolve_job_inputs(
+            engine=engine, job_text=role.get("job_text", ""), title=role.get("title", ""))
+        return build_job_spec(
+            job_id=f"J{idx + 1}", title=role.get("title", ""),
+            employer=role.get("employer", ""), description=role.get("job_text", ""), **inputs)
+
+    with ThreadPoolExecutor(max_workers=min(len(jobs), CONCURRENCY) or 1) as pool:
+        specs = list(pool.map(_spec, enumerate(jobs)))
+    specs = [s for s in specs if s.required_skills or s.preferred_skills]
+    if not specs:
+        return 0
+    sigs = [_job_signature(s) for s in specs]
+
+    deduped, _removed = _dedupe_files(files)
+
+    # The prefetched entries live in the shared bounded LRU until the role loop reads them. If the
+    # cache can't hold the whole grid, later inserts evict earlier ones before they're ever read
+    # and the "fast path" degenerates into batched calls PLUS per-cell fallbacks — strictly slower.
+    # Skip batching instead (per-cell is then the honest cost).
+    if len(specs) * len(deduped) + 8 > CACHE_MAX:
+        _log.warning(
+            "grid fast path skipped: RM_DEMO_CACHE_MAX=%s cannot hold %s roles x %s resumes",
+            CACHE_MAX, len(specs), len(deduped))
+        return 0
+
+    def _prefetch_one(item):
+        idx, (filename, data) = item
+        try:
+            ext = os.path.splitext(filename or "")[1].lower()
+            use_vision, _independent = _vision_candidate(filename or "", ext, data)
+            if SEND_FILE and use_vision:
+                return 0  # scan/image: stays on the per-cell vision path (transcription is PII)
+            try:
+                cand = parse_resume_bytes(f"P{idx + 1:02d}", filename or f"P{idx + 1:02d}.txt",
+                                          data, auto_redact_name=False)
+            except ParseError:
+                return 0
+            if not cand.text.strip():
+                return 0
+            content = cand.text.encode("utf-8")
+            missing = [(spec, key) for spec, key in
+                       ((s, _cache_key("text", model, sig, content)) for s, sig in zip(specs, sigs))
+                       if _cache_get(key) is None]
+            if not missing:
+                return 0  # full cache hit (a re-run) — nothing to pay
+            try:
+                got = _claude_cli.extract_multi(cand, [spec for spec, _ in missing])
+            except Exception:  # noqa: BLE001 - fast path only; per-cell extraction covers the miss
+                _log.warning("multi-job extraction failed for one resume; per-cell fallback",
+                             exc_info=True)
+                return 0
+            stored = 0
+            for spec, key in missing:
+                ex = got.get(spec.job_id)
+                if ex is not None:
+                    _cache_put(key, ex)  # de-identified extraction only, like every cache entry
+                    stored += 1
+            return 1 if stored else 0
+        finally:
+            if on_progress is not None:
+                try:
+                    on_progress(1)
+                except Exception:  # noqa: BLE001
+                    pass
+
+    with ThreadPoolExecutor(max_workers=min(len(deduped), CONCURRENCY) or 1) as pool:
+        return sum(pool.map(_prefetch_one, enumerate(deduped)))
+
+
 def run_demo_grid(
     *,
     store: SessionStore,
@@ -751,8 +914,16 @@ def run_demo_grid(
     if len(jobs) > MAX_JOBS:
         raise DemoError(f"Too many roles: {len(jobs)} (max {MAX_JOBS}).")
     validate_uploads(files)
+
+    _, engine = _resolve_adapter(backend or DEMO_BACKEND)
+    will_batch = engine == "claude_cli" and BATCH_ROLES and len(jobs) >= 2
     if set_total is not None:
-        set_total(len(jobs) * len(files))  # pre-dedupe estimate; complete() snaps done to total
+        # Pre-dedupe estimate; complete() snaps done to total. When batching, the prefetch phase
+        # ticks once per resume (that's where the LLM time now goes), then the role loop ticks per
+        # cell — so the total includes both kinds of step and the bar moves through both phases.
+        set_total(len(jobs) * len(files) + (len(files) if will_batch else 0))
+    if will_batch:
+        _prefetch_grid_extractions(jobs, files, engine=engine, on_progress=on_progress)
 
     scratch = SessionStore(ttl_seconds=store.ttl_seconds, max_sessions=len(jobs) + 1)
     job_cols: list[dict] = []
@@ -854,11 +1025,11 @@ def run_demo_grid_from_files(
         jobs.append({"title": _label_for(filename, 0), "employer": "", "job_text": text})
     if not jobs:
         raise DemoError("None of the uploaded JD files were readable. Use text-based PDF/DOCX/TXT.")
-    if set_total is not None:
-        set_total(len(jobs) * len(resume_files))
 
+    # run_demo_grid owns set_total: it knows whether the batched fast path runs (which adds a
+    # prefetch step per resume to the progress total).
     sess = run_demo_grid(store=store, jobs=jobs, files=resume_files, backend=backend,
-                         on_progress=on_progress)
+                         on_progress=on_progress, set_total=set_total)
     sess.warnings = list(dict.fromkeys(warnings + sess.warnings))  # surface the cap/skip notes too
     return sess
 

@@ -76,6 +76,12 @@ _PREFIX_TEXT: list[tuple[str, str]] = [
         "Possible keyword stuffing detected. Flagged for human review; it does not add points.",
     ),
     (
+        "hidden_text:invisible_layer",
+        "The PDF carries a substantial layer of text a reader would never see (near-white, or drawn "
+        "off the page) — the classic hidden keyword-stuffing carrier. The score was down-weighted "
+        "and the resume flagged for human review.",
+    ),
+    (
         "hidden_text",
         "The document contains hidden or near-invisible text. Flagged for human review.",
     ),

@@ -61,6 +61,9 @@ _INTEGRITY_PENALTIES = [
     ("injection:zero_width", 0.7, "hidden / zero-width characters used to smuggle text"),
     ("hidden_text:white_text", 0.7, "hidden white-on-white text (invisible keyword stuffing)"),
     ("hidden_text:tiny_font", 0.7, "near-invisible tiny-font text"),
+    # High-precision (>=12 distinct hidden-only tokens): near-white / CMYK-white / off-canvas text
+    # a reader would never see — the carrier class that exact-white detection missed.
+    ("hidden_text:invisible_layer", 0.7, "an invisible text layer (near-white or off-page keyword carrier)"),
 ]
 _INTEGRITY_FLOOR = 0.5           # combined integrity penalty never drops below this (no auto-reject)
 

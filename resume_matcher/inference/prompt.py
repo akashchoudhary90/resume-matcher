@@ -31,6 +31,8 @@ SYSTEM = (
     "demonstrates SQL, and 'stood the services up in containers' demonstrates Docker — quote that "
     "phrase. Prefer the phrase that demonstrates the skill over a bare entry in a skills list. The "
     "verbatim-quote rule still holds: if you cannot quote supporting text, mark the skill 'missing'.\n"
+    "BE TERSE in free-text fields (they are advisory; output length costs latency): rationale and "
+    "seniority_assessment at most 2 short sentences, each gap's suggested_action one sentence.\n"
     "Return ONLY a single JSON object that conforms to the provided schema. No prose outside JSON."
 )
 
