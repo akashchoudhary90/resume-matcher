@@ -4,18 +4,55 @@
     "coordinator": {
       "mock": {
         "role": "primary realistic regression target",
-        "min_label_accuracy": 0.20,
-        "min_within_one_bucket": 0.50,
+        "min_label_accuracy": 0.2,
+        "min_within_one_bucket": 0.5,
         "min_spearman": -0.15,
         "max_mae": 52.0
+      },
+      "claude_cli": {
+        "role": "measured real-engine floor (claude_cli, 3 run(s))",
+        "measured": {
+          "label_accuracy": {
+            "mean": 0.611,
+            "stdev": 0.04,
+            "min": 0.583,
+            "max": 0.667,
+            "n": 3
+          },
+          "within_one_bucket": {
+            "mean": 0.903,
+            "stdev": 0.02,
+            "min": 0.875,
+            "max": 0.917,
+            "n": 3
+          },
+          "spearman": {
+            "mean": 0.581,
+            "stdev": 0.007,
+            "min": 0.571,
+            "max": 0.587,
+            "n": 3
+          },
+          "mae": {
+            "mean": 14.143,
+            "stdev": 0.624,
+            "min": 13.43,
+            "max": 14.95,
+            "n": 3
+          }
+        },
+        "min_label_accuracy": 0.521,
+        "min_within_one_bucket": 0.833,
+        "min_spearman": 0.474,
+        "max_mae": 17.8
       }
     },
     "labeled": {
       "mock": {
         "role": "clear-cut seed; pipeline smoke/sanity only (NOT real-world accuracy)",
-        "min_label_accuracy": 0.90,
+        "min_label_accuracy": 0.9,
         "min_within_one_bucket": 1.0,
-        "min_spearman": 0.90,
+        "min_spearman": 0.9,
         "max_mae": 12.0
       }
     }
