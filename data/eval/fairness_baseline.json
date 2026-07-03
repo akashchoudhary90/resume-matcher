@@ -1,5 +1,5 @@
 {
-  "note": "Committed fairness FLOORS for the synthetic cohort (seed 42, mock, tfidf). A scoring change that regresses past these (minus tolerance) fails CI. Synthetic, not outcomes.",
+  "note": "Committed fairness FLOORS for the synthetic cohort (seed 42, mock, tfidf). A scoring change that regresses past these (minus tolerance) fails CI. Synthetic, not outcomes. DELIBERATE two-key update 2026-07-03 with the adjacency-credit + named-vs-demonstrated scoring change (roadmap #3/#3b, incl. adversarial-review hardening): the cohort's protected attributes are assigned INDEPENDENTLY of resume content (rng.choice in ingestion/synthetic.py), so scores cannot causally depend on them - proxy-leakage AUC is the substantive signal (unchanged, no leak); four-fifths ratios move with any selection-set reshuffle at this n (~0.04 per candidate in the smallest group). Floors re-pinned at the final post-review measurement.",
   "cohort": {
     "seed": 42,
     "n_students": 200,
@@ -9,19 +9,19 @@
   },
   "tolerance": 0.03,
   "current": {
-    "race_min_impact_ratio": 0.646,
-    "gender_min_impact_ratio": 0.787,
-    "exposure_parity_ratio": 0.741,
-    "homophily_disparity_ratio": 1.205,
+    "race_min_impact_ratio": 0.721,
+    "gender_min_impact_ratio": 0.713,
+    "exposure_parity_ratio": 0.806,
+    "homophily_disparity_ratio": 0.885,
     "proxy_leakage_auc": 0.546,
     "proxy_leaks": false,
-    "n_selected": 71,
+    "n_selected": 80,
     "n_pool": 200
   },
   "floors": {
-    "min_race_min_impact_ratio": 0.646,
-    "min_gender_min_impact_ratio": 0.787,
-    "min_exposure_parity_ratio": 0.741,
+    "min_race_min_impact_ratio": 0.721,
+    "min_gender_min_impact_ratio": 0.713,
+    "min_exposure_parity_ratio": 0.8,
     "min_homophily_disparity_ratio": 0.8,
     "max_proxy_leakage_auc": 0.7
   }

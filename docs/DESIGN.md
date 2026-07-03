@@ -24,11 +24,16 @@ dashboard**, and defenses against gamed / AI-generated resumes. It is built to b
    any non-local adapter sees text. The redaction tripwire (`assert_redacted`) gates the
    `is_local=False` path in `inference/adapter.py`.
 4. **No fabricated "% chance of hire."** We ship an honest **fit/readiness score** with a
-   point-by-point breakdown — every point is tied to a skill the job asked for and the **verbatim
-   quote** from the resume that proves it. **The LLM never makes the scoring decision**; the
-   deterministic ranker does (`matching/ranker.py`), and it verifies each evidence quote against the
-   resume text (this is what makes the pipeline injection-resistant). The breakdown reconciles
-   exactly to the headline number.
+   point-by-point breakdown — every point is tied to a skill the job asked for and a **verbatim
+   quote** from the resume. Full credit requires a quote that DEMONSTRATES the skill; two explained
+   half-credit paths exist: **adjacency credit** (the quote demonstrates a curated ADJACENT skill —
+   `data/skill_relations.json`; the LLM proposes, the deterministic ranker verifies the quote
+   contains that skill and refuses anything off-graph; flagged `adjacent_credit`) and
+   **named-is-not-demonstrated** (a quote that merely names the skill earns half weight; flagged
+   `bare_mention`). **The LLM never makes the scoring decision**; the deterministic ranker does
+   (`matching/ranker.py`), and it verifies each evidence quote against the resume text (this is
+   what makes the pipeline injection-resistant). Every line item's note states which rule applied,
+   and the breakdown reconciles exactly to the headline number.
 
 ## Inference is swappable on purpose
 

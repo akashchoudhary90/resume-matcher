@@ -16,8 +16,12 @@ from ..schema import (
     MatchStatus,
     SkillEvidence,
 )
+import re
+
 from ..adapter import InferenceAdapter
-from ...matching.taxonomy import canonical_name
+from ...matching.taxonomy import canonical_name, related_skills
+
+_SPAN_CONTEXT = 40  # chars of surrounding context quoted with the skill name
 
 
 def _surface_forms(skill_id: str) -> list[str]:
@@ -25,11 +29,22 @@ def _surface_forms(skill_id: str) -> list[str]:
 
 
 def _find_span(text: str, skill_id: str) -> str | None:
-    low = text.lower()
+    """A verbatim quote around the skill mention, WITH surrounding context — like the real engine is
+    prompted to do ("quote the phrase that demonstrates the skill"). Quoting only the bare name
+    would (correctly) be down-graded by the ranker's named-is-not-demonstrated check.
+
+    Matches use the SAME word boundaries as the taxonomy scanner — a naive substring search let the
+    one-letter skill "R" match inside "developer", which surfaced as phantom adjacency credit."""
     for form in _surface_forms(skill_id):
-        idx = low.find(form.lower())
-        if idx != -1:
-            return text[idx : idx + len(form)]
+        # Skip one-letter surfaces (the taxonomy scanner's own precision guard): even with word
+        # boundaries, "R" matches inside "R&D" / "R-squared" and poisons adjacency proposals.
+        if not form or len(re.sub(r"[\W_]+", "", form)) < 2:
+            continue
+        m = re.search(r"(?<![\w+#.])" + re.escape(form) + r"(?![\w+#])(?!\.\w)", text, re.IGNORECASE)
+        if m:
+            start = max(0, m.start() - _SPAN_CONTEXT)
+            end = min(len(text), m.end() + _SPAN_CONTEXT)
+            return text[start:end].strip()
     return None
 
 
@@ -46,9 +61,13 @@ class MockAdapter(InferenceAdapter):
         gaps: list[Gap] = []
         known = {s.lower() for s in candidate.skills}
 
+        # Same merged view the ranker scores: a skill listed ONLY in must_have_skills (raw JobSpec,
+        # no build_job_spec fold) must still be assessed here.
+        required = list(dict.fromkeys(list(job.required_skills) + list(job.must_have_skills)))
         groups = [
-            (job.required_skills, Importance.essential, Difficulty.high),
-            (job.preferred_skills, Importance.optional, Difficulty.medium),
+            (required, Importance.essential, Difficulty.high),
+            ([s for s in job.preferred_skills if s not in set(required)],
+             Importance.optional, Difficulty.medium),
         ]
         for skills, importance, difficulty in groups:
             for skill_id in skills:
@@ -73,6 +92,21 @@ class MockAdapter(InferenceAdapter):
                             status=MatchStatus.partial,
                             importance=importance,
                             evidence_span=None,
+                        )
+                    )
+                elif (adj := next(((rel, s) for rel in related_skills(skill_id)
+                                   if (s := _find_span(candidate.text, rel))), None)):
+                    # ADJACENT skill found instead (PostgreSQL for a MySQL job, ...): propose it at
+                    # partial; the ranker validates the relation against the curated graph.
+                    rel, span = adj
+                    matches.append(
+                        SkillEvidence(
+                            skill_id=skill_id,
+                            skill_name=_name(skill_id),
+                            status=MatchStatus.partial,
+                            importance=importance,
+                            evidence_span=span,
+                            adjacent_to=rel,
                         )
                     )
                 else:

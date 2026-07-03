@@ -99,6 +99,18 @@
           ],
           "default": null,
           "title": "Recency Years"
+        },
+        "adjacent_to": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Adjacent To"
         }
       },
       "required": [

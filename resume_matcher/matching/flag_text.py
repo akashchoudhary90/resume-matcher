@@ -47,6 +47,23 @@ _PREFIX_TEXT: list[tuple[str, str]] = [
         "scoring is order-independent.",
     ),
     (
+        "adjacent_credit",
+        "A job skill was credited at half weight because a closely-RELATED skill is demonstrated in "
+        "the resume (curated adjacency, e.g. PostgreSQL for a MySQL role) — the transfer a recruiter "
+        "would credit.",
+    ),
+    (
+        "invalid_adjacency",
+        "The AI proposed crediting a skill via a related skill, but either the relation is not in "
+        "the curated adjacency list or the quoted evidence doesn't actually contain that related "
+        "skill; the claim was refused and not counted.",
+    ),
+    (
+        "bare_mention",
+        "A skill was only NAMED in the resume (e.g. in a skills list) with no demonstrated use, so "
+        "it was counted at half weight — naming a skill is not demonstrating it.",
+    ),
+    (
         "injection:zero_width",
         "The resume contains invisible / zero-width characters sometimes used to smuggle hidden "
         "instructions past a human reader. Flagged for review; it cannot change the score.",
@@ -108,6 +125,7 @@ def flag_severity(flag: str) -> str:
     """'bad' (security / fabrication), 'warn' (advisory), or 'info'. Drives UI colour only."""
     if flag.startswith(("injection", "unverifiable_evidence", "hidden_text", "missing_must_have")):
         return "bad"
-    if flag.startswith(("stuffing", "below_min_education", "below_min_experience", "no_required_skills")):
+    if flag.startswith(("stuffing", "below_min_education", "below_min_experience", "no_required_skills",
+                        "bare_mention", "invalid_adjacency")):
         return "warn"
     return "info"

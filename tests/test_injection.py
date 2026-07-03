@@ -31,7 +31,8 @@ def test_ranker_discards_unverifiable_evidence():
         candidate_id="C",
         job_id="J",
         skill_matches=[
-            SkillEvidence(skill_id="python", skill_name="Python", status=MatchStatus.match, evidence_span="Python"),
+            SkillEvidence(skill_id="python", skill_name="Python", status=MatchStatus.match,
+                          evidence_span="I know Python well"),
             SkillEvidence(skill_id="java", skill_name="Java", status=MatchStatus.match, evidence_span="Java"),
         ],
     )

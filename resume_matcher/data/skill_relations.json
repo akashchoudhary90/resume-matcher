@@ -1,0 +1,34 @@
+{
+  "_README": "Curated ADJACENT-skill relations (taxonomy overlay; survives skills.json regeneration). A candidate who demonstrably has one side of a relation earns PARTIAL (half) credit for the other when a job asks for it — recruiters credit close transfer (PostgreSQL person can do MySQL); keyword matching scores it zero. Loaded by matching/taxonomy.py: 'clusters' relate every pair inside the list; 'pairs' relate exactly the two ids. Ids must exist in skills.json to take effect (unknown ids are inert). Keep this HIGH-PRECISION: only add relations where an entry-level hiring manager would genuinely accept the adjacent skill; the deterministic ranker refuses any adjacency claim not in this file.",
+  "clusters": [
+    ["mysql", "postgresql", "mariadb", "sqlite"],
+    ["aws", "gcp", "azure"],
+    ["excel", "google_sheets"],
+    ["microsoft_word", "google_docs"],
+    ["react", "vue", "angular", "svelte"],
+    ["tableau", "power_bi", "looker"],
+    ["jenkins", "github_actions", "gitlab_ci"],
+    ["docker", "podman"],
+    ["terraform", "cloudformation"],
+    ["pytorch", "tensorflow", "keras"],
+    ["snowflake", "redshift", "bigquery"],
+    ["figma", "sketch", "adobe_xd"],
+    ["jira", "asana", "trello"],
+    ["salesforce", "hubspot"],
+    ["quickbooks", "xero"],
+    ["autocad", "solidworks", "fusion_360"],
+    ["spss", "stata", "sas", "r"]
+  ],
+  "pairs": [
+    ["python", "matlab"],
+    ["python", "r"],
+    ["java", "csharp"],
+    ["java", "kotlin"],
+    ["csharp", "dotnet"],
+    ["javascript", "typescript"],
+    ["swift", "objective_c"],
+    ["bash", "zsh"],
+    ["linux", "ubuntu"],
+    ["mongodb", "dynamodb"]
+  ]
+}

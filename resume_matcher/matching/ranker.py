@@ -31,7 +31,7 @@ from ..inference.schema import (
     ScoreResult,
     SkillEvidence,
 )
-from .taxonomy import canonical_name
+from .taxonomy import are_related, canonical_name, normalize_skills, surface_forms
 
 _EDU_RANK = {
     "highschool": 0, "high school": 0, "diploma": 1, "certificate": 1, "associate": 2,
@@ -68,6 +68,87 @@ _INTEGRITY_PENALTIES = [
 _INTEGRITY_FLOOR = 0.5           # combined integrity penalty never drops below this (no auto-reject)
 
 _WS_RE = re.compile(r"\s+")
+# Unicode-aware: a CJK/Cyrillic demonstrating quote must keep its residue, or "用 MySQL 优化了订单查询性能"
+# would strip to just "mysql" and be mis-clamped as a bare mention.
+_ALNUM_RE = re.compile(r"[\W_]+", re.UNICODE)
+
+
+def _alnum(s: str) -> str:
+    return _ALNUM_RE.sub("", (s or "").lower())
+
+
+# Filler words that name-drop a skill without demonstrating it ("Skills:", "proficient in ...").
+_MENTION_FILLER = {
+    "skills", "skill", "technologies", "technology", "tools", "tool", "stack", "and", "in", "with",
+    "of", "using", "other", "plus", "etc", "proficient", "proficiency", "familiar", "familiarity",
+    "knowledge", "experienced", "expert", "advanced", "intermediate", "basic", "working",
+}
+_MENTION_TOKEN_RE = re.compile(r"[\w+#.]+", re.UNICODE)
+
+
+def _surface_present(span: str, skill_id: str) -> bool:
+    """Does the skill's own name/alias appear in `span`, word-bounded? Complements
+    normalize_skills for ids its precision guards exclude (one-letter 'r', stopworded 'go'):
+    those must still be attributable when they are plainly the quoted name. The extra &- guards
+    keep one-letter forms from matching inside 'R&D' / 'R-squared'."""
+    for form in surface_forms(skill_id):
+        if not form:
+            continue
+        pat = r"(?<![\w+#.&-])" + re.escape(form) + r"(?![\w+#&-])(?!\.\w)"
+        if re.search(pat, span, re.IGNORECASE):
+            return True
+    return False
+
+
+def _is_bare_mention(span: str | None, skill_id: str) -> bool:
+    """True when the evidence quote NAMES the skill without showing its USE — the carrier of
+    skills-list dumps. Detectors, all working on the verified quote:
+      (1) the quote is essentially just the skill's own name;
+      (2) after stripping every recognized skill name (trailing sentence punctuation tolerated) and
+          naming-filler ("Skills:", "proficient in"), the ALPHANUMERIC residue is negligible;
+      (3) list context: two or more skill names in comma-list shape, where the residue amounts to
+          at most a junk word per name ("Python ninja, MySQL guru") — decoration is not use.
+    A quote with real demonstration ("Tuned MySQL replication for the events app") keeps plenty of
+    residue and is untouched. The extraction prompt demands the demonstrating phrase for a 'match',
+    so a name-only quote means there was nothing better to quote."""
+    span = span or ""
+    span_a = _alnum(span)
+    if not span_a:
+        return True
+    for form in surface_forms(skill_id):
+        f_a = _alnum(form)
+        if f_a and f_a in span_a and len(span_a) <= len(f_a) + 3:
+            return True
+    found = set(normalize_skills(span))
+    if skill_id not in found:
+        if not _surface_present(span, skill_id):
+            return False  # can't attribute the quote's names — stay conservative
+        found.add(skill_id)  # precision-guarded id (e.g. 'r'): its own surface is plainly there
+    seqs = sorted(
+        {tuple(_MENTION_TOKEN_RE.findall(f.lower())) for fid in found for f in surface_forms(fid)},
+        key=len, reverse=True)
+    # Trailing sentence punctuation must not break sequence matching ('aws.' at end of sentence).
+    tokens = [t if t.rstrip(".") == "" else t.rstrip(".")
+              for t in _MENTION_TOKEN_RE.findall(span.lower())]
+    residue: list[str] = []
+    n_seq = 0
+    i = 0
+    while i < len(tokens):
+        for s in seqs:
+            if s and tuple(tokens[i:i + len(s)]) == s:
+                i += len(s)
+                n_seq += 1
+                break
+        else:
+            residue.append(tokens[i])
+            i += 1
+    leftover = _alnum("".join(t for t in residue if t not in _MENTION_FILLER))
+    if len(leftover) <= 3:
+        return True
+    # List context: N skill names with list punctuation and only ~a junk word of residue per name.
+    if n_seq >= 2 and span.count(",") >= n_seq - 1 and len(leftover) <= 5 * n_seq:
+        return True
+    return False
 
 
 def _integrity_factor(flags: list[str]) -> tuple[float, str]:
@@ -127,6 +208,19 @@ def _dedupe(items: list[str]) -> list[str]:
     return out
 
 
+def _partial_note(ev: SkillEvidence, reason: str | None) -> str:
+    if reason == "adjacent" and ev.adjacent_to:
+        return (f"Adjacent skill demonstrated ({canonical_name(ev.adjacent_to)}) — accepted at half "
+                f"weight (curated adjacency; close transfer a recruiter would credit).")
+    if reason == "adjacent_bare" and ev.adjacent_to:
+        return (f"Adjacent skill ({canonical_name(ev.adjacent_to)}) is NAMED in the resume but not "
+                f"demonstrated — counted at half weight and flagged for review.")
+    if reason == "bare_mention":
+        return ("Skill is named in the resume but the quote shows no actual use of it — counted at "
+                "half weight (named is not demonstrated).")
+    return "Partially evidenced — counted at half weight."
+
+
 def _weighted_components(
     skill_ids: list[str],
     bucket_name: str,
@@ -135,6 +229,7 @@ def _weighted_components(
     importance_of: dict[str, Importance],
     verified_by_skill: dict[str, SkillEvidence],
     discarded_by_skill: dict[str, SkillEvidence],
+    partial_reason: dict[str, str | None],
 ) -> tuple[list[ScoreComponent], float]:
     """One ScoreComponent per job skill, each weighted by importance. Displayed per-row points are
     cumulative-rounded so they sum EXACTLY to the rounded bucket total. Returns (components, earned)."""
@@ -164,7 +259,7 @@ def _weighted_components(
             note = (
                 "Found in the resume — quote verified verbatim."
                 if ev.status == MatchStatus.match
-                else "Partially evidenced — counted at half weight."
+                else _partial_note(ev, partial_reason.get(sid))
             )
             comps.append(ScoreComponent(
                 skill_id=sid, skill_name=canonical_name(sid), bucket=bucket_name,
@@ -192,12 +287,16 @@ def _weighted_components(
 
 
 def _summary(fit, grade, comps, n_discarded, missing_must, edu_factor, exp_factor,
-             integrity_factor=1.0) -> str:
+             integrity_factor=1.0, n_adjacent=0, n_bare=0) -> str:
     real = [c for c in comps if c.bucket in ("required", "preferred")]
     got = sum(1 for c in real if c.verified and c.status == MatchStatus.match)
     parts = [f"Fit {fit:.1f} (grade {grade})."]
     if real:
         parts.append(f"Matched {got} of {len(real)} listed skills with verbatim evidence.")
+    if n_adjacent:
+        parts.append(f"{n_adjacent} skill(s) credited via a demonstrated ADJACENT skill (half weight).")
+    if n_bare:
+        parts.append(f"{n_bare} skill(s) only NAMED, not demonstrated — counted at half weight.")
     if missing_must:
         parts.append(f"Missing must-have skill(s): {', '.join(canonical_name(s) for s in missing_must)} "
                      f"— heavily penalized.")
@@ -231,25 +330,70 @@ def score(
         flags.append("duplicate_skill_ids_collapsed")
     job_skill_ids = req_set | set(pref_ids)
 
-    verified: list[SkillEvidence] = []
+    verified: list[tuple[SkillEvidence, str | None]] = []  # (evidence, partial-credit reason)
     discarded: list[SkillEvidence] = []
     cand_text_norm = _norm_ws(candidate.text).lower()
     for ev in extraction.skill_matches:
         if ev.status == MatchStatus.missing or ev.skill_id not in job_skill_ids:
             continue  # off-spec or non-match -> never counted
-        if _verify(cand_text_norm, ev):
-            verified.append(ev)
-        else:
+        if not _verify(cand_text_norm, ev):
             discarded.append(ev)
             flags.append(f"unverifiable_evidence:{ev.skill_id}")
+            continue
+        reason = None
+        if ev.adjacent_to:
+            # ADJACENCY: the model proposes, deterministic checks decide. Three gates:
+            # (1) the relation must be in the curated graph (the LLM cannot invent relatedness);
+            # (2) the quote must actually contain/evidence the ADJACENT skill — otherwise any
+            #     verbatim sentence ("worked as a barista") could smuggle in adjacency credit;
+            # (3) a quote that merely NAMES the adjacent skill is treated exactly like a direct
+            #     bare mention: still half credit, but flagged and honestly worded.
+            if not are_related(ev.skill_id, ev.adjacent_to):
+                discarded.append(ev)
+                flags.append(f"invalid_adjacency:{ev.skill_id}")
+                continue
+            span_ids = set(normalize_skills(ev.evidence_span or ""))
+            if ev.adjacent_to not in span_ids and not _surface_present(ev.evidence_span or "",
+                                                                       ev.adjacent_to):
+                discarded.append(ev)
+                flags.append(f"invalid_adjacency:{ev.skill_id}")
+                continue
+            if ev.status != MatchStatus.partial:
+                ev = ev.model_copy(update={"status": MatchStatus.partial})  # never full credit
+            reason = ("adjacent_bare" if _is_bare_mention(ev.evidence_span, ev.adjacent_to)
+                      else "adjacent")
+        elif ev.status == MatchStatus.match and _is_bare_mention(ev.evidence_span, ev.skill_id):
+            # NAMED != DEMONSTRATED: a quote that is just the skill's name proves the mention, not
+            # the use — the carrier of skills-list dumps. Half credit, plainly explained.
+            ev = ev.model_copy(update={"status": MatchStatus.partial})
+            reason = "bare_mention"
+        verified.append((ev, reason))
 
+    # Order-independent dedupe: strongest status wins; on equal status the most creditable REASON
+    # wins (genuine partial > demonstrated-adjacent > bare variants), then the shorter span — so
+    # shuffled extractions produce identical scores, notes, and flags.
+    _REASON_RANK = {None: 0, "adjacent": 1, "adjacent_bare": 2, "bare_mention": 3}
     verified_by_skill: dict[str, SkillEvidence] = {}
-    for ev in verified:
+    partial_reason: dict[str, str | None] = {}
+    for ev, reason in verified:
         prev = verified_by_skill.get(ev.skill_id)
-        if prev is None or _STATUS_WEIGHT[ev.status] > _STATUS_WEIGHT[prev.status]:
-            verified_by_skill[ev.skill_id] = ev
         if prev is not None:
             flags.append(f"duplicate_skill_evidence:{ev.skill_id}")
+        key = (-_STATUS_WEIGHT[ev.status], _REASON_RANK[reason], len(ev.evidence_span or ""),
+               ev.evidence_span or "")
+        prev_key = (None if prev is None else
+                    (-_STATUS_WEIGHT[prev.status], _REASON_RANK[partial_reason.get(ev.skill_id)],
+                     len(prev.evidence_span or ""), prev.evidence_span or ""))
+        if prev is None or key < prev_key:
+            verified_by_skill[ev.skill_id] = ev
+            partial_reason[ev.skill_id] = reason
+    # Flags derive from the post-dedupe WINNERS: a bare/adjacent duplicate beaten by a stronger full
+    # match must not leave a stale, contradictory flag behind.
+    for sid, reason in partial_reason.items():
+        if reason in ("adjacent", "adjacent_bare"):
+            flags.append(f"adjacent_credit:{sid}")
+        if reason in ("adjacent_bare", "bare_mention"):
+            flags.append(f"bare_mention:{sid}")
     discarded_by_skill = {ev.skill_id: ev for ev in discarded}
 
     if not req_ids:
@@ -278,9 +422,11 @@ def score(
         weight_of[s] = 1.0
 
     req_comps, req_earned = _weighted_components(
-        req_ids, "required", req_w, weight_of, importance_of, verified_by_skill, discarded_by_skill)
+        req_ids, "required", req_w, weight_of, importance_of, verified_by_skill, discarded_by_skill,
+        partial_reason)
     pref_comps, pref_earned = _weighted_components(
-        pref_ids, "preferred", pref_w, weight_of, importance_of, verified_by_skill, discarded_by_skill)
+        pref_ids, "preferred", pref_w, weight_of, importance_of, verified_by_skill, discarded_by_skill,
+        partial_reason)
 
     required_earned = round(req_earned, 2)
     preferred_earned = round(pref_earned, 2)
@@ -366,7 +512,11 @@ def score(
         integrity_note=integrity_note,
         final_score=fit,
         summary=_summary(fit, grade, req_comps + pref_comps, len(discarded), missing_must,
-                         edu_factor, exp_factor, integrity_factor),
+                         edu_factor, exp_factor, integrity_factor,
+                         n_adjacent=sum(1 for r in partial_reason.values()
+                                        if r in ("adjacent", "adjacent_bare")),
+                         n_bare=sum(1 for r in partial_reason.values()
+                                    if r in ("bare_mention", "adjacent_bare"))),
     )
 
     if not candidate.has_resume or len(candidate.text) < 200:
@@ -394,7 +544,7 @@ def score(
         confidence=conf,
         subscores=subscores,
         explanation=explanation,
-        verified_matches=verified,
+        verified_matches=[ev for ev, _reason in verified],
         discarded_matches=discarded,
         gaps=extraction.gaps,
         rationale=extraction.rationale,

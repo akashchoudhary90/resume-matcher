@@ -31,10 +31,40 @@ SYSTEM = (
     "demonstrates SQL, and 'stood the services up in containers' demonstrates Docker — quote that "
     "phrase. Prefer the phrase that demonstrates the skill over a bare entry in a skills list. The "
     "verbatim-quote rule still holds: if you cannot quote supporting text, mark the skill 'missing'.\n"
+    "NAMED IS NOT DEMONSTRATED: status 'match' requires the quote to show the skill being USED — a "
+    "project, task, or outcome. A skill that appears ONLY in a skills list, heading, or "
+    "self-description with no demonstrated use MUST be 'partial' (quote the mention). A resume "
+    "that merely lists every job keyword earns 'partial' at best on each.\n"
+    "ADJACENT SKILLS: when a job skill itself is NOT evidenced but the job block lists an accepted "
+    "adjacent skill that IS clearly demonstrated, mark the job skill 'partial', set `adjacent_to` "
+    "to that adjacent skill's id, and quote the span demonstrating the ADJACENT skill. Only use "
+    "adjacencies the job block explicitly lists — never invent relatedness.\n"
     "BE TERSE in free-text fields (they are advisory; output length costs latency): rationale and "
     "seniority_assessment at most 2 short sentences, each gap's suggested_action one sentence.\n"
     "Return ONLY a single JSON object that conforms to the provided schema. No prose outside JSON."
 )
+
+
+def adjacency_lines(job: JobSpec) -> str:
+    """The job block's accepted-adjacency section: for each job skill with curated relations, the
+    adjacent ids whose demonstrated evidence the ranker will accept at half credit. Deterministic
+    guidance — the model may only propose adjacencies listed here, and the ranker re-checks every
+    claim against the same curated graph."""
+    from ..matching.taxonomy import related_skills
+
+    # Iterate the same merged skill set the ranker scores: must-haves fold into required (a raw
+    # JobSpec that lists a skill ONLY in must_have_skills is still scored — and must still get its
+    # adjacency line, or the model could never propose what the ranker would accept).
+    merged = list(dict.fromkeys(list(job.required_skills) + list(job.must_have_skills)))
+    lines = []
+    for sid in merged + [s for s in job.preferred_skills if s not in set(merged)]:
+        rel = related_skills(sid)
+        if rel:
+            lines.append(f"    {sid}: {', '.join(rel)}")
+    if not lines:
+        return ""
+    return ("  accepted adjacent skills (demonstrated evidence of these earns HALF credit for the "
+            "listed job skill; set adjacent_to accordingly):\n" + "\n".join(lines) + "\n")
 
 
 def build_messages(candidate: CandidateProfile, job: JobSpec) -> list[dict]:
@@ -47,6 +77,7 @@ def build_messages(candidate: CandidateProfile, job: JobSpec) -> list[dict]:
         f"  employer: {job.employer}\n"
         f"  required_skills (canonical ids): {job.required_skills}\n"
         f"  preferred_skills (canonical ids): {job.preferred_skills}\n"
+        f"{adjacency_lines(job)}"
         f"  min_education: {job.min_education}\n"
         f"  description: {job.description}\n"
     )

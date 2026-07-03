@@ -100,6 +100,8 @@ def _run_cli(prompt: str, *, extra_args: list[str], cwd: str | None, timeout: fl
 
 
 def _job_block(job: JobSpec) -> str:
+    from ..prompt import adjacency_lines
+
     return (
         f"JOB\n"
         f"  job_id: {job.job_id}\n"
@@ -107,6 +109,7 @@ def _job_block(job: JobSpec) -> str:
         f"  employer: {job.employer}\n"
         f"  required_skills (canonical ids): {job.required_skills}\n"
         f"  preferred_skills (canonical ids): {job.preferred_skills}\n"
+        f"{adjacency_lines(job)}"
         f"  min_education: {job.min_education}\n"
         f"  description: {job.description}\n"
     )

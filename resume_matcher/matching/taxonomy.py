@@ -118,6 +118,61 @@ def _build_surface_map() -> dict[str, str]:
     return index
 
 
+_RELATIONS_PATH = Path(__file__).resolve().parent.parent / "data" / "skill_relations.json"
+
+
+def _load_relations() -> dict[str, frozenset[str]]:
+    """Curated adjacent-skill graph (see data/skill_relations.json). Symmetric; ids not in the
+    vocabulary are dropped so a stale overlay can never invent skills. Missing/corrupt file -> {}."""
+    try:
+        raw = json.loads(_RELATIONS_PATH.read_text(encoding="utf-8"))
+    except Exception:  # noqa: BLE001 - the overlay is optional; adjacency simply disables
+        return {}
+    if not isinstance(raw, dict):  # valid JSON but not the expected shape (e.g. a list) -> inert
+        return {}
+    edges: dict[str, set[str]] = {}
+
+    def link(a: str, b: str) -> None:
+        if a != b and a in _CANONICAL and b in _CANONICAL:
+            edges.setdefault(a, set()).add(b)
+            edges.setdefault(b, set()).add(a)
+
+    for cluster in raw.get("clusters", []) or []:
+        ids = [c for c in cluster if isinstance(c, str)]
+        for i, a in enumerate(ids):
+            for b in ids[i + 1:]:
+                link(a, b)
+    for pair in raw.get("pairs", []) or []:
+        if isinstance(pair, (list, tuple)) and len(pair) == 2:
+            link(str(pair[0]), str(pair[1]))
+    return {k: frozenset(v) for k, v in edges.items()}
+
+
+_RELATED = _load_relations()
+
+
+def related_skills(skill_id: str) -> tuple[str, ...]:
+    """Curated ADJACENT skills for `skill_id` (sorted; empty when none). Adjacency earns partial
+    credit in the ranker — recruiters credit close transfer, keyword matching scores it zero."""
+    return tuple(sorted(_RELATED.get(skill_id, ())))
+
+
+def are_related(a: str, b: str) -> bool:
+    """True when (a, b) is in the curated adjacency graph (symmetric). This is the DETERMINISTIC
+    gate on LLM-proposed adjacency: a claim outside this graph is refused by the ranker."""
+    return b in _RELATED.get(a, ())
+
+
+def surface_forms(skill_id: str) -> list[str]:
+    """Every surface form of a skill (canonical name, id-derived forms, aliases) — used by the
+    ranker's bare-mention check (an evidence quote that is JUST the skill's name proves the skill
+    was named, not used)."""
+    spec = _RAW.get(skill_id, {})
+    forms = [_CANONICAL.get(skill_id, skill_id), skill_id, skill_id.replace("_", " ")]
+    forms += list(spec.get("aliases", []) or [])
+    return forms
+
+
 _SURFACE_TO_CID = _build_surface_map()
 # Longest surfaces first so multi-word skills win over their substrings ("machine learning" > "learning").
 _SORTED_SURFACES = sorted(_SURFACE_TO_CID, key=len, reverse=True)

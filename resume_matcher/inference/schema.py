@@ -87,6 +87,11 @@ class SkillEvidence(BaseModel):
     importance: Importance = Importance.important
     evidence_span: str | None = None
     recency_years: float | None = None
+    # ADJACENCY: when the job skill itself is not evidenced but a closely-RELATED skill is, the
+    # model sets this to the related skill's canonical id and quotes the span demonstrating it.
+    # The ranker accepts it at PARTIAL (half) credit ONLY if the (skill_id, adjacent_to) pair is in
+    # the curated relation graph (data/skill_relations.json) — the LLM proposes, code decides.
+    adjacent_to: str | None = None
 
 
 class Gap(BaseModel):

@@ -97,7 +97,10 @@ def test_degenerate_evidence_span_does_not_verify():
 
 
 def test_short_real_skill_token_still_verifies():
-    """The degenerate-span guard must not reject legitimate short skill quotes like 'SQL' or 'AWS'."""
+    """The degenerate-span guard must not reject legitimate short skill quotes like 'SQL' or 'AWS' —
+    they still VERIFY and count. Since the named-is-not-demonstrated rule (#3b), a naked name quote
+    counts at half weight (the model is told to quote the demonstrating phrase); quoting the
+    demonstrating context restores full credit."""
     cand = CandidateProfile(candidate_id="C", text="Wrote SQL and used AWS daily. " + "x" * 250)
     ext = MatchExtraction(
         candidate_id="C", job_id="J",
@@ -107,18 +110,32 @@ def test_short_real_skill_token_still_verifies():
         ],
     )
     res = ranker.score(ext, cand, _job(["sql", "aws"]))
-    assert {m.skill_id for m in res.verified_matches} == {"sql", "aws"}
-    assert res.fit_score == 100.0
+    assert {m.skill_id for m in res.verified_matches} == {"sql", "aws"}  # verified, NOT rejected
+    assert res.fit_score == 50.0  # ...but name-only quotes earn half credit (bare mentions)
+    assert sum(1 for f in res.flags if f.startswith("bare_mention:")) == 2
+
+    demonstrated = MatchExtraction(
+        candidate_id="C", job_id="J",
+        skill_matches=[
+            SkillEvidence(skill_id="sql", skill_name="SQL", status=MatchStatus.match,
+                          evidence_span="Wrote SQL and used AWS daily"),
+            SkillEvidence(skill_id="aws", skill_name="AWS", status=MatchStatus.match,
+                          evidence_span="Wrote SQL and used AWS daily"),
+        ],
+    )
+    res2 = ranker.score(demonstrated, cand, _job(["sql", "aws"]))
+    assert res2.fit_score == 100.0  # demonstrating quotes keep full credit
 
 
 def test_integrity_downweight_for_keyword_stuffing():
     # Anti-gaming flags must now LOWER the score (audit #10) — they used to be computed and ignored,
     # so a keyword-stuffed resume could score ~94. The penalty is bounded and never auto-rejects.
-    cand = CandidateProfile(candidate_id="C", text="python " * 60 + "x" * 250)
+    cand = CandidateProfile(candidate_id="C",
+                            text="Shipped python services to production. " + "python " * 60 + "x" * 250)
     ext = MatchExtraction(
         candidate_id="C", job_id="J",
-        skill_matches=[SkillEvidence(skill_id="python", skill_name="Python",
-                                     status=MatchStatus.match, evidence_span="python")],
+        skill_matches=[SkillEvidence(skill_id="python", skill_name="Python", status=MatchStatus.match,
+                                     evidence_span="Shipped python services to production")],
     )
     clean = ranker.score(ext, cand, _job(["python"]))
     stuffed = ranker.score(ext, cand, _job(["python"]), extra_flags=["stuffing:repetition:pythonx40"])
@@ -253,9 +270,13 @@ def test_duplicate_skill_ids_collapsed():
 
 
 def test_duplicate_evidence_keeps_strongest_regardless_of_order():
-    cand = CandidateProfile(candidate_id="C", text="Expert in Python. Python basics. " + "x" * 250)
+    # NB: the strong quote must DEMONSTRATE use ("built X in Python"), not just claim expertise —
+    # a bare "Expert in Python" would (correctly) be half-credited by the named-not-demonstrated rule.
+    cand = CandidateProfile(candidate_id="C",
+                            text="Built data pipelines in Python. Python basics. " + "x" * 250)
     evs = [
-        SkillEvidence(skill_id="python", skill_name="P", status=MatchStatus.match, evidence_span="Expert in Python"),
+        SkillEvidence(skill_id="python", skill_name="P", status=MatchStatus.match,
+                      evidence_span="Built data pipelines in Python"),
         SkillEvidence(skill_id="python", skill_name="P", status=MatchStatus.partial, evidence_span="Python basics"),
     ]
     fwd = ranker.score(MatchExtraction(candidate_id="C", job_id="J", skill_matches=evs), cand, _job(["python"]))

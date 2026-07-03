@@ -160,7 +160,8 @@ def test_demo_uses_claude_when_available(monkeypatch):
     payload = {
         "candidate_id": "x", "job_id": "x",
         "skill_matches": [
-            {"skill_id": "python", "skill_name": "Python", "status": "match", "evidence_span": "Python"}
+            {"skill_id": "python", "skill_name": "Python", "status": "match",
+             "evidence_span": "Senior Python developer with broad experience"}
         ],
         "gaps": [], "rationale": "",
     }
@@ -183,12 +184,14 @@ def test_demo_file_direct_reads_pdf_via_claude(monkeypatch):
     monkeypatch.setattr(claude_cli, "available", lambda: True)
 
     def fake_from_file(path, job, cid):
-        text = "Jane Doe. Senior Python developer. Strong SQL. Bachelor of Science. 5 years."
+        text = "Jane Doe. Senior Python developer. Strong SQL reporting work. Bachelor of Science. 5 years."
         ext = MatchExtraction(
             candidate_id=cid, job_id=job.job_id,
             skill_matches=[
-                SkillEvidence(skill_id="python", skill_name="Python", status=MatchStatus.match, evidence_span="Python"),
-                SkillEvidence(skill_id="sql", skill_name="SQL", status=MatchStatus.match, evidence_span="SQL"),
+                SkillEvidence(skill_id="python", skill_name="Python", status=MatchStatus.match,
+                              evidence_span="Senior Python developer"),
+                SkillEvidence(skill_id="sql", skill_name="SQL", status=MatchStatus.match,
+                              evidence_span="Strong SQL reporting work"),
             ],
         )
         return text, ext
@@ -213,7 +216,8 @@ def test_extraction_cache_makes_rescore_consistent_and_skips_llm(monkeypatch):
     monkeypatch.setattr(claude_cli, "available", lambda: True)
     calls = {"n": 0}
     payload = {"candidate_id": "x", "job_id": "x",
-               "skill_matches": [{"skill_id": "python", "skill_name": "Python", "status": "match", "evidence_span": "Python"}],
+               "skill_matches": [{"skill_id": "python", "skill_name": "Python", "status": "match",
+                                  "evidence_span": "Senior Python developer with strong experience"}],
                "gaps": [], "rationale": ""}
 
     def fake(prompt, **kw):
