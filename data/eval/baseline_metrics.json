@@ -10,42 +10,41 @@
         "max_mae": 56.1
       },
       "claude_cli": {
-        "role": "measured real-engine floor (claude_cli, 3 run(s)) - MEASURED ON THE ORIGINAL 24-EXAMPLE SET (2026-07-03). The set has since grown to 63 stratified examples; re-measure on a token box (`eval_accuracy.py --backend claude_cli --runs 3 --write-baseline`) before trusting these floors against the grown set.",
+        "role": "measured real-engine floor (claude_cli, 3 run(s))",
         "measured": {
           "label_accuracy": {
-            "mean": 0.611,
-            "stdev": 0.04,
-            "min": 0.583,
-            "max": 0.667,
+            "mean": 0.54,
+            "stdev": 0.013,
+            "min": 0.524,
+            "max": 0.556,
             "n": 3
           },
           "within_one_bucket": {
-            "mean": 0.903,
-            "stdev": 0.02,
-            "min": 0.875,
-            "max": 0.917,
+            "mean": 0.926,
+            "stdev": 0.008,
+            "min": 0.921,
+            "max": 0.937,
             "n": 3
           },
           "spearman": {
-            "mean": 0.581,
-            "stdev": 0.007,
-            "min": 0.571,
-            "max": 0.587,
+            "mean": 0.56,
+            "stdev": 0.029,
+            "min": 0.528,
+            "max": 0.598,
             "n": 3
           },
           "mae": {
-            "mean": 14.143,
-            "stdev": 0.624,
-            "min": 13.43,
-            "max": 14.95,
+            "mean": 16.227,
+            "stdev": 0.153,
+            "min": 16.06,
+            "max": 16.43,
             "n": 3
           }
         },
-        "min_label_accuracy": 0.521,
-        "min_within_one_bucket": 0.833,
-        "min_spearman": 0.474,
-        "max_mae": 17.8,
-        "measured_on_examples": 24
+        "min_label_accuracy": 0.477,
+        "min_within_one_bucket": 0.868,
+        "min_spearman": 0.431,
+        "max_mae": 19.4
       }
     },
     "labeled": {
