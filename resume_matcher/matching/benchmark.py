@@ -20,6 +20,8 @@ from __future__ import annotations
 
 import json
 import math
+import os
+from concurrent.futures import ThreadPoolExecutor, as_completed
 from pathlib import Path
 
 from ..inference.adapter import InferenceAdapter, get_adapter
@@ -119,11 +121,37 @@ def _metrics(rows: list[dict]) -> dict:
     }
 
 
-def run_benchmark(examples: list[dict], adapter: InferenceAdapter | None = None) -> dict:
+def run_benchmark(
+    examples: list[dict], adapter: InferenceAdapter | None = None, progress=None
+) -> dict:
+    """Score every example and report agreement metrics. Examples are scored CONCURRENTLY (up to
+    RM_EVAL_WORKERS, default 8) — a real LLM backend spends the whole call waiting on the model, and
+    the claude_cli adapter already caps actual parallel processes via its own semaphore, so this just
+    stops the harness from making 24 slow calls strictly one at a time. Results are reassembled in
+    dataset order, so output is deterministic for a deterministic backend regardless of workers.
+    `progress(done, total)` is called after each example (for a live counter)."""
     adapter = adapter or get_adapter("mock")
+    total = len(examples)
+    workers = max(1, min(int(os.environ.get("RM_EVAL_WORKERS", "8") or "8"), total or 1))
+    results: list = [None] * total
+    done = 0
+    if workers == 1:
+        for i, ex in enumerate(examples):
+            results[i] = score_example(ex, adapter)
+            done += 1
+            if progress:
+                progress(done, total)
+    else:
+        with ThreadPoolExecutor(max_workers=workers) as pool:
+            futs = {pool.submit(score_example, ex, adapter): i for i, ex in enumerate(examples)}
+            for fut in as_completed(futs):
+                results[futs[fut]] = fut.result()  # a backend error propagates -> aborts cleanly
+                done += 1
+                if progress:
+                    progress(done, total)
     rows = []
-    for ex in examples:
-        fit, grade = score_example(ex, adapter)
+    for i, ex in enumerate(examples):
+        fit, grade = results[i]
         h = ex.get("human", {})
         rows.append({
             "id": ex.get("id"), "job": ex.get("job", {}).get("title"),
@@ -152,7 +180,7 @@ _AGG_METRICS = ("label_accuracy", "within_one_bucket", "spearman", "mae")
 
 
 def run_benchmark_repeated(
-    examples: list[dict], adapter: InferenceAdapter | None = None, runs: int = 3
+    examples: list[dict], adapter: InferenceAdapter | None = None, runs: int = 3, progress=None
 ) -> dict:
     """Run the SAME benchmark `runs` times and report per-metric mean/stdev/min/max.
 
@@ -163,7 +191,11 @@ def run_benchmark_repeated(
     which is exactly how the tests verify the aggregation without needing the model."""
     adapter = adapter or get_adapter("mock")
     runs = max(1, int(runs))
-    per_run = [run_benchmark(examples, adapter) for _ in range(runs)]
+    per_run = []
+    for r in range(runs):
+        # progress(run_no, done, total) -> the caller can render "run 2/3: 5/24".
+        cb = (lambda d, t, _r=r: progress(_r + 1, d, t)) if progress else None
+        per_run.append(run_benchmark(examples, adapter, progress=cb))
     aggregate = {k: _agg([r["metrics"].get(k) for r in per_run]) for k in _AGG_METRICS}
     # Per-example fit-score spread across runs — surfaces WHICH resumes the engine is unstable on.
     fit_by_id: dict = {}

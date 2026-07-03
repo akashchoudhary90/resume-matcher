@@ -55,7 +55,16 @@ def _assert_backend_available(backend: str) -> None:
                 "mock — that would report mock numbers under the claude_cli label.")
 
 
-def _evaluate(dataset: str, backend: str, runs: int) -> dict:
+def _progress_printer(dataset: str, runs: int):
+    """A live one-line counter on stderr (kept off stdout so --json / the report stay clean)."""
+    def cb(run_no: int, done: int, total: int) -> None:
+        tail = f" (run {run_no}/{runs})" if runs > 1 else ""
+        end = "\n" if done >= total and run_no >= runs else ""
+        print(f"\r  scoring {dataset}: {done}/{total}{tail}   ", end=end, file=sys.stderr, flush=True)
+    return cb
+
+
+def _evaluate(dataset: str, backend: str, runs: int, show_progress: bool = False) -> dict:
     """Always routes through the repeated runner (runs>=1) so the report + baseline emission have a
     uniform shape: `metrics` holds the per-metric MEAN (== the single value when runs==1) and
     `aggregate` holds the full mean/stdev/min/max."""
@@ -63,7 +72,8 @@ def _evaluate(dataset: str, backend: str, runs: int) -> dict:
     path = resolve_dataset(dataset)
     examples = load_examples(path)
     adapter = get_adapter(backend)
-    rep = run_benchmark_repeated(examples, adapter, runs=runs)
+    prog = _progress_printer(dataset, runs) if show_progress else None
+    rep = run_benchmark_repeated(examples, adapter, runs=runs, progress=prog)
     agg = rep["aggregate"]
     metrics = {"n": rep["n"], "n_labeled": rep["n_labeled"], "confusion": rep["confusion"]}
     for k in _AGG_METRICS:
@@ -227,7 +237,8 @@ def main() -> None:
     # (missing dep, server down, rejected key) so any engine fails CLEANLY with a non-zero exit and a
     # one-line message — never a raw traceback, and never a silent fall-back to mock (would lie).
     try:
-        results = [_evaluate(ds, args.backend, runs) for ds in datasets]
+        # Live progress on stderr for the human report; suppressed for --json (clean stdout).
+        results = [_evaluate(ds, args.backend, runs, show_progress=not args.json) for ds in datasets]
     except InferenceError as exc:
         sys.exit(f"Cannot benchmark backend '{args.backend}': {exc}")
     failures: list[str] = []

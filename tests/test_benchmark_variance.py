@@ -87,7 +87,10 @@ def _stub_examples():
     ]
 
 
-def test_repeated_nondeterministic_backend_shows_spread():
+def test_repeated_nondeterministic_backend_shows_spread(monkeypatch):
+    # The alternating stub's counter isn't thread-safe; pin workers=1 so the per-run flip is
+    # deterministic (real backends are stateless per call, so concurrency is safe for them).
+    monkeypatch.setenv("RM_EVAL_WORKERS", "1")
     rep = run_benchmark_repeated(_stub_examples(), adapter=_AlternatingAdapter(), runs=3)
     agg = rep["aggregate"]
     # At least one aggregate metric wobbles, and at least one example's fit has min < max.
