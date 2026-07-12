@@ -349,3 +349,85 @@ audit.db with aligned-ref egress and min-cell-5 suppression).
 Remaining known gaps vs. Handshake (not platform features, deliberately out of scope): native
 iOS/Android apps (the responsive PWA is installable instead) and Handshake's cross-school network
 scale itself — which is a go-to-market fact, not software.
+
+---
+
+# Phase 4 — relationship graph & warm-intro engine (goal 2026-07-12: "implement remaining items")
+
+Full spec + boundary compliance + adversarial-fix table: [`RELATIONSHIPS.md`](RELATIONSHIPS.md).
+Consent-first warm intros: student → mutual → hiring manager over CONSENTED edges, double-opt-in.
+The LinkedIn path is self-upload only, RAM-intersected, zero non-member residue. All behind
+`RM_PLATFORM_ENABLED`. KMS pepper is a documented prod interface; dev uses `RM_GRAPH_PEPPER`
+(RM_ENV=dev). PIA / legal opinion / data-residency are recorded launch gates (Slice AK), not code.
+
+## Slice Y — migration 003 + unified consent rebuild + tenant hardening
+- [ ] Y1 `stores/migrations/003_phase4.sql` (RELATIONSHIPS.md §3): rebuild consents once with 4 new
+      purposes (contacts_upload, graph_discoverable, warm_intro, network_analytics); member_graph_identity,
+      graph_edges (ONE canonical edge table), graph_suppressions, employer_contacts, posting_contacts,
+      vouches, intro_requests, intro_events, broker_blocks — all school_id NOT NULL (no default).
+- [ ] Y2 `students.py` CONSENT_PURPOSES += the 4 purposes.
+- [ ] Y3 Tests: protected-column CI still green, 003 idempotent (rows preserved on existing DB),
+      purposes⇔CHECK match, school_id NOT NULL enforced.
+
+## Slice Z — granular consent API + data-subject-request (erasure + non-member repudiation)
+- [ ] Z1 consent grant/revoke routes per purpose; DELETE /api/network (member erasure, hard delete +
+      tombstone); POST /api/graph/repudiate (non-member DSR → graph_suppressions).
+- [ ] Z2 Tests: revoke hides member everywhere; erasure is hard delete; repudiation tombstones.
+
+## Slice AA — tokenizer (KMS interface + dev pepper, per-school, versioned, fail-closed)
+- [ ] AA1 `stores/graph_tokens.py`: canonical_identity + identity_token(school_id,...) → (token, key_version);
+      KMS-MAC interface, dev env-var pepper only when RM_ENV=dev, fail-closed without key.
+- [ ] AA2 Tests: canonicalization determinism, per-school divergence, key-version, fail-closed.
+
+## Slice AB — contacts importer (RAM-only PSI-lite; zero non-member residue)
+- [ ] AB1 NetworkStore.import_csv + POST /api/network/import (202+poll); consent-gated; size/batch caps;
+      RAM intersection vs member_graph_identity; discard non-matches before commit; no per-contact counts.
+- [ ] AB2 Tests: discards non-members (0 residue), no count egress, size/batch guards, fail-closed.
+
+## Slice AC — edge builder + resolve/backfill (revocation-durable)
+- [ ] AC1 RelationshipStore.upsert_edge/build_native_edges/resolve_import/backfill; build_edges +
+      resolve_network job handlers; native folding; never un-revoke; skip suppressed; post-consent only.
+- [ ] AC2 Tests: idempotent, never-unrevoke, skips suppressed, backfill ignores pre-consent, default pending.
+
+## Slice AD — pathfinder (consent-gated BFS + verified-vouch ranking)
+- [ ] AD1 `stores/intros.py`: EDGE_STRENGTH, edge_score, rank_path, find_paths (BFS depth 3, top-5,
+      product×recency), shared _SHAREABLE predicate; GET /api/intros/available/{posting} = bare boolean,
+      gated behind an application, school-scoped, rate-limited.
+- [ ] AD2 Tests: ranking unit tests; respects shareable+both-consent; available is boolean-behind-application;
+      no audit import.
+
+## Slice AE — double-opt-in intro flow (authz-hardened)
+- [ ] AE1 intro lifecycle + routes; _intro_access READ-ONLY; accept/decline explicit broker-only 403;
+      IDOR check (application.student_id==requester); broker pending cap + block; note redacted+escaped;
+      intro_events status-only.
+- [ ] AE2 Tests: student can't accept own request, IDOR blocked, broker cap+block, decline is silent.
+
+## Slice AF — vouches as structured job-related evidence
+- [ ] AF1 create/verify/contest vouch + routes; redact evidence at ingest; only verified tiers project a
+      verified_vouch edge (self→low weight); subject view+contest; per-voucher rate limit; exposure logged.
+- [ ] AF2 Tests: self-vouch low weight, ingest redacts PII, subject view/contest, rate limit, contested not traversed.
+
+## Slice AG — employer evidence card
+- [ ] AG1 GET /api/intros/for-application/{id}; quoted attributable evidence, claim_kind, never in match_results.
+- [ ] AG2 Tests: card not in match_results, output escaped.
+
+## Slice AH — fairness audit (aggregate-only, MIN_CELL=5)
+- [ ] AH1 audit/metrics.access_disparity; GET /api/coordinator/reports/intro-equity (JSON+CSV); access +
+      conversion funnels; two independent AuditDB.aggregate calls, never joined per-person.
+- [ ] AH2 Tests: pass/fail/suppressed-numerator/single-group; two connections never joined.
+
+## Slice AI — active mitigation as governed positive-action program
+- [ ] AI1 NETWORK_FEATURE_KEYS guard in scoring plane; network_poverty (structural, never self-ID) trigger;
+      alumni-bridge matcher + coordinator-initiated intro (double-opt-in); coverage report w/ shut-off.
+- [ ] AI2 Tests: network features rejected by scoring plane; intros not in match_results; no audit import.
+
+## Slice AJ — UI wiring
+- [ ] AJ1 student.html (granular consents + attestation, contacts upload, discovery opt-in, delete-my-network,
+      vouches-about-me, request-warm-intro behind application, intro inbox); coordinator.html (intro-equity +
+      mitigation coverage); employer evidence card; broker inbox. All output escaped.
+- [ ] AJ2 Browser-verify the full flow; console clean; 375px pass.
+
+## Slice AK — retention/erasure job + legal launch gates
+- [ ] AK1 graph_retention job (purge expired edges/intros; erasure cascade on account deletion; tombstones);
+      record PIA + legal-opinion + data-residency + pepper-leak-runbook as documented launch gates.
+- [ ] AK2 Tests: retention purges expired, erasure cascade leaves no PII, intro_events PII-free.
