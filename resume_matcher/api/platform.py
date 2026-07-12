@@ -771,6 +771,104 @@ def my_interviews(user: dict = Depends(require_role("student"))):
     return {"interviews": InterviewStore().upcoming_for_student(user["id"])}
 
 
+# ---- voluntary self-ID + EEO/funnel reports (Slice W) -----------------------------------------------
+def _candidate_ref(user_id: int) -> str:
+    return f"student-{user_id}"
+
+
+@router.post("/api/students/me/self-id")
+def set_self_id(body: dict, user: dict = Depends(require_role("student"))):
+    """Voluntary self-ID for the AGGREGATE bias audit only. Requires the self_id_audit consent;
+    writes ONLY to the separate audit database (boundary #2 — never the scoring plane)."""
+    from ..stores.audit_store import AuditDB
+
+    if not _student_store().has_consent(user["id"], "self_id_audit"):
+        raise HTTPException(409, "Grant the self-ID audit consent first.")
+    try:
+        stored = AuditDB().set_self_id(_candidate_ref(user["id"]), body.get("attrs") or {})
+    except ValueError as exc:
+        raise HTTPException(400, str(exc))
+    return {"stored": stored}
+
+
+@router.delete("/api/students/me/self-id")
+def delete_self_id(user: dict = Depends(require_role("student"))):
+    from ..stores.audit_store import AuditDB
+
+    return {"deleted": AuditDB().delete_self_id(_candidate_ref(user["id"]))}
+
+
+def _funnel_rows(school_id: int) -> list[dict]:
+    """Per-posting selection funnel over REAL applications (+ exposure + match counts)."""
+    with closing(db_connect()) as conn:
+        rows = conn.execute(
+            "SELECT p.id, p.title, o.name AS org_name, p.status, "
+            "(SELECT COUNT(*) FROM match_results m WHERE m.posting_id = p.id) AS candidates_scored,"
+            "(SELECT COUNT(*) FROM applications a WHERE a.posting_id = p.id) AS applied, "
+            "(SELECT COUNT(*) FROM applications a WHERE a.posting_id = p.id "
+            " AND a.status IN ('shortlisted','advanced','hired')) AS shortlisted_or_beyond, "
+            "(SELECT COUNT(*) FROM applications a WHERE a.posting_id = p.id "
+            " AND a.status = 'hired') AS hired, "
+            "(SELECT COUNT(*) FROM applications a WHERE a.posting_id = p.id "
+            " AND a.human_review_requested = 1) AS human_review_requests, "
+            "(SELECT COUNT(*) FROM events e WHERE e.action='shortlist_exposed' "
+            " AND e.entity_id = p.id) AS shortlist_viewers "
+            "FROM postings p LEFT JOIN orgs o ON o.id = p.org_id "
+            "WHERE p.school_id=? AND p.status IN ('live','closed') ORDER BY p.created_at",
+            (school_id,),
+        ).fetchall()
+    out = []
+    for r in rows:
+        row = dict(r)
+        row["selection_rate"] = round(row["shortlisted_or_beyond"] / row["applied"], 3) \
+            if row["applied"] else None
+        out.append(row)
+    return out
+
+
+@router.get("/api/coordinator/reports/funnel")
+def funnel_report(format: str = "json",
+                  user: dict = Depends(require_role("coordinator", "admin"))):
+    rows = _funnel_rows(user.get("school_id") or 1)
+    if format == "csv":
+        import csv
+        import io
+
+        from fastapi.responses import PlainTextResponse
+
+        buf = io.StringIO()
+        writer = csv.writer(buf)
+        writer.writerow(["posting_id", "title", "employer", "status", "candidates_scored",
+                         "applied", "shortlisted_or_beyond", "hired", "human_review_requests",
+                         "shortlist_viewers", "selection_rate"])
+        for r in rows:
+            writer.writerow([r["id"], r["title"], r["org_name"], r["status"],
+                             r["candidates_scored"], r["applied"], r["shortlisted_or_beyond"],
+                             r["hired"], r["human_review_requests"], r["shortlist_viewers"],
+                             r["selection_rate"]])
+        return PlainTextResponse(buf.getvalue(), media_type="text/csv")
+    return {"score_kind": "fit_readiness_not_hire_probability", "postings": rows}
+
+
+@router.get("/api/coordinator/reports/self-id")
+def self_id_report(user: dict = Depends(require_role("coordinator", "admin"))):
+    """Aggregate self-ID distribution among this school's APPLICANTS, min-cell suppressed.
+    The scoring plane supplies only an opaque ref list; the audit DB answers with counts —
+    the aligned-egress shape from stores/data_planes.py, made persistent."""
+    from ..stores.audit_store import AuditDB
+    from ..stores.data_planes import AUDITABLE_ATTRIBUTES
+
+    school = user.get("school_id") or 1
+    with closing(db_connect()) as conn:
+        refs = ["student-" + str(r["student_id"]) for r in conn.execute(
+            "SELECT DISTINCT a.student_id FROM applications a "
+            "JOIN postings p ON p.id = a.posting_id WHERE p.school_id=?", (school,))]
+    audit = AuditDB()
+    return {"applicants": len(refs),
+            "attributes": {attr: audit.aggregate(refs, attr)
+                           for attr in sorted(AUDITABLE_ATTRIBUTES)}}
+
+
 # ---- notifications (Slice M; best-effort by contract) ----------------------------------------------
 def _notify_creator(posting: dict, subject: str, body: str) -> None:
     try:

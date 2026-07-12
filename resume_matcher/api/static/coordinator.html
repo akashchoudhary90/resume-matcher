@@ -108,6 +108,27 @@
     <h2>All postings</h2>
     <table id="allTable"><thead><tr><th>Title</th><th>Employer</th><th>Status</th><th>Updated</th></tr></thead><tbody></tbody></table>
   </section>
+
+  <section class="card hidden" id="eventsCard">
+    <h2>Events &amp; career fairs</h2>
+    <div class="row">
+      <div style="flex:2"><label>Title</label><input id="evTitle" placeholder="Winter Career Fair" /></div>
+      <div><label>Kind</label><select id="evKind" style="width:100%;background:var(--panel2);border:1px solid var(--line);color:var(--text);border-radius:6px;padding:8px">
+        <option value="fair">fair</option><option value="info_session">info session</option><option value="workshop">workshop</option></select></div>
+      <div><label>Where</label><input id="evWhere" placeholder="Vari Hall" /></div>
+      <div><label>When</label><input id="evWhen" type="datetime-local" /></div>
+      <div style="align-self:end"><button id="evCreate">Create draft</button></div>
+    </div>
+    <table id="coordEventsTable" style="margin-top:12px"><thead><tr><th>When</th><th>Event</th><th>Status</th><th>Registered</th><th></th></tr></thead><tbody></tbody></table>
+  </section>
+
+  <section class="card hidden" id="reportsCard">
+    <h2>Reports — selection funnel &amp; aggregate self-ID
+      <a id="csvLink" href="/api/coordinator/reports/funnel?format=csv" download="funnel.csv" style="font-size:12.5px">download CSV</a></h2>
+    <table id="funnelTable"><thead><tr><th>Posting</th><th>Scored</th><th>Applied</th><th>Shortlisted+</th><th>Hired</th><th>Sel. rate</th><th>Viewers</th></tr></thead><tbody></tbody></table>
+    <h2 style="margin-top:16px">Self-ID (voluntary, aggregate, min-cell suppressed)</h2>
+    <div id="selfIdReport" class="muted"></div>
+  </section>
 </main>
 
 <script>
@@ -125,7 +146,8 @@ async function refreshAuth() {
   const me = (await api('/api/account/me').catch(()=>({user:null}))).user;
   const ok = me && (me.role === 'coordinator' || me.role === 'admin');
   $('#authCard').classList.toggle('hidden', !!ok);
-  for (const id of ['linksCard','queueCard','allCard']) $('#'+id).classList.toggle('hidden', !ok);
+  for (const id of ['linksCard','queueCard','allCard','eventsCard','reportsCard'])
+    $('#'+id).classList.toggle('hidden', !ok);
   $('#signoutBtn').classList.toggle('hidden', !ok);
   $('#who').textContent = me ? `${me.email} (${me.role})` : '';
   if (me && !ok) $('#authErr').textContent = 'You are signed in as ' + me.role + ' — this page needs a coordinator account.';
@@ -200,6 +222,58 @@ async function act(kind) {
     loadAll();
   } catch (e) { $('#dErr').textContent = e.message; }
 }
+
+// ---- events CRUD -----------------------------------------------------------------------------------
+$('#evCreate').onclick = async () => {
+  const when = $('#evWhen').value ? new Date($('#evWhen').value).getTime() / 1000 : 0;
+  try {
+    await api('/api/events', {method:'POST', body: JSON.stringify({
+      title: $('#evTitle').value, kind: $('#evKind').value,
+      location: $('#evWhere').value, starts_at: when})});
+    $('#evTitle').value = ''; loadEvents();
+  } catch (e) { alert(e.message); }
+};
+async function loadEvents() {
+  const events = (await api('/api/events').catch(()=>({events:[]}))).events;
+  $('#coordEventsTable tbody').innerHTML = events.map(e => `<tr>
+    <td>${new Date(e.starts_at*1000).toLocaleString()}</td>
+    <td>${esc(e.title)} <span class="muted">${esc(e.kind)} · ${esc(e.location || '')}</span></td>
+    <td><span class="status">${esc(e.status)}</span></td>
+    <td>${e.registrations}</td>
+    <td>${e.status === 'draft' ? `<button data-pub="${esc(e.id)}">Publish</button>` : ''}
+        ${e.status !== 'cancelled' ? `<button class="danger" data-cxl="${esc(e.id)}">Cancel</button>` : ''}</td>
+    </tr>`).join('') || '<tr><td colspan="5" class="muted">No events yet.</td></tr>';
+  $('#coordEventsTable').onclick = async e => {
+    const pub = e.target.dataset.pub, cxl = e.target.dataset.cxl;
+    if (pub || cxl) {
+      await api(`/api/events/${pub || cxl}`, {method:'PATCH',
+                body: JSON.stringify({status: pub ? 'published' : 'cancelled'})})
+        .catch(err => alert(err.message));
+      loadEvents();
+    }
+  };
+}
+
+// ---- reports ---------------------------------------------------------------------------------------
+async function loadReports() {
+  const funnel = (await api('/api/coordinator/reports/funnel').catch(()=>({postings:[]}))).postings;
+  $('#funnelTable tbody').innerHTML = funnel.map(r => `<tr>
+    <td>${esc(r.title)} <span class="muted">${esc(r.org_name || '')}</span></td>
+    <td>${r.candidates_scored}</td><td>${r.applied}</td><td>${r.shortlisted_or_beyond}</td>
+    <td>${r.hired}</td><td>${r.selection_rate ?? '—'}</td><td>${r.shortlist_viewers}</td></tr>`).join('')
+    || '<tr><td colspan="7" class="muted">No live/closed postings yet.</td></tr>';
+  const sid = await api('/api/coordinator/reports/self-id').catch(()=>null);
+  if (sid) {
+    $('#selfIdReport').innerHTML = `Applicants: ${sid.applicants}<br/>` +
+      Object.entries(sid.attributes).map(([attr, a]) => {
+        const cells = Object.entries(a.counts).map(([v, n]) => `${esc(v)}: ${n}`).join(', ');
+        return `<b>${esc(attr)}</b> — ${cells || 'no visible cells'}` +
+          (a.suppressed_cells ? ` <span class="muted">(+${a.suppressed_cells} cell(s) suppressed, n&lt;${a.min_cell})</span>` : '');
+      }).join('<br/>');
+  }
+}
+const _origLoadAll = loadAll;
+loadAll = async () => { await _origLoadAll(); loadEvents(); loadReports(); };
 
 refreshAuth();
 </script>

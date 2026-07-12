@@ -142,6 +142,12 @@
     <div id="shortlist" style="margin-top:10px"></div>
     <button id="slBack" class="ghost" style="margin-top:10px">Back</button>
   </section>
+
+  <!-- events -->
+  <section class="card hidden" id="eventsCard">
+    <h2>Career fairs &amp; events — book a booth</h2>
+    <table id="eventsTable"><thead><tr><th>When</th><th>Event</th><th>Where</th><th></th></tr></thead><tbody></tbody></table>
+  </section>
 </main>
 
 <script>
@@ -166,10 +172,11 @@ async function refreshAuth() {
   $('#authCard').classList.toggle('hidden', !!ok);
   $('#jdCard').classList.toggle('hidden', !ok);
   $('#mineCard').classList.toggle('hidden', !ok);
+  $('#eventsCard').classList.toggle('hidden', !ok);
   $('#signoutBtn').classList.toggle('hidden', !ok);
   $('#who').textContent = me ? `${me.email} (${me.role})` : '';
   if (me && !ok) $('#authErr').textContent = 'This page needs an employer account — you are signed in as ' + me.role + '.';
-  if (ok) loadMine();
+  if (ok) { loadMine(); loadEvents(); }
 }
 $('#loginBtn').onclick = async () => {
   $('#authErr').textContent = '';
@@ -456,18 +463,85 @@ async function openShortlist(pid, title) {
         <table style="margin-top:6px"><thead><tr><th>Skill</th><th>Match</th><th>Points</th><th>Evidence</th></tr></thead>
         <tbody>${comps}</tbody></table>
         <div class="muted" style="margin-top:6px">${esc(ex.summary || '')}</div></details>
+      ${row.application_id ? `
+      <details><summary style="cursor:pointer;color:var(--accent);font-size:12.5px">Messages</summary>
+        <div id="msgs-${esc(row.application_id)}" style="margin-top:6px"></div></details>
+      <details><summary style="cursor:pointer;color:var(--accent);font-size:12.5px">Interview slots</summary>
+        <div id="slots-${esc(row.application_id)}" class="muted" style="margin-top:6px"></div>
+        <div class="row" style="margin-top:6px">
+          <input type="datetime-local" data-slotstart="${esc(row.application_id)}" />
+          <div style="flex:0 0 auto"><button class="ghost" data-propose="${esc(row.application_id)}">Propose 30-min slot</button></div>
+        </div></details>` : ''}
     </div>`;
   }).join('') : '<div class="muted">No candidates scored yet — matching runs when the posting goes live.</div>';
+  // lazy-load threads/slots when a details block opens
+  $('#shortlist').addEventListener('toggle', async e => {
+    const box = e.target.querySelector('[id^="msgs-"], [id^="slots-"]');
+    if (!e.target.open || !box) return;
+    const appId = box.id.split('-').slice(1).join('-');
+    if (box.id.startsWith('msgs-')) {
+      const msgs = (await api(`/api/applications/${appId}/messages`).catch(()=>({messages:[]}))).messages;
+      box.innerHTML = msgs.map(m => `<div class="muted"><b>${esc(m.sender_role)}</b>:
+        <span style="color:var(--text)">${esc(m.body)}</span></div>`).join('')
+        + `<div class="row" style="margin-top:6px"><input placeholder="Message the candidate…" />
+           <div style="flex:0 0 auto"><button data-sendmsg="${esc(appId)}">Send</button></div></div>`;
+    } else {
+      const slots = (await api(`/api/applications/${appId}/interview-slots`).catch(()=>({slots:[]}))).slots;
+      box.textContent = slots.map(s =>
+        `${new Date(s.starts_at*1000).toLocaleString()} — ${s.status}`).join(' · ') || 'No slots proposed yet.';
+    }
+  }, true);
   $('#shortlist').onclick = async e => {
     const appId = e.target.dataset.advance;
     if (appId) {
       try { await api(`/api/applications/${appId}`, {method:'PATCH', body: JSON.stringify({status:'shortlisted'})}); openShortlist(pid, title); }
       catch (err) { alert(err.message); }
     }
+    const msgApp = e.target.dataset.sendmsg;
+    if (msgApp) {
+      const input = e.target.closest('.row').querySelector('input');
+      if (input.value.trim()) {
+        await api(`/api/applications/${msgApp}/messages`, {method:'POST',
+                  body: JSON.stringify({body: input.value})}).catch(err => alert(err.message));
+        input.value = ''; input.placeholder = 'Sent ✓';
+      }
+    }
+    const propApp = e.target.dataset.propose;
+    if (propApp) {
+      const dt = document.querySelector(`[data-slotstart="${propApp}"]`);
+      const start = dt.value ? new Date(dt.value).getTime() / 1000 : 0;
+      if (!start) { alert('Pick a date and time first.'); return; }
+      await api(`/api/applications/${propApp}/interview-slots`, {method:'POST',
+                body: JSON.stringify({slots: [{starts_at: start, ends_at: start + 1800}]})})
+        .catch(err => alert(err.message));
+      const box = document.querySelector(`#slots-${CSS.escape(propApp)}`);
+      if (box) box.textContent = 'Slot proposed ✓ — the candidate will pick a time.';
+    }
   };
   $('#shortlistCard').scrollIntoView({behavior:'smooth'});
 }
 $('#slBack').onclick = () => $('#shortlistCard').classList.add('hidden');
+
+// ---- events (book a booth) -----------------------------------------------------------------------
+async function loadEvents() {
+  const events = (await api('/api/events').catch(()=>({events:[]}))).events;
+  $('#eventsTable tbody').innerHTML = events.map(e => `<tr>
+    <td>${new Date(e.starts_at*1000).toLocaleString()}</td>
+    <td>${esc(e.title)} <span class="muted">${esc(e.kind)}</span></td>
+    <td>${esc(e.location || '—')}</td>
+    <td>${e.registered
+        ? `<span class="status">booth booked</span> <button class="ghost" data-unrsvp="${esc(e.id)}">Cancel</button>`
+        : `<button data-rsvp="${esc(e.id)}">Book a booth</button>`}</td></tr>`).join('')
+    || '<tr><td colspan="4" class="muted">No upcoming events.</td></tr>';
+  $('#eventsTable').onclick = async e => {
+    const r = e.target.dataset.rsvp, u = e.target.dataset.unrsvp;
+    if (r || u) {
+      await api(`/api/events/${r || u}/${r ? 'register' : 'unregister'}`, {method:'POST'})
+        .catch(err => alert(err.message));
+      loadEvents();
+    }
+  };
+}
 
 refreshAuth();
 </script>

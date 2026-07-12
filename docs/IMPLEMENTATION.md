@@ -295,12 +295,12 @@ school_id + employer_school_links), OFCCP/EEO-style reporting exports.
       |cancel, GET /api/students/me/interviews + employer equivalent.
 - [x] T4 Tests: accept auto-declines siblings; only the applicant accepts; cancel rules.
 
-## Slice U — mobile-ready (responsive + PWA)
+## Slice U — mobile-ready (responsive + PWA) ✅
 - [x] U1 manifest.webmanifest + theme-color + icons (inline SVG data URI), route it; link from all
       four platform pages.
 - [x] U2 Responsive CSS for employer/coordinator/student pages (two-pane stacks under 900px,
       tables scroll in a wrapper, touch-sized buttons).
-- [ ] U3 Verify at 375px (browser resize): no horizontal scroll on the three pages.
+- [x] U3 Verify at 375px (browser resize): no horizontal scroll on the three pages.
 
 ## Slice V — multi-school marketplace (schema is ready; wire it through) ✅
 - [x] V1 Schools API: GET /api/schools (public list for the register form),
@@ -313,23 +313,39 @@ school_id + employer_school_links), OFCCP/EEO-style reporting exports.
       queues are per-school; employer posts to each school only after that school's link is
       approved.
 
-## Slice W — EEO / funnel reports + self-ID (audit plane made persistent)
-- [ ] W1 stores/audit_store.py: SEPARATE SQLite file data/audit.db (RM_AUDIT_DB) — self_id rows
+## Slice W — EEO / funnel reports + self-ID (audit plane made persistent) ✅
+- [x] W1 stores/audit_store.py: SEPARATE SQLite file data/audit.db (RM_AUDIT_DB) — self_id rows
       keyed by an opaque candidate ref; no connection ever opens both DBs (boundary #2 physical).
-- [ ] W2 Student voluntary self-ID route (consent purpose self_id_audit required) writing ONLY to
+- [x] W2 Student voluntary self-ID route (consent purpose self_id_audit required) writing ONLY to
       the audit DB; delete-my-self-ID route.
-- [ ] W3 Coordinator funnel report: per-posting applications by status + shortlist exposure
+- [x] W3 Coordinator funnel report: per-posting applications by status + shortlist exposure
       counts + selection rates; aggregate self-ID breakdown with MIN-CELL-5 suppression;
       GET /api/coordinator/reports/funnel.json + .csv.
-- [ ] W4 Tests: self-ID lands only in audit.db (platform.db has no such column — existing CI
+- [x] W4 Tests: self-ID lands only in audit.db (platform.db has no such column — existing CI
       test), min-cell suppression, funnel counts correct, role gates.
 
-## Slice X — UI wiring + ship
-- [ ] X1 student.html: events card (RSVP), interviews card (accept slot), messages on my
+## Slice X — UI wiring + ship ✅
+- [x] X1 student.html: events card (RSVP), interviews card (accept slot), messages on my
       applications. employer.html: events card (book booth), applicant messaging + propose
       slots from the shortlist/applicants view. coordinator.html: events CRUD card + funnel
       report link + self-ID aggregate view.
-- [ ] X2 Browser-verify: event RSVP, a message round-trip, slot accept, 375px pass; console clean.
-- [ ] X3 Full pytest + ruff; flip boxes; update the parity statement (nothing deliberately
+- [x] X2 Browser-verify: event RSVP, a message round-trip, slot accept, 375px pass; console clean.
+- [x] X3 Full pytest + ruff; flip boxes; update the parity statement (nothing deliberately
       missing except native mobile apps — the web app is installable/responsive); README update;
       commit + push; memory update.
+
+## Handshake-parity statement — FINAL (Phase 3 complete, 2026-07-12)
+
+Everything on the "missing 20%" list is now built, tested, and browser-verified:
+career-fair/events (coordinator CRUD -> publish -> student RSVP / employer booths, attendee
+lists), application-thread messaging (no cold outreach by design; unread counts; verified
+round-trip in the UI), interview scheduling (propose N slots -> student accepts one, siblings
+auto-decline), mobile-ready web app (PWA manifest, responsive at 375px with zero horizontal
+scroll on all three pages), multi-school marketplace (hard school isolation for postings/queues/
+match pools/events; per-school employer approval links; public schools API), and EEO/funnel
+reporting (per-posting selection funnel + CSV export; voluntary self-ID in a PHYSICALLY separate
+audit.db with aligned-ref egress and min-cell-5 suppression).
+
+Remaining known gaps vs. Handshake (not platform features, deliberately out of scope): native
+iOS/Android apps (the responsive PWA is installable instead) and Handshake's cross-school network
+scale itself — which is a go-to-market fact, not software.

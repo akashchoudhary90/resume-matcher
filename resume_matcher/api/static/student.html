@@ -106,8 +106,34 @@
   </section>
 
   <section class="card hidden" id="appsCard">
-    <h2>My applications</h2>
+    <h2>My applications <span class="muted" id="unreadBadge"></span></h2>
     <table id="appsTable"><thead><tr><th>Posting</th><th>Status</th><th></th></tr></thead><tbody></tbody></table>
+  </section>
+
+  <section class="card hidden" id="eventsCard">
+    <h2>Events &amp; career fairs</h2>
+    <table id="eventsTable"><thead><tr><th>When</th><th>Event</th><th>Where</th><th></th></tr></thead><tbody></tbody></table>
+  </section>
+
+  <section class="card hidden" id="interviewsCard">
+    <h2>Interviews</h2>
+    <table id="ivTable"><thead><tr><th>Role</th><th>Employer</th><th>When</th><th>Status</th><th></th></tr></thead><tbody></tbody></table>
+  </section>
+
+  <section class="card hidden" id="selfIdCard">
+    <h2>Voluntary self-identification <span class="muted">— aggregate bias audit only; never seen by employers, never used in scoring</span></h2>
+    <div class="row">
+      <div><label>Gender</label><input id="sid_gender" /></div>
+      <div><label>Race / ethnicity</label><input id="sid_race_ethnicity" /></div>
+      <div><label>Disability status</label><input id="sid_disability_status" /></div>
+      <div><label>First generation</label><input id="sid_first_generation" /></div>
+      <div><label>International status</label><input id="sid_international_status" /></div>
+    </div>
+    <div class="row" style="margin-top:10px">
+      <div style="flex:0 0 auto"><button id="sidSave" class="ghost">Save self-ID</button>
+      <button id="sidDelete" class="ghost">Delete my self-ID</button></div>
+    </div>
+    <div class="muted" id="sidMsg"></div>
   </section>
 </main>
 
@@ -131,7 +157,8 @@ async function refreshAuth() {
   const me = (await api('/api/account/me').catch(()=>({user:null}))).user;
   const ok = me && me.role === 'student';
   $('#authCard').classList.toggle('hidden', !!ok);
-  for (const id of ['profileCard','matchesCard','browseCard','appsCard'])
+  for (const id of ['profileCard','matchesCard','browseCard','appsCard','eventsCard',
+                    'interviewsCard','selfIdCard'])
     $('#'+id).classList.toggle('hidden', !ok);
   $('#signoutBtn').classList.toggle('hidden', !ok);
   $('#who').textContent = me ? `${me.email} (${me.role})` : '';
@@ -168,7 +195,7 @@ async function loadAll() {
     if (p) await api('/api/students/me/consents', {method:'POST', body: JSON.stringify({purpose:p, granted:e.target.checked})}).catch(err => alert(err.message));
     loadAll();
   };
-  loadMatches(); loadBrowse(); loadApps();
+  loadMatches(); loadBrowse(); loadApps(); loadEvents(); loadInterviews();
 }
 $('#saveProfileBtn').onclick = async () => {
   $('#profileErr').textContent = '';
@@ -237,17 +264,99 @@ document.body.addEventListener('click', async e => {
 });
 async function loadApps() {
   const rows = (await api('/api/students/me/applications').catch(()=>({applications:[]}))).applications;
+  const unread = (await api('/api/messages/unread-count').catch(()=>({unread:0}))).unread;
+  $('#unreadBadge').textContent = unread ? `· ${unread} unread message(s)` : '';
   $('#appsTable tbody').innerHTML = rows.map(a => `<tr>
     <td>${esc(a.title)}</td><td><span class="status">${esc(a.status)}</span>
       ${a.human_review_requested ? '<span class="muted">· human review requested</span>' : ''}</td>
     <td>${a.human_review_requested ? '' :
-      `<button class="ghost" data-hr="${esc(a.id)}">Request human review</button>`}</td></tr>`).join('')
+      `<button class="ghost" data-hr="${esc(a.id)}">Request human review</button>`}
+      <button class="ghost" data-msg="${esc(a.id)}">Messages</button></td></tr>
+    <tr class="hidden" id="thread-${esc(a.id)}"><td colspan="3"></td></tr>`).join('')
     || '<tr><td colspan="3" class="muted">No applications yet.</td></tr>';
   $('#appsTable').onclick = async e => {
     const id = e.target.dataset.hr;
     if (id) { await api(`/api/applications/${id}/request-human-review`, {method:'POST'}); loadApps(); }
+    const mid = e.target.dataset.msg;
+    if (mid) toggleThread(mid);
+    const send = e.target.dataset.send;
+    if (send) {
+      const box = document.querySelector(`#thread-${send} input`);
+      if (box.value.trim()) {
+        await api(`/api/applications/${send}/messages`, {method:'POST',
+                  body: JSON.stringify({body: box.value})}).catch(err => alert(err.message));
+        renderThread(send);
+      }
+    }
   };
 }
+async function toggleThread(appId) {
+  const row = $('#thread-' + appId);
+  row.classList.toggle('hidden');
+  if (!row.classList.contains('hidden')) renderThread(appId);
+}
+async function renderThread(appId) {
+  const msgs = (await api(`/api/applications/${appId}/messages`).catch(()=>({messages:[]}))).messages;
+  $('#thread-' + appId).firstElementChild.innerHTML =
+    msgs.map(m => `<div class="muted"><b>${esc(m.sender_role)}</b> ·
+      ${new Date(m.sent_at*1000).toLocaleString()}<br/><span style="color:var(--text)">${esc(m.body)}</span></div>`).join('<hr style="border-color:var(--line)"/>')
+    + `<div class="row" style="margin-top:8px"><input placeholder="Write a reply…" />
+       <div style="flex:0 0 auto"><button data-send="${esc(appId)}">Send</button></div></div>`;
+}
+
+async function loadEvents() {
+  const events = (await api('/api/events').catch(()=>({events:[]}))).events;
+  $('#eventsTable tbody').innerHTML = events.map(e => `<tr>
+    <td>${new Date(e.starts_at*1000).toLocaleString()}</td>
+    <td>${esc(e.title)} <span class="muted">${esc(e.kind)}</span></td>
+    <td>${esc(e.location || '—')}</td>
+    <td>${e.registered
+        ? `<span class="status">registered</span> <button class="ghost" data-unrsvp="${esc(e.id)}">Cancel</button>`
+        : `<button data-rsvp="${esc(e.id)}">RSVP</button>`}</td></tr>`).join('')
+    || '<tr><td colspan="4" class="muted">No upcoming events.</td></tr>';
+  $('#eventsTable').onclick = async e => {
+    const r = e.target.dataset.rsvp, u = e.target.dataset.unrsvp;
+    if (r || u) {
+      await api(`/api/events/${r || u}/${r ? 'register' : 'unregister'}`, {method:'POST'})
+        .catch(err => alert(err.message));
+      loadEvents();
+    }
+  };
+}
+
+async function loadInterviews() {
+  const rows = (await api('/api/students/me/interviews').catch(()=>({interviews:[]}))).interviews;
+  $('#ivTable tbody').innerHTML = rows.map(s => `<tr>
+    <td>${esc(s.title)}</td><td>${esc(s.org_name || '—')}</td>
+    <td>${new Date(s.starts_at*1000).toLocaleString()} – ${new Date(s.ends_at*1000).toLocaleTimeString()}</td>
+    <td><span class="status">${esc(s.status)}</span></td>
+    <td>${s.status === 'proposed' ? `<button data-accept="${esc(s.id)}">Accept</button>` : ''}</td>
+    </tr>`).join('')
+    || '<tr><td colspan="5" class="muted">No interviews yet.</td></tr>';
+  $('#ivTable').onclick = async e => {
+    const id = e.target.dataset.accept;
+    if (id) { await api(`/api/interview-slots/${id}/accept`, {method:'POST'})
+      .catch(err => alert(err.message)); loadInterviews(); }
+  };
+}
+
+$('#sidSave').onclick = async () => {
+  const attrs = {};
+  for (const k of ['gender','race_ethnicity','disability_status','first_generation',
+                   'international_status']) {
+    const v = $('#sid_' + k).value.trim();
+    if (v) attrs[k] = v;
+  }
+  try {
+    const r = await api('/api/students/me/self-id', {method:'POST',
+                        body: JSON.stringify({attrs})});
+    $('#sidMsg').textContent = `Saved ${r.stored} answer(s) to the audit store.`;
+  } catch (e) { $('#sidMsg').textContent = e.message; }
+};
+$('#sidDelete').onclick = async () => {
+  await api('/api/students/me/self-id', {method:'DELETE'}).catch(()=>{});
+  $('#sidMsg').textContent = 'Self-ID deleted.';
+};
 
 refreshAuth();
 </script>
