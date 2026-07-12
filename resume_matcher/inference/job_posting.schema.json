@@ -1,0 +1,255 @@
+{
+  "$defs": {
+    "Confidence": {
+      "enum": [
+        "low",
+        "medium",
+        "high"
+      ],
+      "title": "Confidence",
+      "type": "string"
+    },
+    "ExtractedField": {
+      "description": "The provenance envelope every draft field travels in (the design's spine).",
+      "properties": {
+        "value": {
+          "default": null,
+          "title": "Value"
+        },
+        "source_span": {
+          "anyOf": [
+            {
+              "maxItems": 2,
+              "minItems": 2,
+              "prefixItems": [
+                {
+                  "type": "integer"
+                },
+                {
+                  "type": "integer"
+                }
+              ],
+              "type": "array"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Source Span"
+        },
+        "source_page": {
+          "anyOf": [
+            {
+              "type": "integer"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Source Page"
+        },
+        "method": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/Method"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null
+        },
+        "confidence": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/Confidence"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null
+        },
+        "status": {
+          "$ref": "#/$defs/FieldStatus",
+          "default": "missing"
+        },
+        "candidates": {
+          "items": {
+            "additionalProperties": true,
+            "type": "object"
+          },
+          "title": "Candidates",
+          "type": "array"
+        }
+      },
+      "title": "ExtractedField",
+      "type": "object"
+    },
+    "FieldStatus": {
+      "enum": [
+        "auto",
+        "needs_review",
+        "conflict",
+        "missing"
+      ],
+      "title": "FieldStatus",
+      "type": "string"
+    },
+    "Method": {
+      "enum": [
+        "regex",
+        "taxonomy",
+        "heuristic",
+        "llm",
+        "merged",
+        "user"
+      ],
+      "title": "Method",
+      "type": "string"
+    },
+    "SkillDraft": {
+      "description": "One taxonomy-resolved skill chip with its own provenance (skills merge per-skill).",
+      "properties": {
+        "skill_id": {
+          "title": "Skill Id",
+          "type": "string"
+        },
+        "name": {
+          "default": "",
+          "title": "Name",
+          "type": "string"
+        },
+        "bucket": {
+          "default": "required",
+          "title": "Bucket",
+          "type": "string"
+        },
+        "kind": {
+          "default": "named",
+          "title": "Kind",
+          "type": "string"
+        },
+        "method": {
+          "$ref": "#/$defs/Method",
+          "default": "taxonomy"
+        },
+        "confidence": {
+          "$ref": "#/$defs/Confidence",
+          "default": "medium"
+        },
+        "status": {
+          "$ref": "#/$defs/FieldStatus",
+          "default": "needs_review"
+        },
+        "source_span": {
+          "anyOf": [
+            {
+              "maxItems": 2,
+              "minItems": 2,
+              "prefixItems": [
+                {
+                  "type": "integer"
+                },
+                {
+                  "type": "integer"
+                }
+              ],
+              "type": "array"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Source Span"
+        }
+      },
+      "required": [
+        "skill_id"
+      ],
+      "title": "SkillDraft",
+      "type": "object"
+    }
+  },
+  "description": "The reviewable draft. `description` is the canonical (hygiene-passed) posting text itself \u2014\nspans index into it. Everything else is enveloped.",
+  "properties": {
+    "posting_id": {
+      "default": "",
+      "title": "Posting Id",
+      "type": "string"
+    },
+    "title": {
+      "$ref": "#/$defs/ExtractedField"
+    },
+    "employer_name": {
+      "$ref": "#/$defs/ExtractedField"
+    },
+    "employer_website": {
+      "$ref": "#/$defs/ExtractedField"
+    },
+    "locations": {
+      "$ref": "#/$defs/ExtractedField"
+    },
+    "work_mode": {
+      "$ref": "#/$defs/ExtractedField"
+    },
+    "employment_type": {
+      "$ref": "#/$defs/ExtractedField"
+    },
+    "pay": {
+      "$ref": "#/$defs/ExtractedField"
+    },
+    "application_deadline": {
+      "$ref": "#/$defs/ExtractedField"
+    },
+    "start_date": {
+      "$ref": "#/$defs/ExtractedField"
+    },
+    "description": {
+      "default": "",
+      "title": "Description",
+      "type": "string"
+    },
+    "responsibilities": {
+      "$ref": "#/$defs/ExtractedField"
+    },
+    "qualifications_required": {
+      "$ref": "#/$defs/ExtractedField"
+    },
+    "qualifications_preferred": {
+      "$ref": "#/$defs/ExtractedField"
+    },
+    "skills": {
+      "items": {
+        "$ref": "#/$defs/SkillDraft"
+      },
+      "title": "Skills",
+      "type": "array"
+    },
+    "min_education": {
+      "$ref": "#/$defs/ExtractedField"
+    },
+    "min_years": {
+      "$ref": "#/$defs/ExtractedField"
+    },
+    "work_authorization": {
+      "$ref": "#/$defs/ExtractedField"
+    },
+    "application": {
+      "$ref": "#/$defs/ExtractedField"
+    },
+    "contact": {
+      "$ref": "#/$defs/ExtractedField"
+    },
+    "extraction_meta": {
+      "additionalProperties": true,
+      "title": "Extraction Meta",
+      "type": "object"
+    }
+  },
+  "title": "JobPosting",
+  "type": "object"
+}

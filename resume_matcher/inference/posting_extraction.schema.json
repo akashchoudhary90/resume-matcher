@@ -1,0 +1,360 @@
+{
+  "$defs": {
+    "LLMSkill": {
+      "properties": {
+        "name": {
+          "title": "Name",
+          "type": "string"
+        },
+        "bucket": {
+          "default": "required",
+          "title": "Bucket",
+          "type": "string"
+        },
+        "kind": {
+          "default": "named",
+          "title": "Kind",
+          "type": "string"
+        },
+        "quote": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Quote"
+        }
+      },
+      "required": [
+        "name"
+      ],
+      "title": "LLMSkill",
+      "type": "object"
+    },
+    "PayExtraction": {
+      "properties": {
+        "min": {
+          "anyOf": [
+            {
+              "type": "number"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Min"
+        },
+        "max": {
+          "anyOf": [
+            {
+              "type": "number"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Max"
+        },
+        "currency": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Currency"
+        },
+        "period": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Period"
+        },
+        "quote": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Quote"
+        }
+      },
+      "title": "PayExtraction",
+      "type": "object"
+    },
+    "QuotedStr": {
+      "properties": {
+        "value": {
+          "default": "",
+          "title": "Value",
+          "type": "string"
+        },
+        "quote": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Quote"
+        }
+      },
+      "title": "QuotedStr",
+      "type": "object"
+    }
+  },
+  "description": "EXACTLY what the LLM posting pass returns (adapters validate against the pinned schema).\nNames and quotes only \u2014 never taxonomy IDs, never confidences (jd_merge.py computes those).",
+  "properties": {
+    "title": {
+      "anyOf": [
+        {
+          "$ref": "#/$defs/QuotedStr"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null
+    },
+    "employer_name": {
+      "anyOf": [
+        {
+          "$ref": "#/$defs/QuotedStr"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null
+    },
+    "employer_website": {
+      "anyOf": [
+        {
+          "type": "string"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "title": "Employer Website"
+    },
+    "locations": {
+      "items": {
+        "$ref": "#/$defs/QuotedStr"
+      },
+      "title": "Locations",
+      "type": "array"
+    },
+    "work_mode": {
+      "anyOf": [
+        {
+          "type": "string"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "title": "Work Mode"
+    },
+    "employment_type": {
+      "anyOf": [
+        {
+          "type": "string"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "title": "Employment Type"
+    },
+    "pay": {
+      "anyOf": [
+        {
+          "$ref": "#/$defs/PayExtraction"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null
+    },
+    "application_deadline": {
+      "anyOf": [
+        {
+          "$ref": "#/$defs/QuotedStr"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null
+    },
+    "start_date": {
+      "anyOf": [
+        {
+          "$ref": "#/$defs/QuotedStr"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null
+    },
+    "responsibilities": {
+      "items": {
+        "type": "string"
+      },
+      "title": "Responsibilities",
+      "type": "array"
+    },
+    "qualifications_required": {
+      "items": {
+        "type": "string"
+      },
+      "title": "Qualifications Required",
+      "type": "array"
+    },
+    "qualifications_preferred": {
+      "items": {
+        "type": "string"
+      },
+      "title": "Qualifications Preferred",
+      "type": "array"
+    },
+    "skills": {
+      "items": {
+        "$ref": "#/$defs/LLMSkill"
+      },
+      "title": "Skills",
+      "type": "array"
+    },
+    "min_education": {
+      "anyOf": [
+        {
+          "type": "string"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "title": "Min Education"
+    },
+    "min_years": {
+      "anyOf": [
+        {
+          "type": "number"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "title": "Min Years"
+    },
+    "work_authorization_statement": {
+      "anyOf": [
+        {
+          "type": "string"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "title": "Work Authorization Statement"
+    },
+    "sponsorship_available": {
+      "anyOf": [
+        {
+          "type": "boolean"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "title": "Sponsorship Available"
+    },
+    "application_method": {
+      "anyOf": [
+        {
+          "type": "string"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "title": "Application Method"
+    },
+    "application_url": {
+      "anyOf": [
+        {
+          "type": "string"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "title": "Application Url"
+    },
+    "application_email": {
+      "anyOf": [
+        {
+          "type": "string"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "title": "Application Email"
+    },
+    "multi_role_detected": {
+      "default": false,
+      "title": "Multi Role Detected",
+      "type": "boolean"
+    },
+    "other_role_titles": {
+      "items": {
+        "type": "string"
+      },
+      "title": "Other Role Titles",
+      "type": "array"
+    },
+    "language": {
+      "default": "en",
+      "title": "Language",
+      "type": "string"
+    }
+  },
+  "title": "PostingExtraction",
+  "type": "object"
+}

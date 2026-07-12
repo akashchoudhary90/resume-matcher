@@ -54,16 +54,16 @@ pushes stay safe to auto-deploy.
 - [x] B4 Tests: `tests/test_job_runner.py` — enqueue→run→done, failure→retry→error after max,
       dedupe_key idempotency, stale requeue, poll route auth.
 
-## Slice C — posting schema (the contract)
+## Slice C — posting schema (the contract) ✅
 
-- [ ] C1 `resume_matcher/inference/posting_schema.py` — `ExtractedField` envelope
+- [x] C1 `resume_matcher/inference/posting_schema.py` — `ExtractedField` envelope
       {value, source_span, source_page, method, confidence, status}, `JobPosting` (fields per
       JD_AUTOFILL.md §1 incl. work_authorization display-only), `PostingExtraction` (LLM wire
       shape: values + verbatim quotes, no IDs/confidences), `to_job_spec()` projection with
       PROTECTED_KEYS tripwire.
-- [ ] C2 `inference/job_posting.schema.json` generated + CI-pinned (test like
+- [x] C2 `inference/job_posting.schema.json` generated + CI-pinned (test like
       test_prompt/schema pin), `posting_extraction.schema.json` pinned too.
-- [ ] C3 Tests: `tests/test_posting_schema.py` — round-trip, projection drops
+- [x] C3 Tests: `tests/test_posting_schema.py` — round-trip, projection drops
       work_authorization/contact, tripwire fires on a protected key, schema files match models.
 
 ## Slice D — deterministic passes P0–P3
