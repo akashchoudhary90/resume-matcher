@@ -56,7 +56,7 @@ def _member(conn, user_id, email):
 
 def _csv(rows: list[tuple[str, str, str]]) -> bytes:
     body = "Notes:\n\nFirst Name,Last Name,Company,Position,Connected On\n"
-    body += "\n".join(f"{f},{l},{c},Engineer,01 Jan 2020" for f, l, c in rows)
+    body += "\n".join(f"{f},{ln},{c},Engineer,01 Jan 2020" for f, ln, c in rows)
     return body.encode("utf-8")
 
 
