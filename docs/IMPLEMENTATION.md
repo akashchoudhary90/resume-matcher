@@ -138,6 +138,96 @@ pushes stay safe to auto-deploy.
 - [ ] H4 (stretch) `audit_requirements` widget on coordinator view; vision fallback for
       scanned JD PDFs; French heading set. Not MVP-blocking.
 
+---
+
+# Phase 2 — to ~80% of Handshake functionality (goal set 2026-07-12)
+
+Target inventory (Handshake-parity checklist): postings ✅, employer trust gate ✅, coordinator
+approvals ✅, JD-autofill ✅ (our differentiator) — plus the slices below. The deliberate missing
+~20%: events/career fairs, messaging, interview scheduling, mobile.
+
+**York data-isolation stance (recorded):** assume York will NOT allow student PII to a third-party
+LLM. The engine already gates this (redaction chokepoint + `is_local` tripwire + swappable
+adapter); Slice N makes the JD-autofill LLM pass backend-agnostic too, so a fully ISOLATED
+deployment is `RM_INFERENCE_BACKEND=ollama` + `RM_PLATFORM_EXTRACT_BACKEND=ollama` (nothing leaves
+the box) and Claude stays a dev/demo convenience. JDs are employer marketing text (not student
+PII) — lower sensitivity — but the same switch covers them.
+
+## Slice I — students: profile, consents, resume
+
+- [ ] I1 `stores/students.py` — StudentStore: profile upsert/get; consents grant/revoke/active
+      (append-only rows); resume save (blob + extracted + REDACTED text, one active resume per
+      student, replace = hard-delete old row) + hard delete; `matchable_students()` = visible
+      profiles with active resume AND active `profile_matching` consent (pool filter BEFORE
+      retrieval).
+- [ ] I2 Routes: GET/PUT /api/students/me/profile, GET/POST /api/students/me/consents (grant/
+      revoke by purpose), POST /api/students/me/resume (multipart; parse_resume_bytes reuse;
+      requires `resume_storage` consent), DELETE /api/students/me/resume, GET meta.
+- [ ] I3 Tests: consent gate blocks upload; hard delete removes blob+text; matchable pool
+      respects visibility+consent+resume; redacted_text has no direct identifiers.
+
+## Slice J — browse + apply + application pipeline
+
+- [ ] J1 ApplicationStore (in stores/students.py): apply (live posting + own resume), list mine
+      (student), list for posting (employer own org / coordinator), status transitions
+      applied→shortlisted→advanced→rejected|hired, human_review_requested flag.
+- [ ] J2 Routes: POST /api/postings/{id}/apply, GET /api/students/me/applications,
+      GET /api/postings/{id}/applications, PATCH /api/applications/{id} (role-gated),
+      POST /api/applications/{id}/request-human-review (student).
+- [ ] J3 Tests: student applies once (dupe 409), employer sees own org's applicants only,
+      transitions validated, non-live posting rejects applications.
+
+## Slice K — the matching loop (the engine goes live)
+
+- [ ] K1 `stores/matches.py` MatchStore — upsert/get match_results (score_kind CHECK),
+      shortlist(posting), roles_for(student) over live postings.
+- [ ] K2 Job handlers: `match_posting` (enqueued at approve; scores matchable pool vs posting via
+      build_job_spec + CandidateProfile-from-redacted_text + get_adapter() + evaluator — engine
+      untouched), `rematch_student` (enqueued at resume upload; scores vs live postings).
+      Event-driven only.
+- [ ] K3 Routes: GET /api/postings/{id}/shortlist (employer own/coordinator; ranked, full
+      breakdown from result_json; joins applications) — first view per (viewer, posting) writes an
+      EXPOSURE EVENT to the append-only events table; GET /api/students/me/matches (roles for
+      you: fit + gaps per live posting).
+- [ ] K4 Tests: approve → match job runs (mock adapter) → shortlist ranked; resume upload →
+      rematch; consent revoke removes student from next run; exposure event written once per
+      viewer.
+
+## Slice L — student coaching surface (thin)
+
+- [ ] L1 Student match detail includes the score explanation + gaps (already in result_json).
+- [ ] L2 Tests: gaps/explanation present for a scored pair.
+
+## Slice M — email notifications (stdlib, no-op unless configured)
+
+- [ ] M1 `resume_matcher/notify.py` — send via smtplib when RM_SMTP_HOST set, else log+skip;
+      fire on: org link approved, posting approved/rejected, application received.
+- [ ] M2 Tests: monkeypatched transport captures sends; unset config = silent no-op.
+
+## Slice N — isolated LLM extraction (the York answer)
+
+- [ ] N1 Generalize `posting_extract._llm_posting_extraction` to backends: claude_cli (as now),
+      ollama, openai_compat — via adapter-level `extract_posting` using the pinned
+      posting_extraction schema as a format constraint (same pattern as MatchExtraction).
+- [ ] N2 Boundary #3 in code: a non-local adapter (`is_local=False`) only ever sees a
+      `redact_text`-ed JD copy (contacts already captured deterministically in P2), gated by
+      `assert_redacted`.
+- [ ] N3 README "Isolated deployment (York mode)" section.
+- [ ] N4 Tests: hermetic adapter fake; non-local adapter receives redacted JD.
+
+## Slice P — student UI + shortlist UI
+
+- [ ] P1 `static/student.html` — profile+consents, resume upload/delete, browse live postings,
+      apply, my applications, "roles for you" with fit + why + gaps.
+- [ ] P2 employer.html + coordinator.html: ranked shortlist view with expandable why-this-score.
+- [ ] P3 Browser-verified end to end with mock engine; console clean.
+
+## Slice Q — ship the 80%
+
+- [ ] Q1 Full pytest + ruff; boxes flipped; README student-flow update; commit + push.
+- [ ] Q2 Handshake-parity statement written into this file (what's in the 80%; the missing 20% =
+      events/fairs, messaging, interviews, mobile).
+
 ## Env vars added
 
 | Var | Default | Meaning |
@@ -146,6 +236,9 @@ pushes stay safe to auto-deploy.
 | `RM_PLATFORM_DB` | `data/platform.db` | platform + accounts SQLite file |
 | `RM_PLATFORM_WORKERS` | `2` | worker threads |
 | `RM_JOB_MAX_ATTEMPTS` | `3` | retry ceiling per job |
+| `RM_PLATFORM_EXTRACT_BACKEND` | `claude_cli` | JD-autofill LLM pass backend (`ollama` = isolated) |
+| `RM_PLATFORM_EXTRACT_PER_MIN` | `6` | per-user extract rate limit |
+| `RM_SMTP_HOST/PORT/FROM` | (unset) | email notifications; unset = silent no-op |
 
 ## Restart protocol
 
