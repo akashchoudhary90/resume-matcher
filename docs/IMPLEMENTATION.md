@@ -261,3 +261,75 @@ wire to real applications.
 **The deliberate missing ~20%:** career-fair/event management, employer↔student messaging,
 interview scheduling, mobile apps, multi-school marketplace network effects (schema is ready:
 school_id + employer_school_links), OFCCP/EEO-style reporting exports.
+
+---
+
+# Phase 3 — the remaining 20% (goal set 2026-07-12: "don't stop till nothing is left")
+
+## Slice R — events & career fairs
+- [ ] R1 Migration 002: events(id, school_id, kind fair|info_session|workshop, title, description,
+      location, starts_at, ends_at, created_by, status draft|published|cancelled),
+      event_registrations(event_id, user_id, role, status registered|cancelled, created_at,
+      UNIQUE(event_id,user_id)).
+- [ ] R2 stores/events.py EventStore: coordinator create/publish/cancel; list (students+employers
+      see published, coordinators all); register/unregister (employer books a booth, student
+      RSVPs); attendee list for coordinators/owning employer.
+- [ ] R3 Routes: POST /api/events (coordinator), PATCH /api/events/{id} (publish/cancel),
+      GET /api/events, POST /api/events/{id}/register|unregister, GET /api/events/{id}/attendees.
+- [ ] R4 Tests: lifecycle, role gates, dupe registration 409, attendee visibility.
+
+## Slice S — messaging (application threads)
+- [ ] S1 Migration 002: messages(id, application_id, sender_user_id, body, sent_at, read_at).
+- [ ] S2 stores/messages.py: send (only the applicant, the posting org's employers, or a
+      coordinator; only while the application exists), thread list, mark-read, unread counts.
+- [ ] S3 Routes: GET/POST /api/applications/{id}/messages, GET /api/messages/unread-count.
+- [ ] S4 Tests: both parties + coordinator can read/write; a rival employer cannot; unread flow.
+
+## Slice T — interview scheduling
+- [ ] T1 Migration 002: interview_slots(id, application_id, proposed_by, starts_at, ends_at,
+      status proposed|accepted|declined|cancelled, created_at).
+- [ ] T2 stores/interviews.py: employer proposes 1..N slots; student accepts ONE (its siblings
+      auto-decline); either side cancels; upcoming list per user.
+- [ ] T3 Routes: POST /api/applications/{id}/interview-slots (employer),
+      GET /api/applications/{id}/interview-slots, POST /api/interview-slots/{id}/accept (student)
+      |cancel, GET /api/students/me/interviews + employer equivalent.
+- [ ] T4 Tests: accept auto-declines siblings; only the applicant accepts; cancel rules.
+
+## Slice U — mobile-ready (responsive + PWA)
+- [ ] U1 manifest.webmanifest + theme-color + icons (inline SVG data URI), route it; link from all
+      four platform pages.
+- [ ] U2 Responsive CSS for employer/coordinator/student pages (two-pane stacks under 900px,
+      tables scroll in a wrapper, touch-sized buttons).
+- [ ] U3 Verify at 375px (browser resize): no horizontal scroll on the three pages.
+
+## Slice V — multi-school marketplace (schema is ready; wire it through)
+- [ ] V1 Schools API: GET /api/schools (public list for the register form),
+      POST /api/schools (admin only). Registration accepts school_id (default York).
+- [ ] V2 Scope by school everywhere school_id=1 was implied: postings list/queues/match pool/
+      events take school_id from the signed-in user; employer_school_links approval is per
+      school; an employer may request a link to another school
+      (POST /api/orgs/me/school-links {school_id}).
+- [ ] V3 Tests: two schools — a student at school B never sees school A postings; coordinator
+      queues are per-school; employer posts to each school only after that school's link is
+      approved.
+
+## Slice W — EEO / funnel reports + self-ID (audit plane made persistent)
+- [ ] W1 stores/audit_store.py: SEPARATE SQLite file data/audit.db (RM_AUDIT_DB) — self_id rows
+      keyed by an opaque candidate ref; no connection ever opens both DBs (boundary #2 physical).
+- [ ] W2 Student voluntary self-ID route (consent purpose self_id_audit required) writing ONLY to
+      the audit DB; delete-my-self-ID route.
+- [ ] W3 Coordinator funnel report: per-posting applications by status + shortlist exposure
+      counts + selection rates; aggregate self-ID breakdown with MIN-CELL-5 suppression;
+      GET /api/coordinator/reports/funnel.json + .csv.
+- [ ] W4 Tests: self-ID lands only in audit.db (platform.db has no such column — existing CI
+      test), min-cell suppression, funnel counts correct, role gates.
+
+## Slice X — UI wiring + ship
+- [ ] X1 student.html: events card (RSVP), interviews card (accept slot), messages on my
+      applications. employer.html: events card (book booth), applicant messaging + propose
+      slots from the shortlist/applicants view. coordinator.html: events CRUD card + funnel
+      report link + self-ID aggregate view.
+- [ ] X2 Browser-verify: event RSVP, a message round-trip, slot accept, 375px pass; console clean.
+- [ ] X3 Full pytest + ruff; flip boxes; update the parity statement (nothing deliberately
+      missing except native mobile apps — the web app is installable/responsive); README update;
+      commit + push; memory update.
