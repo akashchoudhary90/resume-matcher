@@ -784,7 +784,13 @@ def create_app():
             raise HTTPException(429, "Too many attempts — please wait a minute and try again.")
         data = await request.json()
         try:
-            token, email = _acct().register(data.get("email", ""), data.get("password", ""))
+            # role/org are platform additions (docs/PLATFORM.md): student (default) and employer
+            # self-serve; employers may name their org (created with a PENDING school link a
+            # coordinator must approve). Privileged roles are rejected by the store.
+            token, email = _acct().register(
+                data.get("email", ""), data.get("password", ""),
+                role=(data.get("role") or "student"),
+                org_name=data.get("org_name"))
         except AccountError as exc:
             raise HTTPException(400, str(exc))
         response.set_cookie(auth_cookie, token, max_age=cookie_max_age(),

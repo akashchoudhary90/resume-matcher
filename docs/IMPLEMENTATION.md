@@ -96,23 +96,23 @@ pushes stay safe to auto-deploy.
       `tests/test_posting_extract.py` (hermetic `_arm`-style: LLM ok / junk / down / injection
       fixture → flags fire, nothing red auto-accepts).
 
-## Slice F — platform stores + API routes
+## Slice F — platform stores + API routes ✅
 
-- [ ] F1 `stores/platform.py` — PostingStore (create_draft from extraction, get, patch fields,
+- [x] F1 `stores/platform.py` — PostingStore (create_draft from extraction, get, patch fields,
       submit→pending_review, approve/reject→live/rejected + posting_events rows, list scoped
       by role, skills CRUD), OrgStore (create, link to school, approve link).
-- [ ] F2 `api/platform.py` (APIRouter, mounted when RM_PLATFORM_ENABLED=1):
+- [x] F2 `api/platform.py` (APIRouter, mounted when RM_PLATFORM_ENABLED=1):
       POST /api/postings/extract (text or multipart; rate-limited; enqueues extract_posting
       job → 202 {job_id, poll}), POST /api/postings (draft from reviewed payload),
       GET /api/postings (role-scoped), GET/PATCH /api/postings/{id},
       POST /api/postings/{id}/submit|close, GET /api/coordinator/queue,
       POST /api/coordinator/postings/{id}/approve|reject,
       POST /api/coordinator/org-links/{org_id}/approve, GET /api/skills (typeahead, promoted).
-- [ ] F3 WFWA disclosure: `AI_DISCLOSURE` constant appended to description at approve-time
+- [x] F3 WFWA disclosure: `AI_DISCLOSURE` constant appended to description at approve-time
       (never employer-removable).
-- [ ] F4 extract_posting job handler registered in the worker pool (runs
+- [x] F4 extract_posting job handler registered in the worker pool (runs
       extract_posting_draft, stores result as job result_json).
-- [ ] F5 Tests: `tests/test_platform_api.py` — full lifecycle employer→extract→create→submit→
+- [x] F5 Tests: `tests/test_platform_api.py` — full lifecycle employer→extract→create→submit→
       coordinator approve→live(+disclosure), role denials (student can't post, employer can't
       approve), org-link gate blocks submit until approved.
 
@@ -130,7 +130,7 @@ pushes stay safe to auto-deploy.
 
 ## Slice H — hardening + ship
 
-- [ ] H1 Corrections→eval loop: on create-after-review, diff draft vs submitted; append
+- [x] H1 Corrections→eval loop: on create-after-review, diff draft vs submitted; append
       `data/eval/jd_extraction_corrections.jsonl` (strip contact payloads). 
 - [ ] H2 `RM_PLATFORM_ENABLED=1` in `.claude/launch.json` env (local), README + DEPLOY.md note;
       decide prod flip separately (needs coordinator seed on VPS).

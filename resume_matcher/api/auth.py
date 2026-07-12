@@ -36,6 +36,21 @@ _AUTH_EXEMPT_PATHS = {
     "/verify", "/api/verify", "/api/defense-file/pubkey",
 }
 
+# When the platform is enabled, its routes carry their OWN per-user auth (require_role over the
+# rm_session account cookie) — employers/students/coordinators have accounts, not the shared admin
+# password. The admin gate is thereby demoted to the ops/legacy surface (docs/PLATFORM.md). The
+# flag is read per-request so RM_PLATFORM_ENABLED=0 deployments keep today's posture untouched.
+_PLATFORM_PREFIXES = (
+    "/api/postings", "/api/jobs/", "/api/coordinator/", "/api/skills", "/api/account/",
+    "/employer", "/coordinator",
+)
+
+
+def _platform_exempt(path: str) -> bool:
+    from ..config import env_flag
+
+    return env_flag("RM_PLATFORM_ENABLED", False) and path.startswith(_PLATFORM_PREFIXES)
+
 # Known-weak / placeholder passwords. admin/admin is INTENTIONALLY allowed for the synthetic-data demo
 # (the user wants it) — we warn but never refuse to start.
 _WEAK_PASSWORDS = {"admin", "password", "passwd", "changeme", "change_me_before_deploy", "secret", "123456"}
@@ -111,8 +126,8 @@ def require_role(*roles: str):
 
 def require_auth(request: Request) -> None:
     global _warned
-    if request.url.path in _AUTH_EXEMPT_PATHS:
-        return  # readiness probe + sign-in page/endpoints must work without a session
+    if request.url.path in _AUTH_EXEMPT_PATHS or _platform_exempt(request.url.path):
+        return  # readiness probe, sign-in endpoints, and per-user-authed platform routes
     expected = session_token()
     if expected is None:
         if not _warned:
