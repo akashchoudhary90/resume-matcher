@@ -56,6 +56,9 @@ ToS tradeoff, mitigated by ephemerality).
 
 ## Where to go next
 
+- `PLATFORM.md` — the approved architecture for evolving this into a full campus-recruiting
+  platform (the Handshake replacement): roles, data model, job runner, build order.
+- `JD_AUTOFILL.md` — the flagship JD-upload → auto-filled posting pipeline spec.
 - `README.md` — quick start, the boundaries, the API contract.
 - `DEPLOY.md` / `deploy/cohost/COHOST.md` — deployment and the self-contained co-hosted demo stack.
 - `PRIVACY.md` — the privacy posture in user-facing terms.
