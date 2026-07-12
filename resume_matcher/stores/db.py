@@ -16,6 +16,7 @@ from __future__ import annotations
 import logging
 import os
 import sqlite3
+import threading
 import time
 from contextlib import closing
 from pathlib import Path
@@ -23,6 +24,12 @@ from pathlib import Path
 _log = logging.getLogger("resume_matcher.stores.db")
 
 MIGRATIONS_DIR = Path(__file__).with_name("migrations")
+
+# Serialize migration application within a process: stores construct concurrently at startup (the
+# worker pool spins up threads that each construct stores, each calling migrate()). Idempotent DDL
+# tolerates a race, but migration 003 rebuilds the consents table (non-idempotent — SQLite can't
+# ALTER a CHECK), so one thread must finish applying before another checks the version.
+_MIGRATE_LOCK = threading.Lock()
 
 # Columns added to tables that may PRE-EXIST a migration (the AccountStore bootstrap creates a bare
 # users table). SQLite backfills existing rows with the DEFAULT, so legacy users become 'student'.
@@ -64,7 +71,7 @@ def migrate(path: str | None = None) -> int:
     """Apply pending migrations; returns how many were applied (0 == already current)."""
     p = path or platform_db_path()
     applied = 0
-    with closing(connect(p)) as conn:
+    with _MIGRATE_LOCK, closing(connect(p)) as conn:
         conn.execute(
             "CREATE TABLE IF NOT EXISTS schema_version("
             "version INTEGER PRIMARY KEY, applied_at REAL NOT NULL)"

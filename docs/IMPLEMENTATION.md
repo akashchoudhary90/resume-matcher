@@ -360,13 +360,13 @@ The LinkedIn path is self-upload only, RAM-intersected, zero non-member residue.
 `RM_PLATFORM_ENABLED`. KMS pepper is a documented prod interface; dev uses `RM_GRAPH_PEPPER`
 (RM_ENV=dev). PIA / legal opinion / data-residency are recorded launch gates (Slice AK), not code.
 
-## Slice Y — migration 003 + unified consent rebuild + tenant hardening
-- [ ] Y1 `stores/migrations/003_phase4.sql` (RELATIONSHIPS.md §3): rebuild consents once with 4 new
+## Slice Y — migration 003 ✅ + unified consent rebuild + tenant hardening
+- [x] Y1 `stores/migrations/003_phase4.sql` (RELATIONSHIPS.md §3): rebuild consents once with 4 new
       purposes (contacts_upload, graph_discoverable, warm_intro, network_analytics); member_graph_identity,
       graph_edges (ONE canonical edge table), graph_suppressions, employer_contacts, posting_contacts,
       vouches, intro_requests, intro_events, broker_blocks — all school_id NOT NULL (no default).
-- [ ] Y2 `students.py` CONSENT_PURPOSES += the 4 purposes.
-- [ ] Y3 Tests: protected-column CI still green, 003 idempotent (rows preserved on existing DB),
+- [x] Y2 `students.py` CONSENT_PURPOSES += the 4 purposes.
+- [x] Y3 Tests: protected-column CI still green, 003 idempotent (rows preserved on existing DB),
       purposes⇔CHECK match, school_id NOT NULL enforced.
 
 ## Slice Z — granular consent API + data-subject-request (erasure + non-member repudiation)
@@ -374,15 +374,15 @@ The LinkedIn path is self-upload only, RAM-intersected, zero non-member residue.
       tombstone); POST /api/graph/repudiate (non-member DSR → graph_suppressions).
 - [ ] Z2 Tests: revoke hides member everywhere; erasure is hard delete; repudiation tombstones.
 
-## Slice AA — tokenizer (KMS interface + dev pepper, per-school, versioned, fail-closed)
-- [ ] AA1 `stores/graph_tokens.py`: canonical_identity + identity_token(school_id,...) → (token, key_version);
+## Slice AA — tokenizer ✅ (KMS interface + dev pepper, per-school, versioned, fail-closed)
+- [x] AA1 `stores/graph_tokens.py`: canonical_identity + identity_token(school_id,...) → (token, key_version);
       KMS-MAC interface, dev env-var pepper only when RM_ENV=dev, fail-closed without key.
-- [ ] AA2 Tests: canonicalization determinism, per-school divergence, key-version, fail-closed.
+- [x] AA2 Tests: canonicalization determinism, per-school divergence, key-version, fail-closed.
 
-## Slice AB — contacts importer (RAM-only PSI-lite; zero non-member residue)
-- [ ] AB1 NetworkStore.import_csv + POST /api/network/import (202+poll); consent-gated; size/batch caps;
+## Slice AB — contacts importer ✅ (RAM-only PSI-lite; zero non-member residue)
+- [x] AB1 NetworkStore.import_csv + POST /api/network/import (202+poll); consent-gated; size/batch caps;
       RAM intersection vs member_graph_identity; discard non-matches before commit; no per-contact counts.
-- [ ] AB2 Tests: discards non-members (0 residue), no count egress, size/batch guards, fail-closed.
+- [x] AB2 Tests: discards non-members (0 residue), no count egress, size/batch guards, fail-closed.
 
 ## Slice AC — edge builder + resolve/backfill (revocation-durable)
 - [ ] AC1 RelationshipStore.upsert_edge/build_native_edges/resolve_import/backfill; build_edges +

@@ -19,7 +19,14 @@ from contextlib import closing
 from ..ingestion.parser import parse_resume_bytes
 from .db import connect, migrate, platform_db_path
 
-CONSENT_PURPOSES = ("resume_storage", "profile_matching", "self_id_audit", "contact")
+CONSENT_PURPOSES = (
+    "resume_storage", "profile_matching", "self_id_audit", "contact",
+    # Phase 4 (relationship graph) — must match the CHECK in migrations/003_phase4.sql:
+    "contacts_upload",      # upload my OWN contacts export
+    "graph_discoverable",   # be a node in pathfinding / be resolved as a mutual
+    "warm_intro",           # a mutual may request a double-opt-in intro TO me
+    "network_analytics",    # anonymized participation in fairness/overlap aggregates
+)
 
 # Forward-only application transitions (employer/coordinator move them; students only apply).
 _APP_TRANSITIONS = {
