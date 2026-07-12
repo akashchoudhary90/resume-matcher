@@ -60,10 +60,15 @@ def canonical_identity(first: str = "", last: str = "", company: str = "",
 
 
 def available() -> bool:
-    """True when key material exists (KMS in prod, or the dev pepper under RM_ENV=dev)."""
+    """True when real key MATERIAL exists (a prod secret, or the dev pepper under RM_ENV=dev).
+
+    Fail-closed: the KMS key ID is a non-secret identifier (it appears in ARNs, IAM policies, and
+    logs), so it can NEVER be the MAC key on its own — prod must also supply RM_GRAPH_KMS_SECRET
+    (real key material). Without it the tokenizer stays disabled rather than emitting tokens that
+    anyone holding the public key id could recompute from a low-entropy name+company."""
     if env_str("RM_ENV", "") == "dev" and env_str("RM_GRAPH_PEPPER", ""):
         return True
-    return bool(env_str("RM_GRAPH_KMS_KEY_ID", ""))  # a real deployment sets this
+    return bool(env_str("RM_GRAPH_KMS_KEY_ID", "")) and bool(env_str("RM_GRAPH_KMS_SECRET", ""))
 
 
 def _kms_mac(key_material: bytes, message: bytes) -> str:
@@ -92,13 +97,18 @@ def identity_token(school_id: int, *, first: str = "", last: str = "", company: 
     TokenizerUnavailable when no key material is configured (fail-closed)."""
     if not available():
         raise TokenizerUnavailable(
-            "No graph key material. Set RM_GRAPH_KMS_KEY_ID (prod) or RM_ENV=dev + "
-            "RM_GRAPH_PEPPER (dev). The contacts importer is disabled without it.")
+            "No graph key material. Set RM_GRAPH_KMS_KEY_ID + RM_GRAPH_KMS_SECRET (prod) or "
+            "RM_ENV=dev + RM_GRAPH_PEPPER (dev). The contacts importer is disabled without it.")
     canonical = canonical_identity(first=first, last=last, company=company, email=email)
     if canonical is None:
         return None
     if env_str("RM_ENV", "") == "dev" and env_str("RM_GRAPH_PEPPER", ""):
         key = _dev_key(school_id)
-    else:  # prod: the KMS holds the key; we pass a per-school context, never a raw key
-        key = f"{os.environ['RM_GRAPH_KMS_KEY_ID']}\x1f{school_id}".encode("utf-8")
+    else:
+        # prod: the MAC is keyed on real SECRET material (RM_GRAPH_KMS_SECRET). The KMS key id is
+        # only version/context — never the key itself (it is a non-secret identifier). Wire a real
+        # KMS/HSM GenerateMac into _kms_mac to keep even this secret out of process memory.
+        secret = os.environ["RM_GRAPH_KMS_SECRET"].encode("utf-8")
+        context = f"{os.environ['RM_GRAPH_KMS_KEY_ID']}\x1f{school_id}".encode("utf-8")
+        key = hashlib.sha256(secret + b"\x1f" + context).digest()
     return _kms_mac(key, canonical.encode("utf-8")), key_version()

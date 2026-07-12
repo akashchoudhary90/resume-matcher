@@ -32,6 +32,7 @@ from .service import get_state
 
 _STATIC = Path(__file__).with_name("static")
 _SWEEPER_STARTED = False
+_RETENTION_STARTED = False
 _log = logging.getLogger("resume_matcher.api")
 
 
@@ -167,6 +168,35 @@ def _start_sweeper() -> None:
     threading.Thread(target=_loop, name="rm-demo-sweeper", daemon=True).start()
 
 
+def _start_retention_scheduler() -> None:
+    """Start ONE daemon that runs the relationship-graph retention/erasure purge on an interval.
+
+    Without this the graph_retention job was registered but never enqueued, so the 12-month/6-month
+    retention windows were never actually enforced (PII persisted indefinitely). Interval is
+    RM_GRAPH_RETENTION_HOURS (default 24h); the first sweep runs shortly after boot."""
+    global _RETENTION_STARTED
+    if _RETENTION_STARTED:
+        return
+    _RETENTION_STARTED = True
+    from ..config import env_int
+    from ..stores.retention import run_retention
+
+    interval = max(1, env_int("RM_GRAPH_RETENTION_HOURS", 24)) * 3600
+
+    def _loop() -> None:
+        time.sleep(30)  # let startup settle before the first purge
+        while True:
+            try:
+                out = run_retention()
+                if any(out.values()):
+                    _log.info("graph retention purge: %s", out)
+            except Exception as exc:  # noqa: BLE001 - a purge error must never kill the thread
+                _log.warning("graph retention purge failed: %s", exc)
+            time.sleep(interval)
+
+    threading.Thread(target=_loop, name="rm-graph-retention", daemon=True).start()
+
+
 def create_app():
     try:
         from fastapi import Depends, FastAPI, Form, HTTPException, Request
@@ -174,10 +204,13 @@ def create_app():
     except ImportError as exc:  # pragma: no cover - optional dep
         raise RuntimeError("FastAPI not installed. pip install -r requirements-extra.txt") from exc
 
+    from ..audit.defense_file import assert_defense_signing_configured
     from .auth import ADMIN_COOKIE, assert_admin_password_strong, check_login, require_auth
 
     # Refuse to start if the admin password is a known-weak default (e.g. shipped admin/admin).
     assert_admin_password_strong()
+    # Warn (or, in prod, refuse) if Defense-File signing is using the shared public dev key.
+    assert_defense_signing_configured()
 
     # App-level dependency => the gate covers the dashboard, every /api/* route, and the docs.
     app = FastAPI(title="Resume Matcher", version="0.1.0", dependencies=[Depends(require_auth)])
@@ -196,6 +229,7 @@ def create_app():
 
         app.include_router(platform_router)
         start_worker_pool()  # re-queues stale running jobs from a dead process, then polls
+        _start_retention_scheduler()  # actually enforce the graph retention/erasure windows
 
         @app.get("/employer", include_in_schema=False)
         def employer_page():

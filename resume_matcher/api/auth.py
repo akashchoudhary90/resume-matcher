@@ -41,7 +41,7 @@ _AUTH_EXEMPT_PATHS = {
 # password. The admin gate is thereby demoted to the ops/legacy surface (docs/PLATFORM.md). The
 # flag is read per-request so RM_PLATFORM_ENABLED=0 deployments keep today's posture untouched.
 _PLATFORM_PREFIXES = (
-    "/api/postings", "/api/jobs/", "/api/coordinator/", "/api/skills", "/api/account/",
+    "/api/postings", "/api/coordinator/", "/api/skills", "/api/account/",
     "/api/students/", "/api/applications/", "/api/events", "/api/messages/",
     "/api/interview-slots/", "/api/schools", "/api/orgs/", "/employer", "/coordinator",
     "/student",
@@ -54,7 +54,14 @@ _PLATFORM_PREFIXES = (
 def _platform_exempt(path: str) -> bool:
     from ..config import env_flag
 
-    return env_flag("RM_PLATFORM_ENABLED", False) and path.startswith(_PLATFORM_PREFIXES)
+    if not env_flag("RM_PLATFORM_ENABLED", False):
+        return False
+    # `/api/jobs/` carries the platform poll route /api/jobs/{id} (its own require_role), but the
+    # prefix must NOT swallow the admin-gated dashboard sub-route /api/jobs/{id}/shortlist: exempt
+    # ONLY a single trailing segment (the poll id), never a deeper path.
+    if path.startswith("/api/jobs/"):
+        return "/" not in path[len("/api/jobs/"):]
+    return path.startswith(_PLATFORM_PREFIXES)
 
 # Known-weak / placeholder passwords. admin/admin is INTENTIONALLY allowed for the synthetic-data demo
 # (the user wants it) — we warn but never refuse to start.

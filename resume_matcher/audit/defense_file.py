@@ -23,7 +23,10 @@ from __future__ import annotations
 import hashlib
 import hmac
 import json
+import logging
 import os
+
+_log = logging.getLogger("resume_matcher.defense")
 
 DEFENSE_VERSION = 1
 # A fixed development signing seed. PROD MUST override RM_DEFENSE_SIGNING_SEED (64 hex chars) so the
@@ -73,12 +76,40 @@ def _sha256(b: bytes) -> str:
 
 
 def _seed() -> bytes:
-    raw = os.environ.get("RM_DEFENSE_SIGNING_SEED", _DEV_SEED_HEX)
-    try:
-        seed = bytes.fromhex(raw)
-    except ValueError:
-        seed = bytes.fromhex(_DEV_SEED_HEX)
+    raw = os.environ.get("RM_DEFENSE_SIGNING_SEED")
+    if raw is None:
+        seed = bytes.fromhex(_DEV_SEED_HEX)  # dev/demo default: public key, authenticity NOT proven
+    else:
+        try:
+            seed = bytes.fromhex(raw.strip())
+        except ValueError as exc:
+            # A SET-but-malformed override must fail LOUDLY. Silently falling back to the public dev
+            # key would sign with a known key while appearing configured — the worst of both worlds.
+            raise ValueError(
+                "RM_DEFENSE_SIGNING_SEED is set but is not valid hex — refusing to fall back to the "
+                "public dev signing key. Set it to 64 hex characters (32 bytes).") from exc
     return (seed + b"\x00" * 32)[:32]
+
+
+def assert_defense_signing_configured() -> None:
+    """Warn (or, when required, refuse) if the PUBLIC dev signing seed is in use.
+
+    Every deployment that leaves RM_DEFENSE_SIGNING_SEED unset shares one hardcoded key, so
+    signatures still prove tamper-evidence + reproducibility but NOT authenticity (anyone can forge
+    'this came from the engine'). With RM_REQUIRE_SIGNING_SEED=1 or RM_ENV=prod, an unset/dev seed
+    refuses startup (fail closed); otherwise it logs a warning so the demo keeps working."""
+    from ..config import env_flag, env_str
+
+    raw = os.environ.get("RM_DEFENSE_SIGNING_SEED")
+    using_dev = not raw or raw.strip().lower() == _DEV_SEED_HEX
+    if not using_dev:
+        return
+    msg = ("Defense-File signing is using the PUBLIC dev seed — every deployment shares this key, so "
+           "signatures prove tamper-evidence but NOT authenticity. Set RM_DEFENSE_SIGNING_SEED "
+           "(64 hex chars) to a private value in production.")
+    if env_flag("RM_REQUIRE_SIGNING_SEED", False) or env_str("RM_ENV", "") in ("prod", "production"):
+        raise RuntimeError(msg)
+    _log.warning(msg)
 
 
 def _make_signer() -> dict:

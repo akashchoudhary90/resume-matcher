@@ -43,6 +43,23 @@ def test_tokenizer_fail_closed_without_key(monkeypatch):
         graph_tokens.identity_token(1, first="Jane", last="Doe")
 
 
+def test_tokenizer_prod_needs_a_real_secret_not_just_the_key_id(monkeypatch):
+    """The KMS key ID is a NON-secret identifier; on its own it must not enable tokenization —
+    otherwise anyone holding it could recompute a member's token from name+company. Prod must also
+    supply RM_GRAPH_KMS_SECRET (real key material)."""
+    monkeypatch.delenv("RM_GRAPH_PEPPER", raising=False)
+    monkeypatch.setenv("RM_ENV", "prod")
+    monkeypatch.setenv("RM_GRAPH_KMS_KEY_ID", "arn:aws:kms:...:key/abc")  # public identifier only
+    monkeypatch.delenv("RM_GRAPH_KMS_SECRET", raising=False)
+    assert graph_tokens.available() is False                              # fail closed
+    with pytest.raises(graph_tokens.TokenizerUnavailable):
+        graph_tokens.identity_token(1, first="Jane", last="Doe", company="Acme")
+    monkeypatch.setenv("RM_GRAPH_KMS_SECRET", "a-real-high-entropy-secret")
+    assert graph_tokens.available() is True                               # now it can tokenize
+    tok, _ = graph_tokens.identity_token(1, first="Jane", last="Doe", company="Acme")
+    assert tok and len(tok) == 64                                         # HMAC-SHA256 hex
+
+
 # ---- Slice AB: importer ---------------------------------------------------------------------------
 def _grant(conn, user_id, purpose):
     conn.execute("INSERT INTO consents(user_id, purpose, granted_at) VALUES(?,?,?)",

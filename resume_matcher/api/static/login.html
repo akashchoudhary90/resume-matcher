@@ -40,7 +40,10 @@
 <script>
 const $ = s => document.querySelector(s);
 const params = new URLSearchParams(location.search);
-const next = params.get('next') || '/demo';
+// Only follow a same-origin relative path. Reject //host (protocol-relative), backslashes, and
+// scheme URIs like javascript: — otherwise ?next= is an open redirect / script-injection vector.
+const rawNext = params.get('next') || '/demo';
+const next = (/^\/(?!\/)/.test(rawNext) && !rawNext.includes('\\')) ? rawNext : '/demo';
 $('#form').addEventListener('submit', async e => {
   e.preventDefault();
   $('#go').disabled = true; $('#err').textContent = '';

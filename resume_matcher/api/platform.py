@@ -180,17 +180,27 @@ async def start_extract(request: Request,
 
 # ---- postings CRUD + lifecycle -------------------------------------------------------------------
 def _can_view(posting: dict, user: dict) -> bool:
-    if user["role"] in ("coordinator", "admin"):
-        return True
+    if user["role"] == "admin":
+        return True  # the only cross-school role (ops/support)
+    if user["role"] == "coordinator":
+        # coordinators are seeded per school and every LIST/report is school-filtered; the by-ID
+        # paths must match, or School A staff could read/act on School B postings (tenant break).
+        return posting["school_id"] == (user.get("school_id") or 1)
     if user["role"] == "employer":
         return posting["org_id"] is not None and posting["org_id"] == user.get("org_id")
     return posting["status"] == "live" and posting["school_id"] == (user.get("school_id") or 1)
 
 
 def _require_own_org_posting(posting: dict, user: dict) -> None:
-    if user["role"] in ("coordinator", "admin"):
+    if user["role"] == "admin":
         return
-    if user["role"] != "employer" or posting["org_id"] != user.get("org_id"):
+    if user["role"] == "coordinator":
+        if posting["school_id"] != (user.get("school_id") or 1):
+            raise HTTPException(403, "This posting belongs to another school.")
+        return
+    # employer: must own the posting's org; None==None must NOT pass (org-less employer footgun).
+    if (user["role"] != "employer" or posting["org_id"] is None
+            or posting["org_id"] != user.get("org_id")):
         raise HTTPException(403, "This posting belongs to another organization.")
 
 
@@ -302,6 +312,10 @@ def coordinator_queue(user: dict = Depends(require_role("coordinator", "admin"))
 @router.post("/api/coordinator/postings/{posting_id}/approve")
 def approve_posting(posting_id: str, body: dict | None = None,
                     user: dict = Depends(require_role("coordinator", "admin"))):
+    existing = _posting_store().get(posting_id)
+    if existing is None:
+        raise HTTPException(404, "No such posting.")
+    _require_own_org_posting(existing, user)  # a coordinator may only review their own school
     try:
         posting = _posting_store().transition(posting_id, "live", actor_user_id=user["id"],
                                               note=(body or {}).get("note", ""))
@@ -318,6 +332,10 @@ def approve_posting(posting_id: str, body: dict | None = None,
 def reject_posting(posting_id: str, body: dict | None = None,
                    user: dict = Depends(require_role("coordinator", "admin"))):
     note = (body or {}).get("note", "")
+    existing = _posting_store().get(posting_id)
+    if existing is None:
+        raise HTTPException(404, "No such posting.")
+    _require_own_org_posting(existing, user)  # a coordinator may only review their own school
     try:
         posting = _posting_store().transition(posting_id, "rejected", actor_user_id=user["id"],
                                               note=note)

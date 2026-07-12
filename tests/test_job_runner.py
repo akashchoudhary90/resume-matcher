@@ -84,6 +84,41 @@ def test_dedupe_key_is_idempotent(tmp_path):
     assert store.enqueue("k", {}, dedupe_key="other") != a
 
 
+def test_dedupe_reruns_after_completion(tmp_path):
+    """A FINISHED dedupe job must not block a fresh submit forever — otherwise a constant
+    dedupe_key (build_edges:{school}) makes the job run exactly once ever."""
+    store = _store(tmp_path)
+    a = store.enqueue("k", {"n": 1}, dedupe_key="edges:1")
+    store.claim("w")
+    store.complete(a, {"ok": True})
+    assert store.get(a)["status"] == "done"
+    b = store.enqueue("k", {"n": 2}, dedupe_key="edges:1")
+    assert b != a                       # a fresh run, not the stale completed job
+    assert store.get(a) is None         # the finished one was superseded
+    assert store.get(b)["status"] == "queued"
+
+
+def test_completion_scrubs_payload_pii(tmp_path):
+    """The request payload (which may hold an uploaded Connections.csv / raw JD text) must not
+    persist after the job finishes — only the de-identified result is kept."""
+    store = _store(tmp_path)
+    jid = store.enqueue("resolve_network", {"csv_b64": "c2VjcmV0", "user_id": 1})
+    store.claim("w")
+    store.complete(jid, {"ok": True})
+    job = store.get(jid)
+    assert job["payload"] == {}          # scrubbed
+    assert job["result"] == {"ok": True}  # result retained
+
+
+def test_terminal_failure_scrubs_payload(tmp_path):
+    store = _store(tmp_path)
+    jid = store.enqueue("resolve_network", {"csv_b64": "c2VjcmV0"})
+    store.claim("w")
+    store.fail(jid, "boom", max_attempts=0, backoff_sec=0)   # no retries left -> terminal
+    job = store.get(jid)
+    assert job["status"] == "error" and job["payload"] == {}
+
+
 def test_requeue_stale_recovers_dead_process_jobs(tmp_path):
     store = _store(tmp_path)
     jid = store.enqueue("k", {})

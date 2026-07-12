@@ -58,7 +58,10 @@ class JobStore:
         total: int = 0,
         dedupe_key: str | None = None,
     ) -> str:
-        """Queue a job; an existing job with the same dedupe_key is returned instead (idempotent)."""
+        """Queue a job; an existing PENDING job with the same dedupe_key is returned instead
+        (coalesces concurrent double-submits). A dedupe job that has already FINISHED (done/error)
+        is superseded by a fresh run — otherwise a constant dedupe_key (e.g. build_edges:{school})
+        would make the job run exactly once ever and silently stop after its first completion."""
         job_id = secrets.token_urlsafe(12)
         with closing(self._conn()) as conn:
             try:
@@ -74,11 +77,22 @@ class JobStore:
                 if dedupe_key is None:
                     raise
                 row = conn.execute(
-                    "SELECT id FROM jobs WHERE dedupe_key=?", (dedupe_key,)
+                    "SELECT id, status FROM jobs WHERE dedupe_key=?", (dedupe_key,)
                 ).fetchone()
                 if row is None:  # not a dedupe collision after all
                     raise
-                return row["id"]
+                if row["status"] in ("done", "error"):
+                    # the prior run is finished — replace it so this submit actually re-runs
+                    conn.execute("DELETE FROM jobs WHERE id=?", (row["id"],))
+                    conn.execute(
+                        "INSERT INTO jobs(id, kind, owner_user_id, progress_total, payload_json, "
+                        "dedupe_key, created_at) VALUES(?,?,?,?,?,?,?)",
+                        (job_id, kind, owner_user_id, total, json.dumps(payload or {}),
+                         dedupe_key, time.time()),
+                    )
+                    conn.commit()
+                    return job_id
+                return row["id"]  # still queued/running -> idempotent
 
     def get(self, job_id: str) -> dict | None:
         with closing(self._conn()) as conn:
@@ -119,9 +133,12 @@ class JobStore:
 
     def complete(self, job_id: str, result: dict | None) -> None:
         with closing(self._conn()) as conn:
+            # Scrub the request payload on completion: it can hold PII (e.g. an uploaded
+            # Connections.csv, raw JD text) that must not persist in the jobs table after the
+            # work is done. The result_json is the durable, de-identified output.
             conn.execute(
-                "UPDATE jobs SET status='done', result_json=?, error=NULL, finished_at=? "
-                "WHERE id=? AND status='running'",
+                "UPDATE jobs SET status='done', result_json=?, payload_json='{}', error=NULL, "
+                "finished_at=? WHERE id=? AND status='running'",
                 (json.dumps(result or {}), time.time(), job_id),
             )
             conn.commit()
@@ -133,8 +150,10 @@ class JobStore:
             if row is None:
                 return
             if row["attempts"] >= max_attempts:
+                # terminal failure: no more retries need the payload, so scrub its PII too.
                 conn.execute(
-                    "UPDATE jobs SET status='error', error=?, finished_at=? WHERE id=?",
+                    "UPDATE jobs SET status='error', error=?, payload_json='{}', finished_at=? "
+                    "WHERE id=?",
                     ((error or "job failed")[:2000], time.time(), job_id),
                 )
             else:

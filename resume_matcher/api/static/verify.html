@@ -73,9 +73,13 @@ drop.addEventListener('drop', e => { const f=e.dataTransfer.files[0]; if(f) read
 fileInput.addEventListener('change', e => { const f=e.target.files[0]; if(f) readFile(f); });
 function readFile(f){ const r=new FileReader(); r.onload=()=>{ $('#json').value=r.result; verify(); }; r.readAsText(f); }
 
+// Escape any field that reaches innerHTML. The verified document is caller-supplied (Defense Files
+// are shared for third parties to verify), so its fields — sig_alg, note, detail — are untrusted.
+const esc = s => String(s == null ? '' : s).replace(/[&<>"']/g,
+  c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
 function row(label, state){
   const ic = state===true?'<span class="ic ok-c">✓</span>':state===false?'<span class="ic bad-c">✗</span>':'<span class="ic na-c">—</span>';
-  return `<div class="check">${ic}<span>${label}</span></div>`;
+  return `<div class="check">${ic}<span>${esc(label)}</span></div>`;
 }
 async function verify(){
   let doc;
@@ -90,18 +94,18 @@ async function verify(){
     render(v);
   }catch(e){ showError('Verification request failed: '+e); }
 }
-function showError(msg){ const el=$('#result'); el.classList.remove('hidden'); el.innerHTML=`<div class="verdict bad">Could not verify</div><div class="muted">${msg}</div>`; }
+function showError(msg){ const el=$('#result'); el.classList.remove('hidden'); el.innerHTML=`<div class="verdict bad">Could not verify</div><div class="muted">${esc(msg)}</div>`; }
 function render(v){
   const el = $('#result'); el.classList.remove('hidden');
   const sig = v.signatures_valid===true?true:v.signatures_valid===false?false:null;
   el.innerHTML = `
     <div class="verdict ${v.ok?'ok':'bad'}">${v.ok?'✓ VERIFIED':'✗ NOT VERIFIED'}</div>
-    <div class="muted" style="margin-bottom:10px">${v.n_decisions} decision(s) · signature: <code>${v.sig_alg||'none'}</code></div>
+    <div class="muted" style="margin-bottom:10px">${esc(v.n_decisions)} decision(s) · signature: <code>${esc(v.sig_alg||'none')}</code></div>
     ${row('Records re-derive exactly to their scores (reconciliation)', v.all_reconcile)}
     ${row('Records are hash-chained and untampered', v.chain_intact)}
     ${row('Each record is validly signed', sig)}
     ${row('Signer matches this engine’s published key (authenticity)', v.issuer_verified)}
-    <div class="muted" style="margin-top:10px;font-size:12.5px">${v.note||''}</div>`;
+    <div class="muted" style="margin-top:10px;font-size:12.5px">${esc(v.note||'')}</div>`;
 }
 $('#verifyBtn').onclick = verify;
 </script>

@@ -8,7 +8,17 @@ from fastapi import Depends, FastAPI  # noqa: E402
 from fastapi.testclient import TestClient  # noqa: E402
 
 from resume_matcher.api.accounts import AccountError, get_account_store  # noqa: E402
-from resume_matcher.api.auth import require_role  # noqa: E402
+from resume_matcher.api.auth import _platform_exempt, require_role  # noqa: E402
+
+
+def test_platform_exempt_scopes_jobs_prefix_to_the_poll_route(monkeypatch):
+    """The `/api/jobs/` platform poll exemption must NOT un-gate the admin dashboard sub-route
+    /api/jobs/{id}/shortlist (it has no per-route auth and relied on the admin gate)."""
+    monkeypatch.setenv("RM_PLATFORM_ENABLED", "1")
+    assert _platform_exempt("/api/jobs/abc123") is True            # the poll route (own require_role)
+    assert _platform_exempt("/api/jobs/abc123/shortlist") is False  # stays behind the admin gate
+    monkeypatch.setenv("RM_PLATFORM_ENABLED", "0")
+    assert _platform_exempt("/api/jobs/abc123") is False           # platform off -> nothing exempt
 
 
 def _app() -> FastAPI:

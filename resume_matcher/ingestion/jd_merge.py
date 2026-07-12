@@ -268,9 +268,17 @@ def merge_draft(
 
     deadline_field = _merge_scalar(text, det_fields.get("application_deadline"),
                                    _clean_date(deadline_v), deadline_q)
-    if deadline_field.value and _dt.date.fromisoformat(deadline_field.value) < _dt.date.today():
-        deadline_field.confidence = Confidence.low
-        deadline_field.status = FieldStatus.needs_review  # stale/past deadline: confirm, don't drop
+    if deadline_field.value:
+        # The deterministic regex \d{4}-\d{2}-\d{2} can capture a syntactically-valid but impossible
+        # date (e.g. 2025-13-45); re-validate before comparing so a bad date never raises ValueError
+        # and 500s the whole extraction — flag it for human correction instead.
+        parsed = _clean_date(deadline_field.value)
+        if parsed is None:
+            deadline_field.confidence = Confidence.low
+            deadline_field.status = FieldStatus.conflict
+        elif _dt.date.fromisoformat(parsed) < _dt.date.today():
+            deadline_field.confidence = Confidence.low
+            deadline_field.status = FieldStatus.needs_review  # stale/past deadline: confirm, don't drop
 
     # application: method + url + email folded into one envelope
     det_url = det_fields.get("application_url")

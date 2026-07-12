@@ -133,6 +133,38 @@ def test_school_isolation_end_to_end(two_schools):
     assert mine == {pid_york, pid_sen}
 
 
+def test_coordinator_cannot_touch_another_schools_posting(two_schools):
+    """A coordinator is scoped to their OWN school on by-ID posting routes — School A staff must not
+    read or approve/reject School B postings (cross-tenant authorization break)."""
+    client, tokens, org_id = two_schools
+    # approve Acme at both schools so the employer can post to Seneca
+    _as(client, tokens, "coordA")
+    client.post(f"/api/coordinator/org-links/{org_id}/approve")
+    _as(client, tokens, "employer")
+    client.post("/api/orgs/me/school-links", json={"school_id": 2})
+    _as(client, tokens, "coordB")
+    client.post(f"/api/coordinator/org-links/{org_id}/approve")
+
+    # employer submits a Seneca posting -> lands in Seneca's review queue
+    _as(client, tokens, "employer")
+    pid = client.post("/api/postings", json={
+        "fields": {"title": "Seneca Intern", "description": "Python."},
+        "skills": [{"skill_id": "python", "bucket": "required"}],
+        "school_id": 2}).json()["posting_id"]
+    assert client.post(f"/api/postings/{pid}/submit").status_code == 200
+
+    # the York coordinator must NOT see or act on a Seneca posting
+    _as(client, tokens, "coordA")
+    assert client.get(f"/api/postings/{pid}").status_code == 404
+    assert client.post(f"/api/coordinator/postings/{pid}/approve").status_code == 403
+    assert client.post(f"/api/coordinator/postings/{pid}/reject").status_code == 403
+
+    # Seneca's own coordinator still can
+    _as(client, tokens, "coordB")
+    assert client.get(f"/api/postings/{pid}").status_code == 200
+    assert client.post(f"/api/coordinator/postings/{pid}/approve").status_code == 200
+
+
 def test_schools_api(two_schools):
     client, tokens, _ = two_schools
     names = {s["name"] for s in client.get("/api/schools").json()["schools"]}  # public

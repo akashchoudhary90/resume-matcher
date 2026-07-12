@@ -28,8 +28,14 @@ behaves (`resume_matcher/api/demo.py`, `resume_matcher/ingestion/parser.py`,
    session is the **de-identified score breakdown** — the fit score, the per-skill points, and short
    evidence quotes (each a few words, already passed through redaction). The full resume text is not
    retained anywhere after scoring.
-4. **Processing is local.** By default the matching engine is deterministic and runs entirely on the
-   server (`RM_DEMO_BACKEND=mock`); your resume text is not sent to any third-party API.
+4. **Where processing happens depends on the engine — the default sends data to Anthropic.** By
+   default the demo uses the **NDR AI** extraction engine (`RM_DEMO_BACKEND=claude_cli`), which sends
+   your resume to Anthropic's API to extract skills and evidence. The contact identifiers in step 2
+   (email, phone, URLs, street address, postal code) are stripped *before* anything leaves the
+   server, but the candidate **name and the remaining resume body text are sent**; on the
+   direct-file (vision) path, a temporary copy of the **original PDF/image is sent** so the model can
+   read it. To keep all processing on the server with no third-party call, run the deterministic
+   engine (`RM_DEMO_BACKEND=mock`) — it never leaves the box.
 
 ## How it is deleted
 
@@ -45,7 +51,10 @@ behaves (`resume_matcher/api/demo.py`, `resume_matcher/ingestion/parser.py`,
 - We do **not** store your resumes or results on disk or in a database.
 - We do **not** use protected attributes (race, gender, etc.) anywhere in scoring — the bias features
   are a *separate, audit-only* data plane and are never an input to the score.
-- We do **not** send your data to a third-party model by default.
+- We **strip contact identifiers** (email, phone, URLs, address, postal code) before any resume text
+  leaves the server. With the deterministic engine (`RM_DEMO_BACKEND=mock`) nothing is sent off-box
+  at all; the default NDR AI engine does send the contact-redacted text — and, on the file-direct
+  path, the original file — to Anthropic (see step 4).
 
 ## Scope & honest limitations
 

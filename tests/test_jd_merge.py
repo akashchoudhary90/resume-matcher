@@ -145,3 +145,13 @@ def test_injection_flag_forces_review_on_everything():
     draft = merge_draft(TEXT, {}, [_det_skill("python")], llm,
                         ["injection_suspected:phrase"])
     assert all(s.status != FieldStatus.auto for s in draft.skills)
+
+
+def test_impossible_deadline_does_not_crash_extraction():
+    r"""A syntactic-but-invalid det date (e.g. 2025-13-45 from \d{4}-\d{2}-\d{2}) must be flagged
+    for review, never raise ValueError and 500 the whole posting extraction."""
+    det = {"application_deadline": ExtractedField(
+        value="2025-13-45", source_span=(0, 10), method=Method.regex,
+        confidence=Confidence.high, status=FieldStatus.auto)}
+    draft = merge_draft("Apply by 2025-13-45.", det, [], None, [])
+    assert draft.application_deadline.status == FieldStatus.conflict

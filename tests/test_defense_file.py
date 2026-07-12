@@ -119,3 +119,32 @@ def test_defense_file_endpoint():
     assert "attachment" in r.headers.get("content-disposition", "")
     f = r.json()
     assert f["verification"]["ok"] is True and f["n_decisions"] == 1
+
+
+# ---- signing-key hardening (audit fix #7) --------------------------------------------------------
+def test_malformed_signing_seed_fails_loud_not_silent(monkeypatch):
+    """A SET-but-invalid override must raise, never silently fall back to the public dev key."""
+    monkeypatch.setenv("RM_DEFENSE_SIGNING_SEED", "not-hex!!")
+    with pytest.raises(ValueError):
+        df._seed()
+
+
+def test_assert_signing_refuses_public_seed_in_prod(monkeypatch):
+    monkeypatch.delenv("RM_DEFENSE_SIGNING_SEED", raising=False)
+    monkeypatch.setenv("RM_ENV", "prod")
+    with pytest.raises(RuntimeError):
+        df.assert_defense_signing_configured()
+
+
+def test_assert_signing_only_warns_in_demo(monkeypatch):
+    monkeypatch.delenv("RM_DEFENSE_SIGNING_SEED", raising=False)
+    monkeypatch.delenv("RM_ENV", raising=False)
+    monkeypatch.delenv("RM_REQUIRE_SIGNING_SEED", raising=False)
+    df.assert_defense_signing_configured()   # no raise: demo default just logs a warning
+
+
+def test_private_signing_seed_is_accepted_even_in_prod(monkeypatch):
+    monkeypatch.setenv("RM_DEFENSE_SIGNING_SEED", "ab" * 32)
+    monkeypatch.setenv("RM_ENV", "prod")
+    df.assert_defense_signing_configured()   # a real private override is fine in prod
+    assert df._seed() == bytes.fromhex("ab" * 32)
