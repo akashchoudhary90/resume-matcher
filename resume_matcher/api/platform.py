@@ -916,6 +916,12 @@ def _build_edges_job(payload: dict, progress) -> dict:
     return {"native_edges": made, "promoted": promoted}
 
 
+@register_handler("graph_retention")
+def _graph_retention_job(payload: dict, progress) -> dict:
+    from ..stores.retention import run_retention
+    return run_retention()
+
+
 @register_handler("resolve_network")
 def _resolve_network_job(payload: dict, progress) -> dict:
     import base64

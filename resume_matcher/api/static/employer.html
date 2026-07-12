@@ -471,14 +471,29 @@ async function openShortlist(pid, title) {
         <div class="row" style="margin-top:6px">
           <input type="datetime-local" data-slotstart="${esc(row.application_id)}" />
           <div style="flex:0 0 auto"><button class="ghost" data-propose="${esc(row.application_id)}">Propose 30-min slot</button></div>
-        </div></details>` : ''}
+        </div></details>
+      <details><summary style="cursor:pointer;color:var(--accent);font-size:12.5px">Warm intros &amp; vouches</summary>
+        <div id="evid-${esc(row.application_id)}" class="muted" style="margin-top:6px"></div></details>` : ''}
     </div>`;
   }).join('') : '<div class="muted">No candidates scored yet — matching runs when the posting goes live.</div>';
   // lazy-load threads/slots when a details block opens
   $('#shortlist').addEventListener('toggle', async e => {
-    const box = e.target.querySelector('[id^="msgs-"], [id^="slots-"]');
+    const box = e.target.querySelector('[id^="msgs-"], [id^="slots-"], [id^="evid-"]');
     if (!e.target.open || !box) return;
     const appId = box.id.split('-').slice(1).join('-');
+    if (box.id.startsWith('evid-')) {
+      const card = await api(`/api/intros/for-application/${appId}`).catch(()=>null);
+      if (!card) { box.textContent = 'No warm-intro evidence.'; return; }
+      const intros = (card.warm_intros || []).map(i =>
+        `warm intro via a ${esc(i.broker_role)} (${i.hops} hops)`).join('; ');
+      const vouches = (card.vouches || []).map(v =>
+        `<div class="muted"><b>${esc(v.voucher_role)}</b> · ${esc(v.relationship || '—')} · ${esc(v.verify_level)}`
+        + (v.evidence_redacted ? `: <i>${esc(v.evidence_redacted)}</i>` : '') + '</div>').join('');
+      box.innerHTML = `<div class="muted">Job-related evidence — shown beside the score, never inside it.</div>`
+        + (intros ? `<div>${intros}</div>` : '<div>No accepted warm intros.</div>')
+        + (vouches || '<div>No vouches.</div>');
+      return;
+    }
     if (box.id.startsWith('msgs-')) {
       const msgs = (await api(`/api/applications/${appId}/messages`).catch(()=>({messages:[]}))).messages;
       box.innerHTML = msgs.map(m => `<div class="muted"><b>${esc(m.sender_role)}</b>:

@@ -128,6 +128,12 @@
     <table id="funnelTable"><thead><tr><th>Posting</th><th>Scored</th><th>Applied</th><th>Shortlisted+</th><th>Hired</th><th>Sel. rate</th><th>Viewers</th></tr></thead><tbody></tbody></table>
     <h2 style="margin-top:16px">Self-ID (voluntary, aggregate, min-cell suppressed)</h2>
     <div id="selfIdReport" class="muted"></div>
+    <h2 style="margin-top:16px">Warm-intro equity <span class="muted">— does intro access/conversion
+      skew by self-ID group? (aggregate-only, four-fifths rule)</span></h2>
+    <div id="introEquity" class="muted"></div>
+    <h2 style="margin-top:16px">Network coverage <span class="muted">— structural under-networking,
+      the positive-action shut-off dashboard</span></h2>
+    <div id="netCoverage" class="muted"></div>
   </section>
 </main>
 
@@ -270,6 +276,24 @@ async function loadReports() {
         return `<b>${esc(attr)}</b> — ${cells || 'no visible cells'}` +
           (a.suppressed_cells ? ` <span class="muted">(+${a.suppressed_cells} cell(s) suppressed, n&lt;${a.min_cell})</span>` : '');
       }).join('<br/>');
+  }
+  const eq = await api('/api/coordinator/reports/intro-equity').catch(()=>null);
+  if (eq) {
+    const badge = p => p === true ? '✅ passes' : p === false ? '⚠ fails four-fifths' : '— too few groups';
+    $('#introEquity').innerHTML =
+      `Applicants ${eq.applicants} · requested ${eq.requested} · converted ${eq.converted}<br/>` +
+      Object.entries(eq.by_attribute).map(([attr, f]) =>
+        `<b>${esc(attr)}</b> — access: ${badge(f.access.four_fifths_pass)}` +
+        (f.access.min_impact_ratio != null ? ` (ratio ${f.access.min_impact_ratio})` : '') +
+        ` · conversion: ${badge(f.conversion.four_fifths_pass)}`).join('<br/>');
+  }
+  const cov = await api('/api/coordinator/reports/network-coverage').catch(()=>null);
+  if (cov) {
+    $('#netCoverage').innerHTML =
+      `Discoverable students: ${cov.discoverable_students} · ` +
+      `structurally under-networked (zero connections): <b>${cov.network_poverty}</b> · ` +
+      `students with an accepted intro: ${cov.students_with_accepted_intro}` +
+      `<div class="muted">${esc(cov.note)}</div>`;
   }
 }
 const _origLoadAll = loadAll;

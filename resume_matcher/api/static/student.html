@@ -135,6 +135,41 @@
     </div>
     <div class="muted" id="sidMsg"></div>
   </section>
+
+  <section class="card hidden" id="networkCard">
+    <h2>Network &amp; warm intros
+      <span class="muted">— consent-first; a mutual you connect through is asked before anyone is revealed</span></h2>
+    <div id="graphConsents"></div>
+    <div class="row" style="margin-top:12px">
+      <div><label>Be discoverable as: name your connections know you by + company (stored as an
+        opaque token, never as text)</label>
+        <div class="row">
+          <input id="disc_first" placeholder="First name" />
+          <input id="disc_last" placeholder="Last name" />
+          <input id="disc_company" placeholder="Company / school" />
+        </div>
+      </div>
+      <div style="flex:0 0 auto; align-self:end"><button id="discBtn" class="ghost">Register</button></div>
+    </div>
+    <div class="row" style="margin-top:10px">
+      <div><label>Upload your own LinkedIn Connections.csv — matched only to consenting members;
+        non-members are discarded, never stored</label>
+        <input id="contactsFile" type="file" accept=".csv" /></div>
+      <div style="flex:0 0 auto; align-self:end"><button id="importBtn">Import</button>
+        <button id="deleteNetBtn" class="ghost">Delete my network</button></div>
+    </div>
+    <div class="muted" id="netMsg"></div>
+  </section>
+
+  <section class="card hidden" id="introInboxCard">
+    <h2>Intro requests to me <span class="muted">— someone asked you to make an introduction</span></h2>
+    <div id="introInbox" class="muted"></div>
+  </section>
+
+  <section class="card hidden" id="vouchCard">
+    <h2>Vouches about me <span class="muted">— you can view and contest any of these</span></h2>
+    <div id="vouchList" class="muted"></div>
+  </section>
 </main>
 
 <script>
@@ -158,7 +193,7 @@ async function refreshAuth() {
   const ok = me && me.role === 'student';
   $('#authCard').classList.toggle('hidden', !!ok);
   for (const id of ['profileCard','matchesCard','browseCard','appsCard','eventsCard',
-                    'interviewsCard','selfIdCard'])
+                    'interviewsCard','selfIdCard','networkCard','introInboxCard','vouchCard'])
     $('#'+id).classList.toggle('hidden', !ok);
   $('#signoutBtn').classList.toggle('hidden', !ok);
   $('#who').textContent = me ? `${me.email} (${me.role})` : '';
@@ -196,6 +231,101 @@ async function loadAll() {
     loadAll();
   };
   loadMatches(); loadBrowse(); loadApps(); loadEvents(); loadInterviews();
+  loadGraphConsents(); loadIntroInbox(); loadVouches();
+}
+
+const GRAPH_CONSENT_LABELS = {
+  contacts_upload: 'Let me upload my own contacts export',
+  graph_discoverable: 'Let me be found as a mutual connection in warm-intro paths',
+  warm_intro: 'Allow people to request a warm intro through me',
+  network_analytics: 'Include me (anonymized) in the fairness/coverage audit',
+};
+async function loadGraphConsents() {
+  const c = (await api('/api/graph/consents').catch(()=>({consents:{}}))).consents;
+  $('#graphConsents').innerHTML = Object.entries(GRAPH_CONSENT_LABELS).map(([p, label]) =>
+    `<div class="consent"><input type="checkbox" data-gc="${p}" ${c[p] ? 'checked' : ''} />
+     <span>${esc(label)}</span></div>`).join('');
+  $('#graphConsents').onchange = async e => {
+    const p = e.target.dataset.gc;
+    if (p) { await api('/api/graph/consents', {method:'POST',
+             body: JSON.stringify({purpose:p, granted:e.target.checked})}).catch(err=>alert(err.message));
+             loadGraphConsents(); }
+  };
+}
+$('#discBtn').onclick = async () => {
+  try {
+    const r = await api('/api/graph/discover', {method:'POST', body: JSON.stringify({
+      first:$('#disc_first').value, last:$('#disc_last').value, company:$('#disc_company').value})});
+    $('#netMsg').textContent = `Registered ${r.tokens_registered} discovery token(s).`;
+  } catch (e) { $('#netMsg').textContent = e.message; }
+};
+$('#importBtn').onclick = async () => {
+  const f = $('#contactsFile').files[0];
+  if (!f) { $('#netMsg').textContent = 'Choose your Connections.csv first.'; return; }
+  const fd = new FormData(); fd.append('contacts', f);
+  const r = await fetch('/api/network/import', {method:'POST', body:fd});
+  const b = await r.json().catch(()=>({}));
+  $('#netMsg').textContent = r.ok ? 'Import running — matches to consenting members will appear as connections.'
+    : (b.detail || r.statusText);
+};
+$('#deleteNetBtn').onclick = async () => {
+  if (!confirm('Delete all your relationship-graph data (connections, vouches, intros)? Permanent.')) return;
+  await api('/api/network', {method:'DELETE'}).catch(()=>{});
+  $('#netMsg').textContent = 'Your network data was deleted.';
+  loadGraphConsents();
+};
+
+async function loadIntroInbox() {
+  const rows = (await api('/api/intros/inbox').catch(()=>({requests:[]}))).requests;
+  $('#introInboxCard').classList.toggle('hidden', rows.length === 0);
+  $('#introInbox').innerHTML = rows.length ? rows.map(r => `
+    <div style="border-bottom:1px solid var(--line); padding:8px 0">
+      <b>${esc(r.requester_email)}</b> would like an intro for <b>${esc(r.title || 'a role')}</b>
+      ${r.note_redacted ? `<div class="quote">${esc(r.note_redacted)}</div>` : ''}
+      <div class="row" style="margin-top:6px">
+        <select data-rel="${esc(r.id)}">
+          <option value="worked_together">worked together</option>
+          <option value="managed_them">managed them</option>
+          <option value="ta_instructor">TA / instructor</option>
+          <option value="classmate">classmate</option>
+          <option value="mentored_them">mentored them</option>
+          <option value="other">other</option></select>
+        <input data-ev="${esc(r.id)}" placeholder="one line of job-related context (optional)" />
+        <div style="flex:0 0 auto">
+          <button data-acc="${esc(r.id)}">Make the intro</button>
+          <button class="ghost" data-dec="${esc(r.id)}">Decline</button></div>
+      </div></div>`).join('') : 'No intro requests.';
+  $('#introInbox').onclick = async e => {
+    const acc = e.target.dataset.acc, dec = e.target.dataset.dec;
+    if (acc) {
+      const rel = document.querySelector(`[data-rel="${acc}"]`).value;
+      const ev = document.querySelector(`[data-ev="${acc}"]`).value;
+      await api(`/api/intros/requests/${acc}/accept`, {method:'POST',
+                body: JSON.stringify({relationship:rel, evidence:ev})}).catch(err=>alert(err.message));
+      loadIntroInbox();
+    }
+    if (dec) { await api(`/api/intros/requests/${dec}/decline`, {method:'POST'}).catch(()=>{});
+               loadIntroInbox(); }
+  };
+}
+
+async function loadVouches() {
+  const rows = (await api('/api/vouches/about-me').catch(()=>({vouches:[]}))).vouches;
+  $('#vouchList').innerHTML = rows.length ? rows.map(v => `
+    <div style="border-bottom:1px solid var(--line); padding:6px 0">
+      <b>${esc(v.voucher_role)}</b> · ${esc(v.relationship || '—')} · ${esc(v.verify_level)}
+      · <span class="status">${esc(v.status)}</span>
+      ${v.evidence_redacted ? `<div class="quote">${esc(v.evidence_redacted)}</div>` : ''}
+      ${v.status !== 'contested' ? `<button class="ghost" data-contest="${esc(v.id)}">Contest</button>` : ''}
+    </div>`).join('') : 'No vouches about you yet.';
+  $('#vouchList').onclick = async e => {
+    const id = e.target.dataset.contest;
+    if (id && confirm('Contest this vouch? It will be hidden from employers until resolved.')) {
+      await api(`/api/vouches/${id}/contest`, {method:'POST', body: JSON.stringify({note:''})})
+        .catch(err=>alert(err.message));
+      loadVouches();
+    }
+  };
 }
 $('#saveProfileBtn').onclick = async () => {
   $('#profileErr').textContent = '';
@@ -271,7 +401,8 @@ async function loadApps() {
       ${a.human_review_requested ? '<span class="muted">· human review requested</span>' : ''}</td>
     <td>${a.human_review_requested ? '' :
       `<button class="ghost" data-hr="${esc(a.id)}">Request human review</button>`}
-      <button class="ghost" data-msg="${esc(a.id)}">Messages</button></td></tr>
+      <button class="ghost" data-msg="${esc(a.id)}">Messages</button>
+      <button class="ghost" data-intro="${esc(a.id)}" data-posting="${esc(a.posting_id)}">Warm intro</button></td></tr>
     <tr class="hidden" id="thread-${esc(a.id)}"><td colspan="3"></td></tr>`).join('')
     || '<tr><td colspan="3" class="muted">No applications yet.</td></tr>';
   $('#appsTable').onclick = async e => {
@@ -279,6 +410,15 @@ async function loadApps() {
     if (id) { await api(`/api/applications/${id}/request-human-review`, {method:'POST'}); loadApps(); }
     const mid = e.target.dataset.msg;
     if (mid) toggleThread(mid);
+    const introApp = e.target.dataset.intro, introPosting = e.target.dataset.posting;
+    if (introApp) {
+      const avail = await api(`/api/intros/available/${introPosting}`).catch(()=>({warm_intro_available:false}));
+      if (!avail.warm_intro_available) { alert('No warm intro path is available for this posting yet.'); return; }
+      try {
+        await api('/api/intros/requests', {method:'POST', body: JSON.stringify({application_id: introApp})});
+        alert('Intro requested — your mutual connection will be asked. They are never revealed unless they accept.');
+      } catch (err) { alert(err.message); }
+    }
     const send = e.target.dataset.send;
     if (send) {
       const box = document.querySelector(`#thread-${send} input`);

@@ -421,13 +421,24 @@ The LinkedIn path is self-upload only, RAM-intersected, zero non-member residue.
       alumni-bridge matcher + coordinator-initiated intro (double-opt-in); coverage report w/ shut-off.
 - [x] AI2 Tests: network features rejected by scoring plane; intros not in match_results; no audit import.
 
-## Slice AJ — UI wiring
-- [ ] AJ1 student.html (granular consents + attestation, contacts upload, discovery opt-in, delete-my-network,
+## Slice AJ — UI wiring ✅
+- [x] AJ1 student.html (granular consents + attestation, contacts upload, discovery opt-in, delete-my-network,
       vouches-about-me, request-warm-intro behind application, intro inbox); coordinator.html (intro-equity +
       mitigation coverage); employer evidence card; broker inbox. All output escaped.
-- [ ] AJ2 Browser-verify the full flow; console clean; 375px pass.
+- [x] AJ2 Browser-verify the full flow; console clean; 375px pass.
 
-## Slice AK — retention/erasure job + legal launch gates
-- [ ] AK1 graph_retention job (purge expired edges/intros; erasure cascade on account deletion; tombstones);
+## Slice AK — retention/erasure job + legal launch gates ✅
+- [x] AK1 graph_retention job (purge expired edges/intros; erasure cascade on account deletion; tombstones);
       record PIA + legal-opinion + data-residency + pepper-leak-runbook as documented launch gates.
-- [ ] AK2 Tests: retention purges expired, erasure cascade leaves no PII, intro_events PII-free.
+- [x] AK2 Tests: retention purges expired, erasure cascade leaves no PII, intro_events PII-free.
+
+## Phase-4 completion statement (2026-07-12)
+
+Relationship-graph / warm-intro engine COMPLETE, adversarially designed, tested, browser-verified,
+all behind RM_PLATFORM_ENABLED. Consent-first warm intros (student -> mutual -> hiring manager,
+double-opt-in), verified vouches (self = floor weight, subject can contest), the LinkedIn
+self-upload importer (PSI-lite, zero non-member residue), the intro-equity fairness audit + the
+network-poverty positive-action program, all four boundaries held (graph never enters scoring:
+NETWORK_FEATURE_KEYS guard + boundary-trio tests). Remaining before turning the graph on for real
+students: the Slice AK legal gates (PIA, legal opinion, data-residency, breach runbook) + a real
+KMS for the tokenizer pepper. These are process/ops, not code.

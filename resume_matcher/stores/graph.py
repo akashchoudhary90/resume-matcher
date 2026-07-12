@@ -128,8 +128,10 @@ class NetworkStore:
         return {"rows_seen": len(rows), "edges_created": created}
 
     # ---- erasure / suppression (Slice Z) ---------------------------------------------------------
-    def delete_my_network(self, user_id: int) -> dict:
-        """Hard-delete everything graph-related about a member + tombstone so nothing re-materializes."""
+    def delete_my_network(self, user_id: int, *, reason: str = "member_optout") -> dict:
+        """Hard-delete EVERYTHING graph-related about a member (edges, discovery tokens, vouches as
+        voucher and as subject, intro requests in any role) + tombstone so nothing re-materializes.
+        This is the erasure cascade (Slice AK); a true DELETE, never a soft flag."""
         now = time.time()
         with closing(self._conn()) as conn:
             school = conn.execute("SELECT school_id FROM users WHERE id=?",
@@ -137,9 +139,14 @@ class NetworkStore:
             school_id = school["school_id"] if school else 1
             conn.execute("DELETE FROM graph_edges WHERE user_a=? OR user_b=?", (user_id, user_id))
             conn.execute("DELETE FROM member_graph_identity WHERE user_id=?", (user_id,))
+            conn.execute("DELETE FROM vouches WHERE voucher_user_id=? OR subject_user_id=?",
+                         (user_id, user_id))
+            conn.execute("DELETE FROM intro_requests WHERE requester_user_id=? OR target_user_id=? "
+                         "OR broker_user_id=?", (user_id, user_id, user_id))
+            # intro_events keep only opaque ids + status (no PII), so they need no scrub
             conn.execute(
                 "INSERT INTO graph_suppressions(school_id, user_id, reason, created_at) "
-                "VALUES(?,?,'member_optout',?)", (school_id, user_id, now))
+                "VALUES(?,?,?,?)", (school_id, user_id, reason, now))
             conn.commit()
         return {"ok": True}
 

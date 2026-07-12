@@ -76,13 +76,25 @@ docker compose ps
 To change the hostname, edit the domain line in [deploy/Caddyfile](deploy/Caddyfile).
 
 **Platform (Handshake replacement, docs/PLATFORM.md):** `RM_PLATFORM_ENABLED=1` mounts
-`/employer`, `/coordinator`, and the postings API (default **off** — deploys stay demo-only until
-you flip it deliberately). Before flipping on a real host: (1) make the DB path persistent
-(`RM_PLATFORM_DB` or the existing `RM_ACCOUNTS_DB` volume — the schema migrates in place),
-(2) seed a coordinator inside the container:
+`/employer`, `/coordinator`, `/student`, and the postings/graph API (default **off** — deploys
+stay demo-only until you flip it deliberately). Before flipping on a real host: (1) make the DB
+path persistent (`RM_PLATFORM_DB` or the existing `RM_ACCOUNTS_DB` volume — the schema migrates
+in place through 003), (2) seed a coordinator inside the container:
 `python scripts/create_user.py you@york.ca --password … --role coordinator`,
 (3) note the platform routes carry their own per-user auth and are exempt from the shared admin
 gate while the flag is on.
+
+**Relationship graph & warm intros (Phase 4, docs/RELATIONSHIPS.md):** part of the platform flag.
+The consented warm-intro engine (vouches, native edges, double-opt-in intros, fairness audit)
+works with no extra config. The optional LinkedIn `Connections.csv` importer needs key material
+for the identity tokenizer — set `RM_GRAPH_KMS_KEY_ID` (prod, computes the MAC in a KMS/HSM so the
+key never enters app memory) or, for local dev only, `RM_ENV=dev` + `RM_GRAPH_PEPPER=…`. Without
+key material the importer is disabled (fail-closed); the rest of the graph still works. Schedule
+the `graph_retention` job periodically (enqueue it via the job queue on a cron) to purge expired
+edges/intros. **Launch gates before turning the graph on for real students** (recorded in
+docs/RELATIONSHIPS.md Slice AK): a FIPPA Privacy Impact Assessment, a legal opinion on the
+self-export lawful basis, a data-residency/cross-border assessment confirming the local-backend
+commitment covers vouch text, and a pepper/key-leak reportable-breach runbook.
 
 ---
 
