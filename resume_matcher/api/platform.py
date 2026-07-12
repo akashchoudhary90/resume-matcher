@@ -19,14 +19,26 @@ import logging
 import os
 import threading
 import time
+from contextlib import closing
 
 from fastapi import APIRouter, Depends, HTTPException, Request
 
+from .. import notify
 from ..config import env_int, env_str
+from ..inference.schema import CandidateProfile
 from ..ingestion.posting_extract import PostingExtractError, extract_posting_draft
-from ..ingestion.parser import ParseError
-from ..matching.taxonomy import search_skills
+from ..ingestion.parser import (
+    ParseError,
+    infer_education_level,
+    infer_years_experience,
+)
+from ..ingestion.job_posting import build_job_spec
+from ..matching.evaluator import evaluate
+from ..matching.taxonomy import normalize_skills, search_skills
+from ..stores.db import connect as db_connect
+from ..stores.matches import MatchStore
 from ..stores.platform import OrgStore, PostingError, PostingStore
+from ..stores.students import CONSENT_PURPOSES, ApplicationStore, StudentError, StudentStore
 from ..workers.runner import get_job_store, register_handler
 from .auth import require_role
 
@@ -275,20 +287,30 @@ def coordinator_queue(user: dict = Depends(require_role("coordinator", "admin"))
 def approve_posting(posting_id: str, body: dict | None = None,
                     user: dict = Depends(require_role("coordinator", "admin"))):
     try:
-        return _posting_store().transition(posting_id, "live", actor_user_id=user["id"],
-                                           note=(body or {}).get("note", ""))
+        posting = _posting_store().transition(posting_id, "live", actor_user_id=user["id"],
+                                              note=(body or {}).get("note", ""))
     except PostingError as exc:
         raise HTTPException(409, str(exc))
+    # event-driven matching: a posting going live is THE moment its shortlist gets computed
+    get_job_store().enqueue("match_posting", {"posting_id": posting_id})
+    _notify_creator(posting, "Your posting is live",
+                    f"“{posting['title']}” was approved by career services and is now live.")
+    return posting
 
 
 @router.post("/api/coordinator/postings/{posting_id}/reject")
 def reject_posting(posting_id: str, body: dict | None = None,
                    user: dict = Depends(require_role("coordinator", "admin"))):
+    note = (body or {}).get("note", "")
     try:
-        return _posting_store().transition(posting_id, "rejected", actor_user_id=user["id"],
-                                           note=(body or {}).get("note", ""))
+        posting = _posting_store().transition(posting_id, "rejected", actor_user_id=user["id"],
+                                              note=note)
     except PostingError as exc:
         raise HTTPException(409, str(exc))
+    _notify_creator(posting, "Your posting needs changes",
+                    f"“{posting['title']}” was returned by career services."
+                    + (f" Note: {note}" if note else ""))
+    return posting
 
 
 @router.post("/api/coordinator/org-links/{org_id}/approve")
@@ -313,6 +335,245 @@ def revoke_org_link(org_id: int, user: dict = Depends(require_role("coordinator"
 @router.get("/api/skills")
 def skills_typeahead(q: str = "", user: dict = Depends(require_role())):
     return {"skills": search_skills(q)}
+
+
+# ---- students: profile, consents, resume (Slice I) ------------------------------------------------
+def _student_store() -> StudentStore:
+    return StudentStore()
+
+
+@router.get("/api/students/me/profile")
+def my_profile(user: dict = Depends(require_role("student"))):
+    store = _student_store()
+    return {"profile": store.get_profile(user["id"]), "consents": store.consents(user["id"]),
+            "resume": store.resume_meta(user["id"])}
+
+
+@router.put("/api/students/me/profile")
+def update_profile(body: dict, user: dict = Depends(require_role("student"))):
+    grad = body.get("grad_year")
+    return {"profile": _student_store().upsert_profile(
+        user["id"], program=str(body.get("program") or ""),
+        grad_year=int(grad) if isinstance(grad, (int, float)) and 1990 < int(grad) < 2100 else None,
+        work_auth_simple=str(body.get("work_auth_simple") or ""),
+        visibility=bool(body.get("visibility", True)),
+        school_id=user.get("school_id") or 1)}
+
+
+@router.post("/api/students/me/consents")
+def set_consent(body: dict, user: dict = Depends(require_role("student"))):
+    purpose, granted = str(body.get("purpose") or ""), bool(body.get("granted"))
+    store = _student_store()
+    try:
+        store.set_consent(user["id"], purpose, granted)
+    except StudentError as exc:
+        raise HTTPException(400, str(exc))
+    if purpose == "profile_matching" and not granted:
+        MatchStore().delete_for_student(user["id"])  # revoke removes already-computed scores too
+    return {"consents": store.consents(user["id"])}
+
+
+@router.get("/api/students/me/consents")
+def get_consents(user: dict = Depends(require_role("student"))):
+    return {"consents": _student_store().consents(user["id"]),
+            "purposes": list(CONSENT_PURPOSES)}
+
+
+@router.post("/api/students/me/resume", status_code=201)
+async def upload_resume(request: Request, user: dict = Depends(require_role("student"))):
+    form = await request.form()
+    upload = form.get("resume")
+    if upload is None or not getattr(upload, "filename", ""):
+        raise HTTPException(400, "Attach a resume file (field name: resume).")
+    data = await upload.read()
+    if len(data) > _MAX_JD_MB * 1024 * 1024:
+        raise HTTPException(413, f"Resume too large (max {_MAX_JD_MB} MB).")
+    try:
+        meta = _student_store().save_resume(user["id"], upload.filename,
+                                            upload.content_type or "", data)
+    except StudentError as exc:
+        raise HTTPException(409, str(exc))
+    except ParseError as exc:
+        raise HTTPException(400, str(exc))
+    # event-driven rematch: score this student against every live posting
+    get_job_store().enqueue("rematch_student", {"student_id": user["id"]},
+                            owner_user_id=user["id"])
+    return meta
+
+
+@router.delete("/api/students/me/resume")
+def delete_resume(user: dict = Depends(require_role("student"))):
+    removed = _student_store().delete_resume(user["id"])
+    MatchStore().delete_for_student(user["id"])  # hard delete includes computed scores
+    return {"deleted": removed}
+
+
+# ---- applications (Slice J) ------------------------------------------------------------------------
+@router.post("/api/postings/{posting_id}/apply", status_code=201)
+def apply_to_posting(posting_id: str, body: dict | None = None,
+                     user: dict = Depends(require_role("student"))):
+    posting = _posting_store().get(posting_id)
+    if posting is None or posting["status"] != "live":
+        raise HTTPException(404, "No such posting.")
+    resume = _student_store().resume_meta(user["id"])
+    if resume is None:
+        raise HTTPException(409, "Upload a resume before applying.")
+    try:
+        app_id = ApplicationStore().apply(posting_id, user["id"], resume["id"])
+    except StudentError as exc:
+        raise HTTPException(409, str(exc))
+    _notify_creator(posting, "New application on your posting",
+                    f"A student applied to “{posting['title']}”.")
+    return {"application_id": app_id, "status": "applied"}
+
+
+@router.get("/api/students/me/applications")
+def my_applications(user: dict = Depends(require_role("student"))):
+    return {"applications": ApplicationStore().for_student(user["id"])}
+
+
+@router.get("/api/postings/{posting_id}/applications")
+def posting_applications(posting_id: str,
+                         user: dict = Depends(require_role("employer", "coordinator", "admin"))):
+    posting = _posting_store().get(posting_id)
+    if posting is None:
+        raise HTTPException(404, "No such posting.")
+    _require_own_org_posting(posting, user)
+    return {"applications": ApplicationStore().for_posting(posting_id)}
+
+
+@router.patch("/api/applications/{application_id}")
+def update_application(application_id: str, body: dict,
+                       user: dict = Depends(require_role("employer", "coordinator", "admin"))):
+    apps = ApplicationStore()
+    app_row = apps.get(application_id)
+    if app_row is None:
+        raise HTTPException(404, "No such application.")
+    posting = _posting_store().get(app_row["posting_id"])
+    _require_own_org_posting(posting, user)
+    try:
+        return apps.set_status(application_id, str(body.get("status") or ""))
+    except StudentError as exc:
+        raise HTTPException(409, str(exc))
+
+
+@router.post("/api/applications/{application_id}/request-human-review")
+def request_human_review(application_id: str, user: dict = Depends(require_role("student"))):
+    try:
+        ApplicationStore().request_human_review(application_id, user["id"])
+    except StudentError as exc:
+        raise HTTPException(404, str(exc))
+    return {"ok": True}
+
+
+# ---- the matching loop (Slice K) -------------------------------------------------------------------
+def _candidate_from_row(row: dict) -> CandidateProfile:
+    """CandidateProfile from stored REDACTED text — recomputed deterministically, so nothing but
+    the redacted text ever reaches an adapter (boundary #3)."""
+    text = row["redacted_text"] or ""
+    return CandidateProfile(
+        candidate_id=f"u{row['user_id']}",
+        skills=normalize_skills(text),
+        education_level=infer_education_level(text),
+        years_experience=infer_years_experience(text),
+        text=text,
+    )
+
+
+def _job_spec_from_posting(posting: dict):
+    buckets: dict[str, list[str]] = {"must_have": [], "required": [], "preferred": []}
+    for s in posting.get("skills", []):
+        buckets.setdefault(s["bucket"], []).append(s["skill_id"])
+    return build_job_spec(
+        job_id=posting["id"], title=posting["title"], employer=posting.get("org_name") or "",
+        description=posting.get("description") or "",
+        required_skills=buckets["required"], preferred_skills=buckets["preferred"],
+        must_have_skills=buckets["must_have"],
+        min_education=posting.get("min_education"), min_years=posting.get("min_years"),
+    )
+
+
+@register_handler("match_posting")
+def _match_posting_job(payload: dict, progress) -> dict:
+    posting = PostingStore().get(payload["posting_id"])
+    if posting is None or posting["status"] != "live":
+        return {"scored": 0, "skipped": "posting not live"}
+    spec = _job_spec_from_posting(posting)
+    students = StudentStore().matchable_students()
+    matches = MatchStore()
+    progress(0, len(students))
+    for i, row in enumerate(students):
+        matches.upsert(posting["id"], row["user_id"], evaluate(_candidate_from_row(row), spec))
+        progress(i + 1)
+    return {"scored": len(students)}
+
+
+@register_handler("rematch_student")
+def _rematch_student_job(payload: dict, progress) -> dict:
+    student_id = payload["student_id"]
+    store = StudentStore()
+    rows = [r for r in store.matchable_students() if r["user_id"] == student_id]
+    if not rows:
+        return {"scored": 0, "skipped": "student not in match pool"}
+    candidate = _candidate_from_row(rows[0])
+    postings = PostingStore().list(status="live")
+    matches, posting_store = MatchStore(), PostingStore()
+    progress(0, len(postings))
+    for i, summary in enumerate(postings):
+        posting = posting_store.get(summary["id"])
+        matches.upsert(posting["id"], student_id,
+                       evaluate(candidate, _job_spec_from_posting(posting)))
+        progress(i + 1)
+    return {"scored": len(postings)}
+
+
+def _record_exposure(viewer: dict, posting_id: str) -> None:
+    """Append-only exposure event the FIRST time this human sees this posting's ranking — the
+    AEDT-relevant moment (docs/PLATFORM.md graft #7)."""
+    with closing(db_connect()) as conn:
+        seen = conn.execute(
+            "SELECT 1 FROM events WHERE actor_user_id=? AND action='shortlist_exposed' "
+            "AND entity='posting' AND entity_id=?",
+            (viewer["id"], posting_id),
+        ).fetchone()
+        if not seen:
+            conn.execute(
+                "INSERT INTO events(actor_user_id, action, entity, entity_id, at) "
+                "VALUES(?,?,?,?,?)",
+                (viewer["id"], "shortlist_exposed", "posting", posting_id, time.time()),
+            )
+            conn.commit()
+
+
+@router.get("/api/postings/{posting_id}/shortlist")
+def posting_shortlist(posting_id: str,
+                      user: dict = Depends(require_role("employer", "coordinator", "admin"))):
+    posting = _posting_store().get(posting_id)
+    if posting is None:
+        raise HTTPException(404, "No such posting.")
+    _require_own_org_posting(posting, user)
+    _record_exposure(user, posting_id)
+    return {"posting_id": posting_id, "title": posting["title"],
+            "score_kind": "fit_readiness_not_hire_probability",
+            "shortlist": MatchStore().shortlist(posting_id)}
+
+
+@router.get("/api/students/me/matches")
+def my_matches(user: dict = Depends(require_role("student"))):
+    return {"score_kind": "fit_readiness_not_hire_probability",
+            "matches": MatchStore().roles_for(user["id"])}
+
+
+# ---- notifications (Slice M; best-effort by contract) ----------------------------------------------
+def _notify_creator(posting: dict, subject: str, body: str) -> None:
+    try:
+        with closing(db_connect()) as conn:
+            row = conn.execute("SELECT email FROM users WHERE id=?",
+                               (posting["created_by"],)).fetchone()
+        if row:
+            notify.send(row["email"], subject, body)
+    except Exception:  # noqa: BLE001
+        _log.warning("notification failed", exc_info=True)
 
 
 # ---- corrections -> eval set (docs/JD_AUTOFILL.md §4) --------------------------------------------

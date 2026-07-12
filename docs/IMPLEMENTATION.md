@@ -153,56 +153,56 @@ deployment is `RM_INFERENCE_BACKEND=ollama` + `RM_PLATFORM_EXTRACT_BACKEND=ollam
 the box) and Claude stays a dev/demo convenience. JDs are employer marketing text (not student
 PII) — lower sensitivity — but the same switch covers them.
 
-## Slice I — students: profile, consents, resume
+## Slice I — students: profile, consents, resume ✅
 
-- [ ] I1 `stores/students.py` — StudentStore: profile upsert/get; consents grant/revoke/active
+- [x] I1 `stores/students.py` — StudentStore: profile upsert/get; consents grant/revoke/active
       (append-only rows); resume save (blob + extracted + REDACTED text, one active resume per
       student, replace = hard-delete old row) + hard delete; `matchable_students()` = visible
       profiles with active resume AND active `profile_matching` consent (pool filter BEFORE
       retrieval).
-- [ ] I2 Routes: GET/PUT /api/students/me/profile, GET/POST /api/students/me/consents (grant/
+- [x] I2 Routes: GET/PUT /api/students/me/profile, GET/POST /api/students/me/consents (grant/
       revoke by purpose), POST /api/students/me/resume (multipart; parse_resume_bytes reuse;
       requires `resume_storage` consent), DELETE /api/students/me/resume, GET meta.
-- [ ] I3 Tests: consent gate blocks upload; hard delete removes blob+text; matchable pool
+- [x] I3 Tests: consent gate blocks upload; hard delete removes blob+text; matchable pool
       respects visibility+consent+resume; redacted_text has no direct identifiers.
 
-## Slice J — browse + apply + application pipeline
+## Slice J — browse + apply + application pipeline ✅
 
-- [ ] J1 ApplicationStore (in stores/students.py): apply (live posting + own resume), list mine
+- [x] J1 ApplicationStore (in stores/students.py): apply (live posting + own resume), list mine
       (student), list for posting (employer own org / coordinator), status transitions
       applied→shortlisted→advanced→rejected|hired, human_review_requested flag.
-- [ ] J2 Routes: POST /api/postings/{id}/apply, GET /api/students/me/applications,
+- [x] J2 Routes: POST /api/postings/{id}/apply, GET /api/students/me/applications,
       GET /api/postings/{id}/applications, PATCH /api/applications/{id} (role-gated),
       POST /api/applications/{id}/request-human-review (student).
-- [ ] J3 Tests: student applies once (dupe 409), employer sees own org's applicants only,
+- [x] J3 Tests: student applies once (dupe 409), employer sees own org's applicants only,
       transitions validated, non-live posting rejects applications.
 
-## Slice K — the matching loop (the engine goes live)
+## Slice K — the matching loop (the engine goes live) ✅
 
-- [ ] K1 `stores/matches.py` MatchStore — upsert/get match_results (score_kind CHECK),
+- [x] K1 `stores/matches.py` MatchStore — upsert/get match_results (score_kind CHECK),
       shortlist(posting), roles_for(student) over live postings.
-- [ ] K2 Job handlers: `match_posting` (enqueued at approve; scores matchable pool vs posting via
+- [x] K2 Job handlers: `match_posting` (enqueued at approve; scores matchable pool vs posting via
       build_job_spec + CandidateProfile-from-redacted_text + get_adapter() + evaluator — engine
       untouched), `rematch_student` (enqueued at resume upload; scores vs live postings).
       Event-driven only.
-- [ ] K3 Routes: GET /api/postings/{id}/shortlist (employer own/coordinator; ranked, full
+- [x] K3 Routes: GET /api/postings/{id}/shortlist (employer own/coordinator; ranked, full
       breakdown from result_json; joins applications) — first view per (viewer, posting) writes an
       EXPOSURE EVENT to the append-only events table; GET /api/students/me/matches (roles for
       you: fit + gaps per live posting).
-- [ ] K4 Tests: approve → match job runs (mock adapter) → shortlist ranked; resume upload →
+- [x] K4 Tests: approve → match job runs (mock adapter) → shortlist ranked; resume upload →
       rematch; consent revoke removes student from next run; exposure event written once per
       viewer.
 
-## Slice L — student coaching surface (thin)
+## Slice L — student coaching surface (thin) ✅
 
-- [ ] L1 Student match detail includes the score explanation + gaps (already in result_json).
-- [ ] L2 Tests: gaps/explanation present for a scored pair.
+- [x] L1 Student match detail includes the score explanation + gaps (already in result_json).
+- [x] L2 Tests: gaps/explanation present for a scored pair.
 
-## Slice M — email notifications (stdlib, no-op unless configured)
+## Slice M — email notifications (stdlib, no-op unless configured) ✅
 
-- [ ] M1 `resume_matcher/notify.py` — send via smtplib when RM_SMTP_HOST set, else log+skip;
+- [x] M1 `resume_matcher/notify.py` — send via smtplib when RM_SMTP_HOST set, else log+skip;
       fire on: org link approved, posting approved/rejected, application received.
-- [ ] M2 Tests: monkeypatched transport captures sends; unset config = silent no-op.
+- [x] M2 Tests: monkeypatched transport captures sends; unset config = silent no-op.
 
 ## Slice N — isolated LLM extraction (the York answer)
 
