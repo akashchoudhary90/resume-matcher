@@ -153,7 +153,26 @@ Phase 1 of the platform in [docs/PLATFORM.md](docs/PLATFORM.md) ships behind a f
   extraction accuracy is measured and tuned like matching accuracy.
 
 Knobs: `RM_PLATFORM_WORKERS` (2), `RM_JOB_MAX_ATTEMPTS` (3), `RM_PLATFORM_EXTRACT_BACKEND`
-(`claude_cli`; anything else = deterministic-only draft), `RM_PLATFORM_EXTRACT_PER_MIN` (6).
+(`claude_cli` | `ollama` | `openai_compat`; anything else = deterministic-only draft),
+`RM_PLATFORM_EXTRACT_PER_MIN` (6), `RM_SMTP_HOST/PORT/FROM` (email notifications; unset = no-op).
+
+### Isolated deployment ("York mode") — nothing leaves the box
+
+If the institution won't allow data to a third-party LLM (the safe assumption under
+FIPPA/PIA review), run both LLM paths on-box:
+
+```bash
+RM_INFERENCE_BACKEND=ollama            # resume-side matching extraction (existing switch)
+RM_PLATFORM_EXTRACT_BACKEND=ollama     # JD-autofill extraction (grammar-constrained, pinned schema)
+RM_OLLAMA_MODEL=qwen2.5:7b-instruct    # any local instruct model
+```
+
+With both set, **no resume or JD text ever leaves the machine** — Claude becomes a dev/demo
+convenience, not a dependency. Defense in depth regardless of config: any backend whose adapter
+is non-local only ever receives a `redact_text`-ed copy, enforced by the `assert_redacted`
+tripwire on the resume side (`inference/adapter.py`) and on the JD side
+(`ingestion/posting_extract.py`) — and the JD's contact fields are captured deterministically
+*before* redaction, so the posting form loses nothing.
 
 ## Measuring & tuning accuracy
 

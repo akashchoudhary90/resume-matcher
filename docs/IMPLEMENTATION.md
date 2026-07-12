@@ -204,16 +204,16 @@ PII) — lower sensitivity — but the same switch covers them.
       fire on: org link approved, posting approved/rejected, application received.
 - [x] M2 Tests: monkeypatched transport captures sends; unset config = silent no-op.
 
-## Slice N — isolated LLM extraction (the York answer)
+## Slice N — isolated LLM extraction (the York answer) ✅
 
-- [ ] N1 Generalize `posting_extract._llm_posting_extraction` to backends: claude_cli (as now),
+- [x] N1 Generalize `posting_extract._llm_posting_extraction` to backends: claude_cli (as now),
       ollama, openai_compat — via adapter-level `extract_posting` using the pinned
       posting_extraction schema as a format constraint (same pattern as MatchExtraction).
-- [ ] N2 Boundary #3 in code: a non-local adapter (`is_local=False`) only ever sees a
+- [x] N2 Boundary #3 in code: a non-local adapter (`is_local=False`) only ever sees a
       `redact_text`-ed JD copy (contacts already captured deterministically in P2), gated by
       `assert_redacted`.
-- [ ] N3 README "Isolated deployment (York mode)" section.
-- [ ] N4 Tests: hermetic adapter fake; non-local adapter receives redacted JD.
+- [x] N3 README "Isolated deployment (York mode)" section.
+- [x] N4 Tests: hermetic adapter fake; non-local adapter receives redacted JD.
 
 ## Slice P — student UI + shortlist UI
 
