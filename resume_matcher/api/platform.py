@@ -25,6 +25,7 @@ from fastapi import APIRouter, Depends, HTTPException, Request
 
 from .. import notify
 from ..config import env_int, env_str
+from ..inference.redaction import redact_text
 from ..inference.schema import CandidateProfile
 from ..ingestion.posting_extract import PostingExtractError, extract_posting_draft
 from ..ingestion.parser import (
@@ -37,11 +38,20 @@ from ..matching.evaluator import evaluate
 from ..matching.taxonomy import normalize_skills, search_skills
 from ..stores.db import connect as db_connect
 from ..stores.engage import EngageError, EventStore, InterviewStore, MessageStore
+from ..stores.graph import GraphError, NetworkStore
+from ..stores.intros import IntroError, IntroStore, find_paths
 from ..stores.matches import MatchStore
 from ..stores.platform import OrgStore, PostingError, PostingStore
+from ..stores.relationships import RelationshipError, RelationshipStore
 from ..stores.students import CONSENT_PURPOSES, ApplicationStore, StudentError, StudentStore
 from ..workers.runner import get_job_store, register_handler
 from .auth import require_role
+
+# Phase-4 graph purposes (subset of CONSENT_PURPOSES) exposed via the granular consent API.
+_GRAPH_PURPOSES = ("contacts_upload", "graph_discoverable", "warm_intro", "network_analytics")
+# Broker role -> the vouch verification tier an accepted intro produces.
+_BROKER_VERIFY_LEVEL = {"employer": "employer_verified", "coordinator": "coordinator",
+                        "admin": "coordinator", "student": "self"}
 
 _log = logging.getLogger("resume_matcher.api.platform")
 
@@ -879,6 +889,293 @@ def _notify_creator(posting: dict, subject: str, body: str) -> None:
             notify.send(row["email"], subject, body)
     except Exception:  # noqa: BLE001
         _log.warning("notification failed", exc_info=True)
+
+
+# ==================================================================================================
+# Phase 4 — relationship graph & warm intros (docs/RELATIONSHIPS.md)
+# ==================================================================================================
+def _network_store() -> NetworkStore:
+    return NetworkStore()
+
+
+def _rel_store() -> RelationshipStore:
+    return RelationshipStore()
+
+
+def _intro_store() -> IntroStore:
+    return IntroStore()
+
+
+# ---- graph job handlers ---------------------------------------------------------------------------
+@register_handler("build_edges")
+def _build_edges_job(payload: dict, progress) -> dict:
+    school_id = int(payload["school_id"])
+    rel = _rel_store()
+    made = rel.build_native_edges(school_id)
+    promoted = rel.promote_shareable(school_id)
+    return {"native_edges": made, "promoted": promoted}
+
+
+@register_handler("resolve_network")
+def _resolve_network_job(payload: dict, progress) -> dict:
+    import base64
+    raw = base64.b64decode(payload["csv_b64"])
+    try:
+        _network_store().import_csv(int(payload["user_id"]), int(payload["school_id"]), raw)
+    except GraphError as exc:
+        raise RuntimeError(str(exc)) from exc
+    _rel_store().promote_shareable(int(payload["school_id"]))
+    return {"ok": True}   # no per-contact counts surfaced (membership-oracle fix)
+
+
+# ---- Slice Z: granular consent + discovery identity + data-subject requests -----------------------
+@router.get("/api/graph/consents")
+def graph_consents(user: dict = Depends(require_role())):
+    store = _student_store()
+    return {"consents": {p: store.has_consent(user["id"], p) for p in _GRAPH_PURPOSES}}
+
+
+@router.post("/api/graph/consents")
+def set_graph_consent(body: dict, user: dict = Depends(require_role())):
+    purpose, granted = str(body.get("purpose") or ""), bool(body.get("granted"))
+    if purpose not in _GRAPH_PURPOSES:
+        raise HTTPException(400, "Unknown graph consent purpose.")
+    store = _student_store()
+    try:
+        store.set_consent(user["id"], purpose, granted)
+    except StudentError as exc:
+        raise HTTPException(400, str(exc))
+    if purpose == "graph_discoverable":
+        if granted:
+            get_job_store().enqueue("build_edges", {"school_id": user.get("school_id") or 1},
+                                    dedupe_key=f"build_edges:{user.get('school_id') or 1}")
+        else:
+            # revoking discovery immediately removes the member from every read path + edges
+            _rel_store().revoke_edges_for(user["id"])
+            _network_store().clear_identity(user["id"])
+    return {"consents": {p: store.has_consent(user["id"], p) for p in _GRAPH_PURPOSES}}
+
+
+@router.post("/api/graph/discover")
+def register_discovery(body: dict, user: dict = Depends(require_role())):
+    """Register the name+company a member's connections would know them by (tokens only, never
+    stored as cleartext) so others' uploaded contacts can resolve to them."""
+    if not _student_store().has_consent(user["id"], "graph_discoverable"):
+        raise HTTPException(409, "Grant the 'discoverable' consent first.")
+    n = _network_store().register_identity(
+        user["id"], user.get("school_id") or 1,
+        first=str(body.get("first") or ""), last=str(body.get("last") or ""),
+        company=str(body.get("company") or ""), email=str(body.get("email") or ""))
+    _rel_store().promote_shareable(user.get("school_id") or 1)
+    return {"tokens_registered": n}
+
+
+@router.delete("/api/network")
+def delete_my_network(user: dict = Depends(require_role())):
+    return _network_store().delete_my_network(user["id"])
+
+
+@router.post("/api/graph/repudiate")
+def repudiate(body: dict):
+    """PUBLIC non-member data-subject request (a non-member has no account). Rate-limited; the
+    self-asserted identity is tokenized in RAM, tombstoned, and any resolved edge is deleted."""
+    school_id = int(body.get("school_id") or 1)
+    if not _extract_rate.allow(-abs(hash(str(body.get("last") or "")) % 100000)):
+        raise HTTPException(429, "Too many requests — try again shortly.")
+    try:
+        return _network_store().repudiate(
+            school_id, first=str(body.get("first") or ""), last=str(body.get("last") or ""),
+            company=str(body.get("company") or ""), email=str(body.get("email") or ""))
+    except GraphError as exc:
+        raise HTTPException(400, str(exc))
+
+
+# ---- Slice AB: contacts import (202 + poll; consent-gated; no count egress) ------------------------
+@router.post("/api/network/import", status_code=202)
+async def import_contacts(request: Request, user: dict = Depends(require_role("student"))):
+    if not _student_store().has_consent(user["id"], "contacts_upload"):
+        raise HTTPException(409, "Grant the 'upload my contacts' consent first.")
+    if not _extract_rate.allow(user["id"]):
+        raise HTTPException(429, "Too many imports — wait a minute and try again.")
+    form = await request.form()
+    upload = form.get("contacts")
+    if upload is None or not getattr(upload, "filename", ""):
+        raise HTTPException(400, "Attach your Connections.csv (field name: contacts).")
+    data = await upload.read()
+    if len(data) > 5 * 1024 * 1024:
+        raise HTTPException(413, "File too large (5 MB max).")
+    import base64
+    job_id = get_job_store().enqueue("resolve_network", {
+        "user_id": user["id"], "school_id": user.get("school_id") or 1,
+        "csv_b64": base64.b64encode(data).decode("ascii")}, owner_user_id=user["id"])
+    return {"job_id": job_id, "poll": f"/api/jobs/{job_id}"}
+
+
+# ---- Slice AD: pathfinder (bare boolean, gated behind an application) ------------------------------
+def _hiring_manager(posting: dict) -> int | None:
+    with closing(db_connect()) as conn:
+        row = conn.execute("SELECT contact_user_id FROM posting_contacts WHERE posting_id=? "
+                           "AND contact_user_id IS NOT NULL LIMIT 1", (posting["id"],)).fetchone()
+    return row["contact_user_id"] if row else posting.get("created_by")
+
+
+def _has_application(user_id: int, posting_id: str) -> bool:
+    with closing(db_connect()) as conn:
+        return conn.execute("SELECT 1 FROM applications WHERE student_id=? AND posting_id=?",
+                            (user_id, posting_id)).fetchone() is not None
+
+
+@router.get("/api/intros/available/{posting_id}")
+def intro_available(posting_id: str, user: dict = Depends(require_role("student"))):
+    """Bare boolean, only after applying, only for a live posting in the caller's school
+    (enumeration-oracle fix). A later silent decline is thus indistinguishable from 'no path'."""
+    posting = _posting_store().get(posting_id)
+    if posting is None or posting["status"] != "live" or not _can_view(posting, user):
+        raise HTTPException(404, "No such posting.")
+    if not _has_application(user["id"], posting_id):
+        return {"warm_intro_available": False}   # gate: no probing before applying
+    target = _hiring_manager(posting)
+    if target is None or target == user["id"]:
+        return {"warm_intro_available": False}
+    paths = find_paths(_rel_store(), user["id"], target, user.get("school_id") or 1)
+    return {"warm_intro_available": bool(paths)}
+
+
+# ---- Slice AE: double-opt-in intro flow -----------------------------------------------------------
+def _intro_read_access(intro_id: str, user: dict) -> dict:
+    """READ access only (coordinator/admin, broker, or requester). Never used to gate mutations."""
+    intro = _intro_store().get(intro_id)
+    if intro is None:
+        raise HTTPException(404, "No such intro request.")
+    if user["role"] in ("coordinator", "admin") or user["id"] in (
+            intro["broker_user_id"], intro["requester_user_id"]):
+        return intro
+    raise HTTPException(404, "No such intro request.")
+
+
+@router.post("/api/intros/requests", status_code=201)
+def create_intro(body: dict, user: dict = Depends(require_role("student"))):
+    application_id = str(body.get("application_id") or "")
+    apps = ApplicationStore()
+    app_row = apps.get(application_id)
+    if app_row is None or app_row["student_id"] != user["id"]:   # IDOR fix
+        raise HTTPException(404, "No such application.")
+    posting = _posting_store().get(app_row["posting_id"])
+    if posting is None or posting["status"] != "live":
+        raise HTTPException(404, "No such posting.")
+    target = _hiring_manager(posting)
+    if target is None or target == user["id"]:
+        raise HTTPException(409, "No warm intro is available for this posting.")
+    paths = find_paths(_rel_store(), user["id"], target, user.get("school_id") or 1)
+    if not paths:
+        raise HTTPException(409, "No warm intro is available for this posting.")
+    note = redact_text(str(body.get("note") or "")[:500])
+    try:
+        return _intro_store().create(
+            school_id=user.get("school_id") or 1, posting_id=posting["id"],
+            application_id=application_id, requester_user_id=user["id"], target_user_id=target,
+            path=paths[0], note_redacted=note)
+    except IntroError as exc:
+        raise HTTPException(409, str(exc))
+
+
+@router.get("/api/intros/inbox")
+def intro_inbox(user: dict = Depends(require_role())):
+    return {"requests": _intro_store().inbox(user["id"])}
+
+
+@router.get("/api/intros/requests/mine")
+def intro_mine(user: dict = Depends(require_role("student"))):
+    return {"requests": _intro_store().mine(user["id"])}
+
+
+@router.post("/api/intros/requests/{intro_id}/accept")
+def accept_intro(intro_id: str, body: dict, user: dict = Depends(require_role())):
+    intro = _intro_store().get(intro_id)
+    if intro is None or intro["broker_user_id"] != user["id"]:   # CRITICAL: broker-only, explicit
+        raise HTTPException(403, "Only the requested connection can accept this intro.")
+    # the broker writes a job-related vouch about the requester; verify tier from broker role
+    vouch = _rel_store().create_vouch(
+        school_id=intro["school_id"], voucher_user_id=user["id"],
+        subject_user_id=intro["requester_user_id"], relationship=str(body.get("relationship") or "other"),
+        evidence=str(body.get("evidence") or ""), scope="posting", posting_id=intro["posting_id"],
+        verify_level=_BROKER_VERIFY_LEVEL.get(user["role"], "self"))
+    try:
+        return _intro_store().accept(intro_id, user["id"], vouch["vouch_id"])
+    except IntroError as exc:
+        raise HTTPException(409, str(exc))
+
+
+@router.post("/api/intros/requests/{intro_id}/decline")
+def decline_intro(intro_id: str, user: dict = Depends(require_role())):
+    intro = _intro_store().get(intro_id)
+    if intro is None or intro["broker_user_id"] != user["id"]:   # broker-only, explicit
+        raise HTTPException(403, "Only the requested connection can decline this intro.")
+    try:
+        return _intro_store().decline(intro_id, user["id"])
+    except IntroError as exc:
+        raise HTTPException(409, str(exc))
+
+
+@router.post("/api/intros/broker/block")
+def broker_block(body: dict, user: dict = Depends(require_role())):
+    _intro_store().block(user["id"], int(body.get("blocked_user_id") or 0))
+    return {"ok": True}
+
+
+# ---- Slice AF: vouches ----------------------------------------------------------------------------
+@router.post("/api/vouches", status_code=201)
+def create_vouch(body: dict, user: dict = Depends(require_role())):
+    try:
+        return _rel_store().create_vouch(
+            school_id=user.get("school_id") or 1, voucher_user_id=user["id"],
+            subject_user_id=int(body.get("subject_user_id") or 0),
+            relationship=body.get("relationship"), evidence=str(body.get("evidence") or ""),
+            scope=str(body.get("scope") or "general"), posting_id=body.get("posting_id"),
+            verify_level="self")   # self-authored -> low weight until a coordinator verifies
+    except RelationshipError as exc:
+        raise HTTPException(400, str(exc))
+
+
+@router.get("/api/vouches/about-me")
+def vouches_about_me(user: dict = Depends(require_role())):
+    return {"vouches": _rel_store().vouches_about(user["id"])}
+
+
+@router.post("/api/vouches/{vouch_id}/contest")
+def contest_vouch(vouch_id: str, body: dict, user: dict = Depends(require_role())):
+    try:
+        return _rel_store().contest_vouch(vouch_id, user["id"], str(body.get("note") or ""))
+    except RelationshipError as exc:
+        raise HTTPException(404, str(exc))
+
+
+@router.post("/api/vouches/{vouch_id}/verify")
+def verify_vouch(vouch_id: str, body: dict,
+                 user: dict = Depends(require_role("coordinator", "admin"))):
+    try:
+        return _rel_store().verify_vouch(vouch_id, user["id"],
+                                         str(body.get("verify_level") or "coordinator"))
+    except RelationshipError as exc:
+        raise HTTPException(400, str(exc))
+
+
+# ---- Slice AG: employer evidence card -------------------------------------------------------------
+@router.get("/api/intros/for-application/{application_id}")
+def intro_card(application_id: str,
+               user: dict = Depends(require_role("employer", "coordinator", "admin"))):
+    app_row = ApplicationStore().get(application_id)
+    if app_row is None:
+        raise HTTPException(404, "No such application.")
+    posting = _posting_store().get(app_row["posting_id"])
+    _require_own_org_posting(posting, user)
+    intros = _intro_store().accepted_for_application(application_id)
+    vouches = _rel_store().vouches_for_subject_on_posting(app_row["student_id"],
+                                                          app_row["posting_id"])
+    # quoted, attributable, job-related evidence — NEVER blended into match_results / fit_score
+    return {"claim_kind": "job_related_evidence_not_hire_recommendation",
+            "warm_intros": [{"broker_role": i["broker_role"], "hops": i["hops"]} for i in intros],
+            "vouches": vouches}
 
 
 # ---- corrections -> eval set (docs/JD_AUTOFILL.md §4) --------------------------------------------

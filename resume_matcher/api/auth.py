@@ -45,6 +45,9 @@ _PLATFORM_PREFIXES = (
     "/api/students/", "/api/applications/", "/api/events", "/api/messages/",
     "/api/interview-slots/", "/api/schools", "/api/orgs/", "/employer", "/coordinator",
     "/student",
+    # Phase 4 — relationship graph / warm intros (each route declares its own require_role;
+    # /api/graph/repudiate is intentionally public for non-member data-subject requests).
+    "/api/network", "/api/graph", "/api/intros", "/api/vouches",
 )
 
 

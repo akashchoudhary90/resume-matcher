@@ -369,10 +369,10 @@ The LinkedIn path is self-upload only, RAM-intersected, zero non-member residue.
 - [x] Y3 Tests: protected-column CI still green, 003 idempotent (rows preserved on existing DB),
       purposes⇔CHECK match, school_id NOT NULL enforced.
 
-## Slice Z — granular consent API + data-subject-request (erasure + non-member repudiation)
-- [ ] Z1 consent grant/revoke routes per purpose; DELETE /api/network (member erasure, hard delete +
+## Slice Z — granular consent ✅ API + data-subject-request (erasure + non-member repudiation)
+- [x] Z1 consent grant/revoke routes per purpose; DELETE /api/network (member erasure, hard delete +
       tombstone); POST /api/graph/repudiate (non-member DSR → graph_suppressions).
-- [ ] Z2 Tests: revoke hides member everywhere; erasure is hard delete; repudiation tombstones.
+- [x] Z2 Tests: revoke hides member everywhere; erasure is hard delete; repudiation tombstones.
 
 ## Slice AA — tokenizer ✅ (KMS interface + dev pepper, per-school, versioned, fail-closed)
 - [x] AA1 `stores/graph_tokens.py`: canonical_identity + identity_token(school_id,...) → (token, key_version);
@@ -384,32 +384,32 @@ The LinkedIn path is self-upload only, RAM-intersected, zero non-member residue.
       RAM intersection vs member_graph_identity; discard non-matches before commit; no per-contact counts.
 - [x] AB2 Tests: discards non-members (0 residue), no count egress, size/batch guards, fail-closed.
 
-## Slice AC — edge builder + resolve/backfill (revocation-durable)
-- [ ] AC1 RelationshipStore.upsert_edge/build_native_edges/resolve_import/backfill; build_edges +
+## Slice AC — edge builder ✅ + resolve/backfill (revocation-durable)
+- [x] AC1 RelationshipStore.upsert_edge/build_native_edges/resolve_import/backfill; build_edges +
       resolve_network job handlers; native folding; never un-revoke; skip suppressed; post-consent only.
-- [ ] AC2 Tests: idempotent, never-unrevoke, skips suppressed, backfill ignores pre-consent, default pending.
+- [x] AC2 Tests: idempotent, never-unrevoke, skips suppressed, backfill ignores pre-consent, default pending.
 
-## Slice AD — pathfinder (consent-gated BFS + verified-vouch ranking)
-- [ ] AD1 `stores/intros.py`: EDGE_STRENGTH, edge_score, rank_path, find_paths (BFS depth 3, top-5,
+## Slice AD — pathfinder ✅ (consent-gated BFS + verified-vouch ranking)
+- [x] AD1 `stores/intros.py`: EDGE_STRENGTH, edge_score, rank_path, find_paths (BFS depth 3, top-5,
       product×recency), shared _SHAREABLE predicate; GET /api/intros/available/{posting} = bare boolean,
       gated behind an application, school-scoped, rate-limited.
-- [ ] AD2 Tests: ranking unit tests; respects shareable+both-consent; available is boolean-behind-application;
+- [x] AD2 Tests: ranking unit tests; respects shareable+both-consent; available is boolean-behind-application;
       no audit import.
 
-## Slice AE — double-opt-in intro flow (authz-hardened)
-- [ ] AE1 intro lifecycle + routes; _intro_access READ-ONLY; accept/decline explicit broker-only 403;
+## Slice AE — double-opt-in intro flow ✅ (authz-hardened)
+- [x] AE1 intro lifecycle + routes; _intro_access READ-ONLY; accept/decline explicit broker-only 403;
       IDOR check (application.student_id==requester); broker pending cap + block; note redacted+escaped;
       intro_events status-only.
-- [ ] AE2 Tests: student can't accept own request, IDOR blocked, broker cap+block, decline is silent.
+- [x] AE2 Tests: student can't accept own request, IDOR blocked, broker cap+block, decline is silent.
 
-## Slice AF — vouches as structured job-related evidence
-- [ ] AF1 create/verify/contest vouch + routes; redact evidence at ingest; only verified tiers project a
+## Slice AF — vouches ✅ as structured job-related evidence
+- [x] AF1 create/verify/contest vouch + routes; redact evidence at ingest; only verified tiers project a
       verified_vouch edge (self→low weight); subject view+contest; per-voucher rate limit; exposure logged.
-- [ ] AF2 Tests: self-vouch low weight, ingest redacts PII, subject view/contest, rate limit, contested not traversed.
+- [x] AF2 Tests: self-vouch low weight, ingest redacts PII, subject view/contest, rate limit, contested not traversed.
 
-## Slice AG — employer evidence card
-- [ ] AG1 GET /api/intros/for-application/{id}; quoted attributable evidence, claim_kind, never in match_results.
-- [ ] AG2 Tests: card not in match_results, output escaped.
+## Slice AG — employer evidence card ✅
+- [x] AG1 GET /api/intros/for-application/{id}; quoted attributable evidence, claim_kind, never in match_results.
+- [x] AG2 Tests: card not in match_results, output escaped.
 
 ## Slice AH — fairness audit (aggregate-only, MIN_CELL=5)
 - [ ] AH1 audit/metrics.access_disparity; GET /api/coordinator/reports/intro-equity (JSON+CSV); access +
