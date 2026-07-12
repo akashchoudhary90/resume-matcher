@@ -42,7 +42,7 @@ _AUTH_EXEMPT_PATHS = {
 # flag is read per-request so RM_PLATFORM_ENABLED=0 deployments keep today's posture untouched.
 _PLATFORM_PREFIXES = (
     "/api/postings", "/api/jobs/", "/api/coordinator/", "/api/skills", "/api/account/",
-    "/employer", "/coordinator",
+    "/api/students/", "/api/applications/", "/employer", "/coordinator", "/student",
 )
 
 

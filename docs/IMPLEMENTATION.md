@@ -215,17 +215,17 @@ PII) — lower sensitivity — but the same switch covers them.
 - [x] N3 README "Isolated deployment (York mode)" section.
 - [x] N4 Tests: hermetic adapter fake; non-local adapter receives redacted JD.
 
-## Slice P — student UI + shortlist UI
+## Slice P — student UI + shortlist UI ✅
 
-- [ ] P1 `static/student.html` — profile+consents, resume upload/delete, browse live postings,
+- [x] P1 `static/student.html` — profile+consents, resume upload/delete, browse live postings,
       apply, my applications, "roles for you" with fit + why + gaps.
-- [ ] P2 employer.html + coordinator.html: ranked shortlist view with expandable why-this-score.
-- [ ] P3 Browser-verified end to end with mock engine; console clean.
+- [x] P2 employer.html + coordinator.html: ranked shortlist view with expandable why-this-score.
+- [x] P3 Browser-verified end to end with mock engine; console clean.
 
-## Slice Q — ship the 80%
+## Slice Q — ship the 80% ✅
 
-- [ ] Q1 Full pytest + ruff; boxes flipped; README student-flow update; commit + push.
-- [ ] Q2 Handshake-parity statement written into this file (what's in the 80%; the missing 20% =
+- [x] Q1 Full pytest + ruff; boxes flipped; README student-flow update; commit + push.
+- [x] Q2 Handshake-parity statement written into this file (what's in the 80%; the missing 20% =
       events/fairs, messaging, interviews, mobile).
 
 ## Env vars added
@@ -245,3 +245,19 @@ PII) — lower sensitivity — but the same switch covers them.
 1. `git log --oneline -5` + read this file → find first unchecked box.
 2. `pytest -q` to confirm the tree is green before continuing.
 3. Continue the slice; keep commits slice-scoped; update boxes in the same commit.
+
+## Handshake-parity statement (Q2, 2026-07-12)
+
+**In the ~80% (built, tested, browser-verified):** employer self-service accounts + org trust
+gate; JD-autofill posting creation (the differentiator Handshake lacks); coordinator posting
+approval workflow + append-only audit trail; student accounts, profiles, consent lifecycle,
+resume upload with redaction-at-ingest and hard delete; job browse + apply + application status
+pipeline + human-review-requested; evidence-quoted match rankings BOTH directions (employer
+shortlists ranked by fit with verbatim-quote breakdowns + exposure-event logging; student
+"roles for you" with why-this-score and gaps) — Handshake has none of this matching depth;
+email notifications; isolated on-box LLM mode; bias-audit machinery (pre-existing) ready to
+wire to real applications.
+
+**The deliberate missing ~20%:** career-fair/event management, employer↔student messaging,
+interview scheduling, mobile apps, multi-school marketplace network effects (schema is ready:
+school_id + employer_school_links), OFCCP/EEO-style reporting exports.

@@ -205,6 +205,10 @@ def create_app():
         def coordinator_page():
             return FileResponse(str(_STATIC / "coordinator.html"))
 
+        @app.get("/student", include_in_schema=False)
+        def student_page():
+            return FileResponse(str(_STATIC / "student.html"))
+
     # DoS guards for the public demo (defense in depth — the app is also admin-auth gated):
     demo_rate = _RateLimiter(
         demo_mod._int_env("RM_DEMO_RATE_BURST", 15),

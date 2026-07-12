@@ -101,6 +101,10 @@ class StudentStore:
     def save_resume(self, user_id: int, filename: str, content_type: str, data: bytes) -> dict:
         if not self.has_consent(user_id, "resume_storage"):
             raise StudentError("Grant the resume-storage consent before uploading a resume.")
+        if self.get_profile(user_id) is None:
+            # A resume without a saved profile must still land in the match pool — create the
+            # default (visible) profile row rather than silently excluding the student.
+            self.upsert_profile(user_id)
         profile = parse_resume_bytes(f"u{user_id}", filename, data)  # in-memory; redacts contacts
         if not profile.has_resume:
             raise StudentError("No readable text found in that file.")

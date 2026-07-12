@@ -182,6 +182,20 @@ def test_apply_and_matching_loop_end_to_end(platform):
         == "stu@york.ca"
 
 
+def test_resume_upload_without_saved_profile_still_joins_pool(platform):
+    """Regression (found live): a student who never clicked Save Profile must not be silently
+    excluded from matching — upload creates the default visible profile row."""
+    client, tokens, _ = platform
+    _as(client, tokens, "student")
+    for purpose in ("resume_storage", "profile_matching"):
+        client.post("/api/students/me/consents", json={"purpose": purpose, "granted": True})
+    r = client.post("/api/students/me/resume",
+                    files={"resume": ("alex.txt", RESUME.encode(), "text/plain")})
+    assert r.status_code == 201
+    student_id = get_account_store().user_for_token(tokens["student"])["id"]
+    assert any(row["user_id"] == student_id for row in StudentStore().matchable_students())
+
+
 def test_apply_rules(platform):
     client, tokens, org_id = platform
     pid = _make_live_posting(client, tokens, org_id)
