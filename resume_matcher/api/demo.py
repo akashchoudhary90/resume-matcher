@@ -18,19 +18,18 @@ import hashlib
 import json
 import logging
 import os
-import re
 import secrets
 import shutil
 import tempfile
 import threading
 import time
-import unicodedata
 from collections import OrderedDict
 from concurrent.futures import ThreadPoolExecutor
 from dataclasses import dataclass, field
 
 from ..antigaming.hidden_text import cross_modal_diff, scan_pdf, scan_pdf_bytes
 from ..config import DemoConfig, env_int
+from ..ingestion.jd_fields import skill_ids_from_names
 from ..ingestion.job_posting import build_job_spec, detect_job_skills, skill_options
 from ..ingestion.parser import (
     ParseError,
@@ -46,7 +45,7 @@ from ..matching import coaching as coaching_mod
 from ..matching import counterfactual as counterfactual_mod
 from ..matching import jd_audit as jd_audit_mod
 from ..matching.evaluator import score_with_antigaming
-from ..matching.taxonomy import canonical_name, normalize_skills
+from ..matching.taxonomy import canonical_name
 from .serialize import result_to_dict
 
 # Demo config now lives in resume_matcher/config.py (one documented home for the RM_* knobs). The
@@ -392,26 +391,9 @@ _JD_EDU_LEVELS = {"highschool", "high school", "diploma", "certificate", "associ
 _JD_MAX_REQUIRED, _JD_MAX_PREFERRED, _JD_MAX_MUST = 12, 8, 4
 # Unicode-aware: an accented/CJK skill name ("Résumé Writing", "机器学习") must survive as a
 # matchable id, not be mangled to an ASCII stub or dropped.
-_SLUG_RE = re.compile(r"[^\w+#.]+")
-
-
-def _skill_ids_from_names(names) -> list[str]:
-    """LLM skill NAMES -> skill ids. A name containing a known taxonomy surface resolves to the
-    canonical id (so synonyms collapse, same as everywhere else); anything the taxonomy doesn't
-    know gets a conservative slug (the same rule as the UI's manual skill-add), because the ranker
-    and both extraction engines match skills against the resume TEXT, not against the taxonomy."""
-    out: list[str] = []
-    for name in names if isinstance(names, list) else []:
-        if not isinstance(name, str) or not name.strip():
-            continue
-        ids = normalize_skills(name)
-        if not ids:
-            slug = _SLUG_RE.sub("_", unicodedata.normalize("NFKC", name.strip()).lower()).strip("_")
-            ids = [slug] if 2 <= len(slug) <= 40 else []
-        for sid in ids:
-            if sid not in out:
-                out.append(sid)
-    return out
+# Promoted to ingestion/jd_fields.py (the platform JD-autofill pipeline shares it); the demo keeps
+# its private alias so existing callers/tests are untouched.
+_skill_ids_from_names = skill_ids_from_names
 
 
 def _llm_job_requirements(job_text: str, title: str = "") -> dict | None:

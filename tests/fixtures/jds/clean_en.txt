@@ -1,0 +1,32 @@
+Data Analyst Intern (Hybrid) — Summer 2027
+
+About Us
+Northwind Analytics is a Toronto fintech founded 12 years ago. Our mission is
+to make data useful. We use Kafka and Snowflake across the company. Visit
+https://northwind.example.com to learn more.
+
+What You'll Do
+- Pull raw order data with SQL queries and build reports
+- Build interactive dashboards for the operations team
+- Present findings to stakeholders every sprint
+
+Requirements
+- Currently enrolled in a Bachelor's degree in a quantitative field
+- 2+ years of experience with Python for data analysis
+- Strong SQL skills
+- Excellent communication skills
+
+Nice to Have
+- Familiarity with Tableau
+- Experience with Git
+
+Compensation & Benefits
+The pay range for this role is $24 - $28 per hour (CAD). We offer a health
+spending account and a transit pass.
+
+How to Apply
+Apply by March 15, 2027 at https://jobs.example.com/apply/da-intern or email
+recruiting@northwind.example.com. The term begins May 3, 2027.
+
+Northwind is an equal opportunity employer. Accommodations are available on
+request throughout the recruitment process.

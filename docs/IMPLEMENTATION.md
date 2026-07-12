@@ -66,19 +66,19 @@ pushes stay safe to auto-deploy.
 - [x] C3 Tests: `tests/test_posting_schema.py` — round-trip, projection drops
       work_authorization/contact, tripwire fires on a protected key, schema files match models.
 
-## Slice D — deterministic passes P0–P3
+## Slice D — deterministic passes P0–P3 ✅
 
-- [ ] D1 `ingestion/jd_structure.py` — sectionizer (EN+FR heading regexes, bullet runs,
+- [x] D1 `ingestion/jd_structure.py` — sectionizer (EN+FR heading regexes, bullet runs,
       char offsets), kinds: header/about_company/responsibilities/qualifications_required/
       qualifications_preferred/pay_benefits/application/eeo_boilerplate/other.
-- [ ] D2 `ingestion/jd_fields.py` — deterministic extractors returning ExtractedField:
+- [x] D2 `ingestion/jd_fields.py` — deterministic extractors returning ExtractedField:
       email/url/phone (reuse redaction.py patterns, capturing), pay (currency+range+period),
       deadline vs start date, employment_type, work_mode, min_education + min_years (scoped to
       qualifications sections), responsibilities/qualification bullet lines, per-section
       `normalize_skills`, title/employer heuristics. Promote `_skill_ids_from_names` here;
       `api/demo.py` re-exports it (test imports keep working).
-- [ ] D3 P3 scan: reuse `scan_injection` + language heuristic + multi-role heuristic → flags.
-- [ ] D4 Tests: `tests/test_jd_structure.py`, `tests/test_jd_fields.py` (incl. URL-junk and
+- [x] D3 P3 scan: reuse `scan_injection` + language heuristic + multi-role heuristic → flags.
+- [x] D4 Tests: `tests/test_jd_structure.py`, `tests/test_jd_fields.py` (incl. URL-junk and
       about-company-years regressions), fixture JDs under `tests/fixtures/jds/`.
 
 ## Slice E — LLM pass P4 + merge P5
