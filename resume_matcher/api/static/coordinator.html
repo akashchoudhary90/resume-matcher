@@ -2,6 +2,8 @@
 <html lang="en">
 <head>
 <meta charset="utf-8" />
+<meta name="theme-color" content="#0f1419" />
+<link rel="manifest" href="/manifest.webmanifest" />
 <meta name="viewport" content="width=device-width, initial-scale=1" />
 <title>Campus Recruiting — Coordinator</title>
 <style>
@@ -38,6 +40,19 @@
   .flags { color:var(--amber); font-size:12.5px; margin:6px 0; }
   .hidden { display:none !important; }
   a { color:var(--accent); cursor:pointer; }
+
+  /* mobile (Slice U): stack panes, wrap rows, scrollable tables, touch targets */
+  @media (max-width: 900px) {
+    .twopane { grid-template-columns: 1fr; }
+    #src { max-height: 40vh; }
+  }
+  @media (max-width: 700px) {
+    main { padding: 12px 10px 40px; }
+    header { flex-wrap: wrap; padding: 10px 12px; }
+    .row { flex-wrap: wrap; } .row > div { flex: 1 1 100%; }
+    table { display: block; overflow-x: auto; white-space: nowrap; }
+    button { padding: 11px 16px; }
+  }
 </style>
 </head>
 <body>

@@ -209,6 +209,11 @@ def create_app():
         def student_page():
             return FileResponse(str(_STATIC / "student.html"))
 
+        @app.get("/manifest.webmanifest", include_in_schema=False)
+        def manifest():
+            return FileResponse(str(_STATIC / "manifest.webmanifest"),
+                                media_type="application/manifest+json")
+
     # DoS guards for the public demo (defense in depth — the app is also admin-auth gated):
     demo_rate = _RateLimiter(
         demo_mod._int_env("RM_DEMO_RATE_BURST", 15),
@@ -802,7 +807,8 @@ def create_app():
             token, email = _acct().register(
                 data.get("email", ""), data.get("password", ""),
                 role=(data.get("role") or "student"),
-                org_name=data.get("org_name"))
+                org_name=data.get("org_name"),
+                school_id=int(data.get("school_id") or 1))
         except AccountError as exc:
             raise HTTPException(400, str(exc))
         response.set_cookie(auth_cookie, token, max_age=cookie_max_age(),

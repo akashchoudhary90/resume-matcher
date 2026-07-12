@@ -36,6 +36,7 @@ from ..ingestion.job_posting import build_job_spec
 from ..matching.evaluator import evaluate
 from ..matching.taxonomy import normalize_skills, search_skills
 from ..stores.db import connect as db_connect
+from ..stores.engage import EngageError, EventStore, InterviewStore, MessageStore
 from ..stores.matches import MatchStore
 from ..stores.platform import OrgStore, PostingError, PostingStore
 from ..stores.students import CONSENT_PURPOSES, ApplicationStore, StudentError, StudentStore
@@ -173,7 +174,7 @@ def _can_view(posting: dict, user: dict) -> bool:
         return True
     if user["role"] == "employer":
         return posting["org_id"] is not None and posting["org_id"] == user.get("org_id")
-    return posting["status"] == "live"  # students see live postings only
+    return posting["status"] == "live" and posting["school_id"] == (user.get("school_id") or 1)
 
 
 def _require_own_org_posting(posting: dict, user: dict) -> None:
@@ -192,9 +193,10 @@ def create_posting(body: dict, user: dict = Depends(require_role("employer", "co
     skills = body.get("skills") or []
     extraction = body.get("extraction")  # {"draft": {...}} from the review page (optional)
     try:
+        target_school = body.get("school_id") or user.get("school_id") or 1
         posting_id = _posting_store().create(
             created_by=user["id"], org_id=user.get("org_id"), fields=fields, skills=skills,
-            extraction=extraction, school_id=user.get("school_id") or 1)
+            extraction=extraction, school_id=int(target_school))
     except PostingError as exc:
         raise HTTPException(400, str(exc))
     if extraction and isinstance(extraction.get("draft"), dict):
@@ -205,13 +207,15 @@ def create_posting(body: dict, user: dict = Depends(require_role("employer", "co
 @router.get("/api/postings")
 def list_postings(status: str = "", user: dict = Depends(require_role())):
     store = _posting_store()
+    school = user.get("school_id") or 1
     if user["role"] in ("coordinator", "admin"):
-        return {"postings": store.list(status=status or None)}
+        return {"postings": store.list(status=status or None, school_id=school)}
     if user["role"] == "employer":
         if user.get("org_id") is None:
             return {"postings": []}
-        return {"postings": store.list(status=status or None, org_id=user["org_id"])}
-    return {"postings": store.list(status="live")}  # students
+        return {"postings": store.list(status=status or None, org_id=user["org_id"],
+                                       school_id=None)}  # an org can span schools
+    return {"postings": store.list(status="live", school_id=school)}  # students
 
 
 @router.get("/api/postings/{posting_id}")
@@ -251,7 +255,8 @@ def submit_posting(posting_id: str,
         raise HTTPException(404, "No such posting.")
     _require_own_org_posting(posting, user)
     if user["role"] == "employer":
-        if _org_store().link_status(posting["org_id"] or -1) != "approved":
+        if _org_store().link_status(posting["org_id"] or -1,
+                                    school_id=posting["school_id"]) != "approved":
             raise HTTPException(409, "Your organization hasn't been approved by career services "
                                      "yet — the posting stays a draft until it is.")
     try:
@@ -277,9 +282,10 @@ def close_posting(posting_id: str,
 # ---- coordinator ----------------------------------------------------------------------------------
 @router.get("/api/coordinator/queue")
 def coordinator_queue(user: dict = Depends(require_role("coordinator", "admin"))):
+    school = user.get("school_id") or 1
     return {
-        "postings": _posting_store().list(status="pending_review"),
-        "org_links": _org_store().pending_links(),
+        "postings": _posting_store().list(status="pending_review", school_id=school),
+        "org_links": _org_store().pending_links(school),
     }
 
 
@@ -316,7 +322,8 @@ def reject_posting(posting_id: str, body: dict | None = None,
 @router.post("/api/coordinator/org-links/{org_id}/approve")
 def approve_org_link(org_id: int, user: dict = Depends(require_role("coordinator", "admin"))):
     try:
-        _org_store().set_link_status(org_id, "approved", reviewed_by=user["id"])
+        _org_store().set_link_status(org_id, "approved", reviewed_by=user["id"],
+                                     school_id=user.get("school_id") or 1)
     except PostingError as exc:
         raise HTTPException(404, str(exc))
     return {"org_id": org_id, "status": "approved"}
@@ -325,10 +332,54 @@ def approve_org_link(org_id: int, user: dict = Depends(require_role("coordinator
 @router.post("/api/coordinator/org-links/{org_id}/revoke")
 def revoke_org_link(org_id: int, user: dict = Depends(require_role("coordinator", "admin"))):
     try:
-        _org_store().set_link_status(org_id, "revoked", reviewed_by=user["id"])
+        _org_store().set_link_status(org_id, "revoked", reviewed_by=user["id"],
+                                     school_id=user.get("school_id") or 1)
     except PostingError as exc:
         raise HTTPException(404, str(exc))
     return {"org_id": org_id, "status": "revoked"}
+
+
+# ---- schools (Slice V: the multi-school marketplace) ----------------------------------------------
+@router.get("/api/schools")
+def list_schools():
+    """Public: the register form needs the school list before sign-in."""
+    with closing(db_connect()) as conn:
+        rows = conn.execute("SELECT id, name FROM schools ORDER BY name").fetchall()
+    return {"schools": [dict(r) for r in rows]}
+
+
+@router.post("/api/schools", status_code=201)
+def create_school(body: dict, user: dict = Depends(require_role("admin"))):
+    name = str(body.get("name") or "").strip()
+    if not name:
+        raise HTTPException(400, "A school needs a name.")
+    with closing(db_connect()) as conn:
+        row = conn.execute("SELECT id FROM schools WHERE name=?", (name,)).fetchone()
+        if row:
+            return {"school_id": row["id"], "name": name}
+        cur = conn.execute("INSERT INTO schools(name, created_at) VALUES(?,?)",
+                           (name, time.time()))
+        conn.commit()
+        return {"school_id": cur.lastrowid, "name": name}
+
+
+@router.post("/api/orgs/me/school-links", status_code=201)
+def request_school_link(body: dict, user: dict = Depends(require_role("employer"))):
+    """An employer asks to recruit at ANOTHER school; that school's coordinator approves."""
+    if user.get("org_id") is None:
+        raise HTTPException(409, "Your account has no organization.")
+    school_id = int(body.get("school_id") or 0)
+    with closing(db_connect()) as conn:
+        if not conn.execute("SELECT 1 FROM schools WHERE id=?", (school_id,)).fetchone():
+            raise HTTPException(400, "Unknown school.")
+        conn.execute(
+            "INSERT OR IGNORE INTO employer_school_links(org_id, school_id, created_at) "
+            "VALUES(?,?,?)",
+            (user["org_id"], school_id, time.time()),
+        )
+        conn.commit()
+    return {"org_id": user["org_id"], "school_id": school_id,
+            "status": OrgStore().link_status(user["org_id"], school_id)}
 
 
 # ---- skills typeahead (promoted from the demo-gated route) ---------------------------------------
@@ -390,7 +441,8 @@ async def upload_resume(request: Request, user: dict = Depends(require_role("stu
         raise HTTPException(413, f"Resume too large (max {_MAX_JD_MB} MB).")
     try:
         meta = _student_store().save_resume(user["id"], upload.filename,
-                                            upload.content_type or "", data)
+                                            upload.content_type or "", data,
+                                            school_id=user.get("school_id") or 1)
     except StudentError as exc:
         raise HTTPException(409, str(exc))
     except ParseError as exc:
@@ -413,8 +465,8 @@ def delete_resume(user: dict = Depends(require_role("student"))):
 def apply_to_posting(posting_id: str, body: dict | None = None,
                      user: dict = Depends(require_role("student"))):
     posting = _posting_store().get(posting_id)
-    if posting is None or posting["status"] != "live":
-        raise HTTPException(404, "No such posting.")
+    if posting is None or posting["status"] != "live" or not _can_view(posting, user):
+        raise HTTPException(404, "No such posting.")  # incl. other schools' postings
     resume = _student_store().resume_meta(user["id"])
     if resume is None:
         raise HTTPException(409, "Upload a resume before applying.")
@@ -499,7 +551,7 @@ def _match_posting_job(payload: dict, progress) -> dict:
     if posting is None or posting["status"] != "live":
         return {"scored": 0, "skipped": "posting not live"}
     spec = _job_spec_from_posting(posting)
-    students = StudentStore().matchable_students()
+    students = StudentStore().matchable_students(school_id=posting["school_id"])
     matches = MatchStore()
     progress(0, len(students))
     for i, row in enumerate(students):
@@ -512,11 +564,14 @@ def _match_posting_job(payload: dict, progress) -> dict:
 def _rematch_student_job(payload: dict, progress) -> dict:
     student_id = payload["student_id"]
     store = StudentStore()
-    rows = [r for r in store.matchable_students() if r["user_id"] == student_id]
+    profile = store.get_profile(student_id) or {}
+    school = profile.get("school_id") or 1
+    rows = [r for r in store.matchable_students(school_id=school)
+            if r["user_id"] == student_id]
     if not rows:
         return {"scored": 0, "skipped": "student not in match pool"}
     candidate = _candidate_from_row(rows[0])
-    postings = PostingStore().list(status="live")
+    postings = PostingStore().list(status="live", school_id=school)
     matches, posting_store = MatchStore(), PostingStore()
     progress(0, len(postings))
     for i, summary in enumerate(postings):
@@ -562,6 +617,158 @@ def posting_shortlist(posting_id: str,
 def my_matches(user: dict = Depends(require_role("student"))):
     return {"score_kind": "fit_readiness_not_hire_probability",
             "matches": MatchStore().roles_for(user["id"])}
+
+
+# ---- events & career fairs (Slice R) ---------------------------------------------------------------
+@router.post("/api/events", status_code=201)
+def create_event(body: dict, user: dict = Depends(require_role("coordinator", "admin"))):
+    try:
+        event_id = EventStore().create(
+            created_by=user["id"], school_id=user.get("school_id") or 1,
+            title=str(body.get("title") or ""), kind=str(body.get("kind") or "fair"),
+            description=str(body.get("description") or ""),
+            location=str(body.get("location") or ""),
+            starts_at=float(body.get("starts_at") or 0),
+            ends_at=float(body["ends_at"]) if body.get("ends_at") else None)
+    except EngageError as exc:
+        raise HTTPException(400, str(exc))
+    return {"event_id": event_id, "status": "draft"}
+
+
+@router.patch("/api/events/{event_id}")
+def update_event(event_id: str, body: dict,
+                 user: dict = Depends(require_role("coordinator", "admin"))):
+    try:
+        return EventStore().set_status(event_id, str(body.get("status") or ""))
+    except EngageError as exc:
+        raise HTTPException(409, str(exc))
+
+
+@router.get("/api/events")
+def list_events(user: dict = Depends(require_role())):
+    store = EventStore()
+    include_drafts = user["role"] in ("coordinator", "admin")
+    events = store.list(school_id=user.get("school_id") or 1, include_drafts=include_drafts)
+    mine = store.my_registrations(user["id"])
+    for e in events:
+        e["registered"] = e["id"] in mine
+    return {"events": events}
+
+
+@router.post("/api/events/{event_id}/register")
+def register_event(event_id: str, user: dict = Depends(require_role("student", "employer"))):
+    try:
+        EventStore().register(event_id, user["id"], user["role"])
+    except EngageError as exc:
+        raise HTTPException(409, str(exc))
+    return {"ok": True}
+
+
+@router.post("/api/events/{event_id}/unregister")
+def unregister_event(event_id: str, user: dict = Depends(require_role("student", "employer"))):
+    EventStore().unregister(event_id, user["id"])
+    return {"ok": True}
+
+
+@router.get("/api/events/{event_id}/attendees")
+def event_attendees(event_id: str, user: dict = Depends(require_role("coordinator", "admin"))):
+    return {"attendees": EventStore().attendees(event_id)}
+
+
+# ---- application-thread access (shared by messaging + interviews) -----------------------------------
+def _application_access(application_id: str, user: dict) -> tuple[dict, dict]:
+    """The applicant, the posting org's employers, and coordinators. Everyone else: 404."""
+    app_row = ApplicationStore().get(application_id)
+    if app_row is None:
+        raise HTTPException(404, "No such application.")
+    posting = _posting_store().get(app_row["posting_id"]) or {}
+    role = user["role"]
+    if role in ("coordinator", "admin"):
+        return app_row, posting
+    if role == "student" and app_row["student_id"] == user["id"]:
+        return app_row, posting
+    if role == "employer" and posting.get("org_id") == user.get("org_id"):
+        return app_row, posting
+    raise HTTPException(404, "No such application.")
+
+
+# ---- messaging (Slice S) ----------------------------------------------------------------------------
+@router.get("/api/applications/{application_id}/messages")
+def get_messages(application_id: str, user: dict = Depends(require_role())):
+    _application_access(application_id, user)
+    return {"messages": MessageStore().thread(application_id, user["id"])}
+
+
+@router.post("/api/applications/{application_id}/messages", status_code=201)
+def send_message(application_id: str, body: dict, user: dict = Depends(require_role())):
+    _application_access(application_id, user)
+    try:
+        return MessageStore().send(application_id, user["id"], str(body.get("body") or ""))
+    except EngageError as exc:
+        raise HTTPException(400, str(exc))
+
+
+@router.get("/api/messages/unread-count")
+def unread_count(user: dict = Depends(require_role())):
+    apps = ApplicationStore()
+    if user["role"] == "student":
+        ids = [a["id"] for a in apps.for_student(user["id"])]
+    elif user["role"] == "employer" and user.get("org_id") is not None:
+        ids = []
+        for summary in _posting_store().list(org_id=user["org_id"]):
+            ids += [a["id"] for a in apps.for_posting(summary["id"])]
+    else:
+        ids = []
+    return {"unread": MessageStore().unread_count(user["id"], ids)}
+
+
+# ---- interview scheduling (Slice T) -----------------------------------------------------------------
+@router.post("/api/applications/{application_id}/interview-slots", status_code=201)
+def propose_slots(application_id: str, body: dict,
+                  user: dict = Depends(require_role("employer", "coordinator", "admin"))):
+    _application_access(application_id, user)
+    try:
+        return {"slots": InterviewStore().propose(application_id, user["id"],
+                                                  body.get("slots") or [])}
+    except EngageError as exc:
+        raise HTTPException(400, str(exc))
+
+
+@router.get("/api/applications/{application_id}/interview-slots")
+def list_slots(application_id: str, user: dict = Depends(require_role())):
+    _application_access(application_id, user)
+    return {"slots": InterviewStore().for_application(application_id)}
+
+
+@router.post("/api/interview-slots/{slot_id}/accept")
+def accept_slot(slot_id: str, user: dict = Depends(require_role("student"))):
+    store = InterviewStore()
+    slot = store.get(slot_id)
+    if slot is None:
+        raise HTTPException(404, "No such slot.")
+    app_row, _ = _application_access(slot["application_id"], user)  # applicant-only via role gate
+    try:
+        return store.accept(slot_id)
+    except EngageError as exc:
+        raise HTTPException(409, str(exc))
+
+
+@router.post("/api/interview-slots/{slot_id}/cancel")
+def cancel_slot(slot_id: str, user: dict = Depends(require_role())):
+    store = InterviewStore()
+    slot = store.get(slot_id)
+    if slot is None:
+        raise HTTPException(404, "No such slot.")
+    _application_access(slot["application_id"], user)
+    try:
+        return store.cancel(slot_id)
+    except EngageError as exc:
+        raise HTTPException(409, str(exc))
+
+
+@router.get("/api/students/me/interviews")
+def my_interviews(user: dict = Depends(require_role("student"))):
+    return {"interviews": InterviewStore().upcoming_for_student(user["id"])}
 
 
 # ---- notifications (Slice M; best-effort by contract) ----------------------------------------------

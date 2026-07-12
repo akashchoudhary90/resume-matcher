@@ -116,8 +116,12 @@ class PostingStore:
         return posting
 
     def list(self, *, status: str | None = None, org_id: int | None = None,
-             school_id: int = 1) -> list[dict]:
-        where, params = ["school_id=?"], [school_id]
+             school_id: int | None = 1) -> list[dict]:
+        """school_id=None skips the school filter (an employer's own postings span schools)."""
+        where, params = ["1=1"], []
+        if school_id is not None:
+            where.append("school_id=?")
+            params.append(school_id)
         if status:
             where.append("status=?")
             params.append(status)

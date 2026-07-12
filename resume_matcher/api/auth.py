@@ -33,7 +33,7 @@ ADMIN_COOKIE = "rm_admin"
 # no secrets or PII — it only re-checks a file the caller already holds).
 _AUTH_EXEMPT_PATHS = {
     "/api/health", "/login", "/api/login", "/api/logout",
-    "/verify", "/api/verify", "/api/defense-file/pubkey",
+    "/verify", "/api/verify", "/api/defense-file/pubkey", "/manifest.webmanifest",
 }
 
 # When the platform is enabled, its routes carry their OWN per-user auth (require_role over the
@@ -42,7 +42,9 @@ _AUTH_EXEMPT_PATHS = {
 # flag is read per-request so RM_PLATFORM_ENABLED=0 deployments keep today's posture untouched.
 _PLATFORM_PREFIXES = (
     "/api/postings", "/api/jobs/", "/api/coordinator/", "/api/skills", "/api/account/",
-    "/api/students/", "/api/applications/", "/employer", "/coordinator", "/student",
+    "/api/students/", "/api/applications/", "/api/events", "/api/messages/",
+    "/api/interview-slots/", "/api/schools", "/api/orgs/", "/employer", "/coordinator",
+    "/student",
 )
 
 

@@ -25,6 +25,7 @@ def main() -> int:
     ap.add_argument("--password", help="required when creating a new user")
     ap.add_argument("--role", choices=ROLES, default="coordinator")
     ap.add_argument("--org", help="employer org name (created/joined with a pending school link)")
+    ap.add_argument("--school-id", type=int, default=1, help="school the account belongs to")
     ap.add_argument("--promote", choices=ROLES, metavar="ROLE",
                     help="change an EXISTING user's role instead of creating one")
     args = ap.parse_args()
@@ -44,7 +45,8 @@ def main() -> int:
     if not args.password:
         ap.error("--password is required when creating a user")
     try:
-        store.create_user(args.email, args.password, role=args.role, org_name=args.org)
+        store.create_user(args.email, args.password, role=args.role, org_name=args.org,
+                          school_id=args.school_id)
     except AccountError as exc:
         print(f"error: {exc}", file=sys.stderr)
         return 1

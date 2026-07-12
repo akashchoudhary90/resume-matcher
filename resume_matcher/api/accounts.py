@@ -82,17 +82,20 @@ class AccountStore:
 
     # ---- auth ----------------------------------------------------------------------------------
     def register(
-        self, email: str, password: str, role: str = "student", org_name: str | None = None
+        self, email: str, password: str, role: str = "student", org_name: str | None = None,
+        school_id: int = 1,
     ) -> tuple[str, str]:
         """Self-serve signup. Only public roles here; coordinators/admins go through create_user
         (seeded by an operator). An employer may name their org — it is created (or joined) with a
         PENDING school link a coordinator must approve before their postings can go live."""
         if role not in SELF_SERVE_ROLES:
             raise AccountError("That account type can't self-register — ask your coordinator.")
-        return self.create_user(email, password, role=role, org_name=org_name)
+        return self.create_user(email, password, role=role, org_name=org_name,
+                                school_id=school_id)
 
     def create_user(
-        self, email: str, password: str, role: str = "student", org_name: str | None = None
+        self, email: str, password: str, role: str = "student", org_name: str | None = None,
+        school_id: int = 1,
     ) -> tuple[str, str]:
         """Privileged/internal user creation — any role (used by register and scripts/create_user)."""
         email = (email or "").strip().lower()
@@ -102,15 +105,18 @@ class AccountStore:
             raise AccountError("Password must be at least 8 characters.")
         if role not in ROLES:
             raise AccountError(f"Unknown role {role!r}.")
-        salt = secrets.token_hex(16)
-        pw_hash = self._hash_pw(password, salt)
         with self._lock, closing(self._conn()) as conn:
-            org_id = self._get_or_create_org(conn, org_name) if (org_name or "").strip() else None
+            if not conn.execute("SELECT 1 FROM schools WHERE id=?", (school_id,)).fetchone():
+                raise AccountError("Unknown school.")
+            salt = secrets.token_hex(16)
+            pw_hash = self._hash_pw(password, salt)
+            org_id = self._get_or_create_org(conn, org_name, school_id) \
+                if (org_name or "").strip() else None
             try:
                 cur = conn.execute(
-                    "INSERT INTO users(email, pw_hash, salt, created_at, role, org_id) "
-                    "VALUES(?,?,?,?,?,?)",
-                    (email, pw_hash, salt, time.time(), role, org_id),
+                    "INSERT INTO users(email, pw_hash, salt, created_at, role, org_id, school_id)"
+                    " VALUES(?,?,?,?,?,?,?)",
+                    (email, pw_hash, salt, time.time(), role, org_id, school_id),
                 )
             except sqlite3.IntegrityError as exc:
                 raise AccountError("That email is already registered — sign in instead.") from exc
@@ -119,7 +125,8 @@ class AccountStore:
         return self._issue_token(uid), email
 
     @staticmethod
-    def _get_or_create_org(conn: sqlite3.Connection, org_name: str | None) -> int:
+    def _get_or_create_org(conn: sqlite3.Connection, org_name: str | None,
+                           school_id: int = 1) -> int:
         """Org by name (get-or-create) + ensure a school link row exists (status stays pending
         until a coordinator approves — docs/PLATFORM.md employer_school_links graft)."""
         name = (org_name or "").strip()[:120]
@@ -130,7 +137,7 @@ class AccountStore:
         conn.execute(
             "INSERT OR IGNORE INTO employer_school_links(org_id, school_id, created_at) "
             "VALUES(?,?,?)",
-            (org_id, 1, time.time()),
+            (org_id, school_id, time.time()),
         )
         return org_id
 

@@ -75,8 +75,10 @@ def migrate(path: str | None = None) -> int:
             if version <= current:
                 continue
             conn.executescript(sql_file.read_text(encoding="utf-8"))
+            # OR IGNORE: two threads may race the first migrate on a fresh DB; the DDL is all
+            # IF NOT EXISTS so a double apply is harmless — the version row must not throw.
             conn.execute(
-                "INSERT INTO schema_version(version, applied_at) VALUES(?,?)",
+                "INSERT OR IGNORE INTO schema_version(version, applied_at) VALUES(?,?)",
                 (version, time.time()),
             )
             applied += 1
