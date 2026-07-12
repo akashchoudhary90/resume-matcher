@@ -20,25 +20,25 @@ pushes stay safe to auto-deploy.
 - Run `pytest -q` before each commit; commit message names the slice; push (auto-deploy is safe
   because the flag defaults off).
 
-## Slice A — foundations: DB, migrations, roles
+## Slice A — foundations: DB, migrations, roles ✅
 
-- [ ] A1 `resume_matcher/stores/db.py` — `platform_db_path()` (env `RM_PLATFORM_DB`, default
+- [x] A1 `resume_matcher/stores/db.py` — `platform_db_path()` (env `RM_PLATFORM_DB`, default
       `data/platform.db`), `connect()`, `migrate(path)` with `schema_version` table, applies
       `resume_matcher/stores/migrations/NNN_*.sql` in order + python column-upgrade helper
       (`_ensure_columns`) for ALTERs on pre-existing tables.
-- [ ] A2 `stores/migrations/001_platform.sql` — schools (seed York), orgs,
+- [x] A2 `stores/migrations/001_platform.sql` — schools (seed York), orgs,
       employer_school_links, users(+role/org_id/school_id), tokens, projects, postings,
       posting_skills, posting_events, consents, jobs, events, student_profiles, resumes,
       applications, match_results (score_kind NOT NULL CHECK). All with school_id.
-- [ ] A3 Legacy fold-in: on migrate, if users empty and legacy `RM_ACCOUNTS_DB`/accounts.db
+- [x] A3 Legacy fold-in: on migrate, if users empty and legacy `RM_ACCOUNTS_DB`/accounts.db
       exists → copy users/tokens/projects rows.
-- [ ] A4 `api/accounts.py` — AccountStore defaults to the platform DB; `register(..., role,
+- [x] A4 `api/accounts.py` — AccountStore defaults to the platform DB; `register(..., role,
       org_name)`; `user_for_token` returns role/org_id/school_id. Existing demo/account tests
       stay green (default role `student`; legacy DBs upgraded by migrate()).
-- [ ] A5 `api/auth.py` — `require_role(*roles)` FastAPI dependency (401 no user, 403 wrong
+- [x] A5 `api/auth.py` — `require_role(*roles)` FastAPI dependency (401 no user, 403 wrong
       role) reading the `rm_session` cookie via the shared AccountStore.
-- [ ] A6 `scripts/create_user.py` — seed coordinator/admin from CLI.
-- [ ] A7 Tests: `tests/test_platform_db.py` (fresh migrate, re-migrate idempotent, legacy
+- [x] A6 `scripts/create_user.py` — seed coordinator/admin from CLI.
+- [x] A7 Tests: `tests/test_platform_db.py` (fresh migrate, re-migrate idempotent, legacy
       fold-in, protected-column CI grep over platform schema), `tests/test_require_role.py`.
 
 ## Slice B — DB-backed job runner

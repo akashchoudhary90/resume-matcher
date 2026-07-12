@@ -83,6 +83,32 @@ def check_login(username: str, password: str) -> str | None:
     return session_token() if ok else None
 
 
+SESSION_COOKIE = "rm_session"  # the per-user account cookie (api/accounts.py layer)
+
+
+def require_role(*roles: str):
+    """FastAPI dependency factory for the platform's per-user role gate (docs/PLATFORM.md).
+
+    No signed-in user -> 401; signed in but role not in `roles` -> 403. With no roles given it just
+    requires a signed-in user. Returns the user dict {id, email, role, org_id, school_id} so routes
+    can take it as a parameter. This is the PER-USER layer — independent of the shared admin gate."""
+
+    def _dep(request: Request) -> dict:
+        from .accounts import get_account_store  # deferred: accounts imports stores.db at import time
+
+        user = get_account_store().user_for_token(request.cookies.get(SESSION_COOKIE))
+        if user is None:
+            raise HTTPException(status.HTTP_401_UNAUTHORIZED, "Sign in required.")
+        if roles and user.get("role") not in roles:
+            raise HTTPException(
+                status.HTTP_403_FORBIDDEN,
+                f"This action needs a {' or '.join(roles)} account.",
+            )
+        return user
+
+    return _dep
+
+
 def require_auth(request: Request) -> None:
     global _warned
     if request.url.path in _AUTH_EXEMPT_PATHS:
