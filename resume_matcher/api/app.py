@@ -188,6 +188,15 @@ def create_app():
     _start_sweeper()
     demo_mod.sweep_stale_tmpdirs()  # mop up any crash-leftover file-direct temp dirs at startup
 
+    # Platform (Handshake replacement, docs/PLATFORM.md) — routes + DB-backed worker pool, mounted
+    # only when explicitly enabled so pushes stay safe to auto-deploy while Phase 1 is built out.
+    if env_flag("RM_PLATFORM_ENABLED", False):
+        from ..workers.runner import start_worker_pool
+        from .platform import router as platform_router
+
+        app.include_router(platform_router)
+        start_worker_pool()  # re-queues stale running jobs from a dead process, then polls
+
     # DoS guards for the public demo (defense in depth — the app is also admin-auth gated):
     demo_rate = _RateLimiter(
         demo_mod._int_env("RM_DEMO_RATE_BURST", 15),

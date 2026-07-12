@@ -41,17 +41,17 @@ pushes stay safe to auto-deploy.
 - [x] A7 Tests: `tests/test_platform_db.py` (fresh migrate, re-migrate idempotent, legacy
       fold-in, protected-column CI grep over platform schema), `tests/test_require_role.py`.
 
-## Slice B — DB-backed job runner
+## Slice B — DB-backed job runner ✅
 
-- [ ] B1 `resume_matcher/workers/__init__.py` + `workers/runner.py` — `JobStore`
+- [x] B1 `resume_matcher/workers/__init__.py` + `workers/runner.py` — `JobStore`
       (enqueue/claim/progress/complete/fail/requeue_stale; columns per PLATFORM.md incl.
       attempts, run_after, locked_by, dedupe_key), `WorkerPool` (daemon threads, handler
       registry by kind, backoff = min(2**attempts, 60)s, max attempts 3).
-- [ ] B2 Wire into `create_app()` lifespan when `RM_PLATFORM_ENABLED=1`: start pool, requeue
+- [x] B2 Wire into `create_app()` lifespan when `RM_PLATFORM_ENABLED=1`: start pool, requeue
       stale `running` jobs on boot, stop on shutdown.
-- [ ] B3 Route `GET /api/jobs/{id}` (owner or coordinator) — generic 202-poll payload
+- [x] B3 Route `GET /api/jobs/{id}` (owner or coordinator) — generic 202-poll payload
       {status, progress, result?, error?}.
-- [ ] B4 Tests: `tests/test_job_runner.py` — enqueue→run→done, failure→retry→error after max,
+- [x] B4 Tests: `tests/test_job_runner.py` — enqueue→run→done, failure→retry→error after max,
       dedupe_key idempotency, stale requeue, poll route auth.
 
 ## Slice C — posting schema (the contract)
