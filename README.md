@@ -130,6 +130,31 @@ service. Runbook: **[deploy/cohost/COHOST.md](deploy/cohost/COHOST.md)**.
 
 ---
 
+## The campus recruiting platform (the Handshake replacement) — `RM_PLATFORM_ENABLED=1`
+
+Phase 1 of the platform in [docs/PLATFORM.md](docs/PLATFORM.md) ships behind a flag (default
+**off**, so existing deployments are untouched). Flipping `RM_PLATFORM_ENABLED=1` mounts:
+
+- **`/employer`** — the flagship **JD-autofill** flow ([docs/JD_AUTOFILL.md](docs/JD_AUTOFILL.md)):
+  paste or upload a JD → every posting field is extracted with a **verbatim source span, method,
+  and confidence** → a two-pane review form (click a field, see where it came from) → submit.
+  Nothing publishes unreviewed; unverified AI suggestions render as greyed chips needing an
+  explicit click. Employers self-register with their org, which stays **pending** until a
+  coordinator approves it (`employer_school_links` — the Handshake trust model).
+- **`/coordinator`** — employer approvals + the posting review queue. Approval publishes the
+  posting and appends the (non-optional) Ontario **AI-disclosure** block. Every lifecycle
+  transition lands in an append-only `posting_events` log.
+- **`GET /api/jobs/{id}`** — the generic 202-poll endpoint; extraction runs on a DB-backed job
+  queue (`workers/runner.py`) that survives restarts and retries with backoff.
+- Storage: one SQLite file `data/platform.db` (`RM_PLATFORM_DB`; existing `RM_ACCOUNTS_DB`
+  deployments keep their file — the schema migrates in place, `stores/migrations/`).
+- Seed a coordinator: `python scripts/create_user.py you@york.ca --password … --role coordinator`.
+- Human corrections on the review form append to `data/eval/jd_extraction_corrections.jsonl` —
+  extraction accuracy is measured and tuned like matching accuracy.
+
+Knobs: `RM_PLATFORM_WORKERS` (2), `RM_JOB_MAX_ATTEMPTS` (3), `RM_PLATFORM_EXTRACT_BACKEND`
+(`claude_cli`; anything else = deterministic-only draft), `RM_PLATFORM_EXTRACT_PER_MIN` (6).
+
 ## Measuring & tuning accuracy
 
 Accuracy is *measurable*, not guessed. Put labeled `(job, resume, human-rating)` pairs in

@@ -128,13 +128,13 @@ pushes stay safe to auto-deploy.
 - [x] G4 Verified in browser (preview server, mock backend): full employer flow + coordinator
       approve; console clean. (Playwright E2E deferred — manual verify via Browser pane.)
 
-## Slice H — hardening + ship
+## Slice H — hardening + ship ✅ (H4 stretch items deliberately deferred)
 
 - [x] H1 Corrections→eval loop: on create-after-review, diff draft vs submitted; append
       `data/eval/jd_extraction_corrections.jsonl` (strip contact payloads). 
-- [ ] H2 `RM_PLATFORM_ENABLED=1` in `.claude/launch.json` env (local), README + DEPLOY.md note;
+- [x] H2 `RM_PLATFORM_ENABLED=1` in `.claude/launch.json` env (local), README + DEPLOY.md note;
       decide prod flip separately (needs coordinator seed on VPS).
-- [ ] H3 Full `pytest -q` + ruff clean; update this file's boxes; final commit + push.
+- [x] H3 Full `pytest -q` + ruff clean; update this file's boxes; final commit + push.
 - [ ] H4 (stretch) `audit_requirements` widget on coordinator view; vision fallback for
       scanned JD PDFs; French heading set. Not MVP-blocking.
 

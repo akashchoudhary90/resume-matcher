@@ -75,6 +75,15 @@ docker compose ps
 
 To change the hostname, edit the domain line in [deploy/Caddyfile](deploy/Caddyfile).
 
+**Platform (Handshake replacement, docs/PLATFORM.md):** `RM_PLATFORM_ENABLED=1` mounts
+`/employer`, `/coordinator`, and the postings API (default **off** — deploys stay demo-only until
+you flip it deliberately). Before flipping on a real host: (1) make the DB path persistent
+(`RM_PLATFORM_DB` or the existing `RM_ACCOUNTS_DB` volume — the schema migrates in place),
+(2) seed a coordinator inside the container:
+`python scripts/create_user.py you@york.ca --password … --role coordinator`,
+(3) note the platform routes carry their own per-user auth and are exempt from the shared admin
+gate while the flag is on.
+
 ---
 
 ## Updating
