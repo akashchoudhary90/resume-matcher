@@ -157,3 +157,35 @@ def homophily_disparity(
         "disparity_ratio": ratio,  # < 0.8 => homophily bias flagged
         "flagged": (ratio is not None and ratio < 0.8),
     }
+
+
+def access_disparity(numerator: dict[str, int], denominator: dict[str, int],
+                     min_cell: int = 5) -> dict:
+    """Warm-intro ACCESS/CONVERSION disparity from two INDEPENDENT aggregate count dicts (never an
+    aligned per-person label list — boundary #2). `denominator` = group sizes among the cohort
+    (e.g. all applicants who self-ID'd); `numerator` = group sizes among those who got/converted an
+    intro. A group whose DENOMINATOR is below min_cell is excluded from ratios; a group with a
+    denominator but a suppressed numerator is reported as 'below threshold', NEVER as 0 (a
+    suppressed small numerator is not the same as no one — the privacy nuance). Pure Python; no
+    per-person data crosses the plane boundary."""
+    rates: dict[str, dict] = {}
+    for group, denom in denominator.items():
+        if denom < min_cell:
+            continue
+        num = numerator.get(group)
+        if num is None:
+            rates[group] = {"rate": None, "note": "below reporting threshold", "denom": denom}
+        else:
+            rates[group] = {"rate": round(num / denom, 3), "denom": denom, "num": num}
+    computable = {g: r["rate"] for g, r in rates.items() if r.get("rate") is not None}
+    min_ratio = four_fifths_pass = None
+    if len(computable) >= 2:
+        mx = max(computable.values()) or 1.0
+        min_ratio = round((min(computable.values()) / mx) if mx else 0.0, 3)
+        four_fifths_pass = min_ratio >= 0.8
+    return {
+        "rates": rates,
+        "min_impact_ratio": min_ratio,
+        "four_fifths_pass": four_fifths_pass,   # None when <2 comparable groups
+        "min_cell": min_cell,
+    }

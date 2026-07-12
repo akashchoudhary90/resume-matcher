@@ -28,6 +28,15 @@ AUDITABLE_ATTRIBUTES = {
     "race_ethnicity", "gender", "disability_status", "first_generation", "international_status",
 }
 
+# Relationship-graph structural features (Phase 4). Graph degree/reachability correlate with
+# first_generation / international_status, so they are PROXIES: they may drive the positive-action
+# mitigation program (adding opportunity to the under-networked), but they must NEVER enter a
+# score or any opportunity-allocation decision that RANKS candidates. This guard extends the
+# no-proxy guarantee beyond match_results to every scoring feature dict (adversarial requirement).
+NETWORK_FEATURE_KEYS = {
+    "degree", "reachability", "intro_count", "connector_count", "components", "network_poverty",
+}
+
 
 class ProtectedDataError(ValueError):
     pass
@@ -43,11 +52,19 @@ class ScoringStore:
 
     @staticmethod
     def assert_no_protected(features: dict) -> None:
-        bad = PROTECTED_KEYS & {k.lower() for k in features}
+        keys = {k.lower() for k in features}
+        bad = PROTECTED_KEYS & keys
         if bad:
             raise ProtectedDataError(
                 f"Refusing to store protected attribute(s)/proxy(ies) in the scoring plane: "
                 f"{sorted(bad)}. These belong only in the AuditStore (aggregate-only)."
+            )
+        net = NETWORK_FEATURE_KEYS & keys
+        if net:
+            raise ProtectedDataError(
+                f"Refusing to put relationship-graph feature(s) {sorted(net)} into a scoring "
+                f"feature dict. Graph degree is a network-privilege proxy — it may drive the "
+                f"positive-action mitigation program, never a ranking/score (boundary #2)."
             )
 
     def add_candidate(self, c: CandidateProfile, extra_features: dict | None = None) -> None:

@@ -411,15 +411,15 @@ The LinkedIn path is self-upload only, RAM-intersected, zero non-member residue.
 - [x] AG1 GET /api/intros/for-application/{id}; quoted attributable evidence, claim_kind, never in match_results.
 - [x] AG2 Tests: card not in match_results, output escaped.
 
-## Slice AH — fairness audit (aggregate-only, MIN_CELL=5)
-- [ ] AH1 audit/metrics.access_disparity; GET /api/coordinator/reports/intro-equity (JSON+CSV); access +
+## Slice AH — fairness audit ✅ (aggregate-only, MIN_CELL=5)
+- [x] AH1 audit/metrics.access_disparity; GET /api/coordinator/reports/intro-equity (JSON+CSV); access +
       conversion funnels; two independent AuditDB.aggregate calls, never joined per-person.
-- [ ] AH2 Tests: pass/fail/suppressed-numerator/single-group; two connections never joined.
+- [x] AH2 Tests: pass/fail/suppressed-numerator/single-group; two connections never joined.
 
-## Slice AI — active mitigation as governed positive-action program
-- [ ] AI1 NETWORK_FEATURE_KEYS guard in scoring plane; network_poverty (structural, never self-ID) trigger;
+## Slice AI — active mitigation ✅ as governed positive-action program
+- [x] AI1 NETWORK_FEATURE_KEYS guard in scoring plane; network_poverty (structural, never self-ID) trigger;
       alumni-bridge matcher + coordinator-initiated intro (double-opt-in); coverage report w/ shut-off.
-- [ ] AI2 Tests: network features rejected by scoring plane; intros not in match_results; no audit import.
+- [x] AI2 Tests: network features rejected by scoring plane; intros not in match_results; no audit import.
 
 ## Slice AJ — UI wiring
 - [ ] AJ1 student.html (granular consents + attestation, contacts upload, discovery opt-in, delete-my-network,

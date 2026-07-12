@@ -1160,6 +1160,106 @@ def verify_vouch(vouch_id: str, body: dict,
         raise HTTPException(400, str(exc))
 
 
+# ---- Slice AH: warm-intro fairness report (aggregate-only, MIN_CELL=5) ----------------------------
+def _refs(user_ids) -> list[str]:
+    return [f"student-{uid}" for uid in user_ids]
+
+
+@router.get("/api/coordinator/reports/intro-equity")
+def intro_equity(format: str = "json",
+                 user: dict = Depends(require_role("coordinator", "admin"))):
+    """Does warm-intro ACCESS/CONVERSION concentrate among privileged self-ID groups? Computed from
+    TWO INDEPENDENT AuditDB.aggregate() calls per attribute (denominator=all applicants,
+    numerator=intro receivers / converters) — never an aligned per-person label list. The scoring
+    plane supplies only opaque refs; the audit DB answers with min-cell-suppressed counts."""
+    from ..audit.metrics import access_disparity
+    from ..stores.audit_store import AuditDB
+    from ..stores.data_planes import AUDITABLE_ATTRIBUTES
+
+    school = user.get("school_id") or 1
+    with closing(db_connect()) as conn:
+        applicants = [r["student_id"] for r in conn.execute(
+            "SELECT DISTINCT a.student_id FROM applications a JOIN postings p ON p.id=a.posting_id "
+            "WHERE p.school_id=?", (school,))]
+        requested = [r["requester_user_id"] for r in conn.execute(
+            "SELECT DISTINCT requester_user_id FROM intro_requests WHERE school_id=?", (school,))]
+        converted = [r["requester_user_id"] for r in conn.execute(
+            "SELECT DISTINCT requester_user_id FROM intro_requests WHERE school_id=? "
+            "AND status='accepted'", (school,))]
+    audit = AuditDB()
+    report = {}
+    for attr in sorted(AUDITABLE_ATTRIBUTES):
+        denom = audit.aggregate(_refs(applicants), attr)["counts"]
+        report[attr] = {
+            "access": access_disparity(audit.aggregate(_refs(requested), attr)["counts"], denom),
+            "conversion": access_disparity(audit.aggregate(_refs(converted), attr)["counts"], denom),
+        }
+    if format == "csv":
+        import csv
+        import io
+
+        from fastapi.responses import PlainTextResponse
+        buf = io.StringIO()
+        w = csv.writer(buf)
+        w.writerow(["attribute", "funnel", "min_impact_ratio", "four_fifths_pass"])
+        for attr, funnels in report.items():
+            for name, d in funnels.items():
+                w.writerow([attr, name, d["min_impact_ratio"], d["four_fifths_pass"]])
+        return PlainTextResponse(buf.getvalue(), media_type="text/csv")
+    return {"applicants": len(applicants), "requested": len(requested),
+            "converted": len(converted), "by_attribute": report}
+
+
+# ---- Slice AI: mitigation coverage + coordinator-initiated bridge (governed positive action) ------
+@router.get("/api/coordinator/reports/network-coverage")
+def network_coverage(user: dict = Depends(require_role("coordinator", "admin"))):
+    """Structural under-networking (network_poverty = a discoverable student with ZERO shareable
+    edges) and how many got a coordinator/alumni bridge. NEVER keyed on self-ID — the trigger is
+    structural. This is the shut-off dashboard for the positive-action program."""
+    school = user.get("school_id") or 1
+    now = time.time()
+    with closing(db_connect()) as conn:
+        discoverable = [r["user_id"] for r in conn.execute(
+            "SELECT u.id AS user_id FROM users u WHERE u.school_id=? AND u.role='student' "
+            "AND EXISTS(SELECT 1 FROM consents c WHERE c.user_id=u.id "
+            "          AND c.purpose='graph_discoverable' AND c.revoked_at IS NULL)", (school,))]
+        under = 0
+        for uid in discoverable:
+            deg = conn.execute(
+                "SELECT COUNT(*) FROM graph_edges ge WHERE ge.school_id=? "
+                "AND (ge.user_a=? OR ge.user_b=?) AND ge.consent_state='shareable' "
+                "AND ge.revoked_at IS NULL AND (ge.expires_at IS NULL OR ge.expires_at > ?)",
+                (school, uid, uid, now)).fetchone()[0]
+            if deg == 0:
+                under += 1
+        bridged = conn.execute(
+            "SELECT COUNT(DISTINCT requester_user_id) FROM intro_requests WHERE school_id=? "
+            "AND status='accepted'", (school,)).fetchone()[0]
+    return {"discoverable_students": len(discoverable), "network_poverty": under,
+            "students_with_accepted_intro": bridged,
+            "note": "network_poverty is structural (zero shareable edges), never self-ID-based"}
+
+
+@router.post("/api/coordinator/intros/bridge")
+def coordinator_bridge(body: dict, user: dict = Depends(require_role("coordinator", "admin"))):
+    """A coordinator manufactures a warm path for an under-networked student by creating a
+    verified alumni/coordinator vouch edge to a willing mentor (who must hold warm_intro consent).
+    This is the active-mitigation lever; the mentor still opts in via their standing consent."""
+    student_id = int(body.get("student_id") or 0)
+    mentor_id = int(body.get("mentor_id") or 0)
+    if not student_id or not mentor_id:
+        raise HTTPException(400, "student_id and mentor_id are required.")
+    if not _student_store().has_consent(mentor_id, "warm_intro"):
+        raise HTTPException(409, "That mentor hasn't opted into making intros.")
+    school = user.get("school_id") or 1
+    with closing(db_connect()) as conn:
+        _rel_store().upsert_edge(conn, school, student_id, mentor_id, "alumni_bridge",
+                                 provenance="alumni", consent_state="pending")
+        conn.commit()
+    _rel_store().promote_shareable(school)
+    return {"ok": True, "bridged": True}
+
+
 # ---- Slice AG: employer evidence card -------------------------------------------------------------
 @router.get("/api/intros/for-application/{application_id}")
 def intro_card(application_id: str,
