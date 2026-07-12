@@ -81,18 +81,18 @@ pushes stay safe to auto-deploy.
 - [x] D4 Tests: `tests/test_jd_structure.py`, `tests/test_jd_fields.py` (incl. URL-junk and
       about-company-years regressions), fixture JDs under `tests/fixtures/jds/`.
 
-## Slice E — LLM pass P4 + merge P5
+## Slice E — LLM pass P4 + merge P5 ✅
 
-- [ ] E1 `claude_cli.extract_posting(jd_text, title)` + `_POSTING_SYSTEM` (fence, no-authority,
+- [x] E1 `claude_cli.extract_posting(jd_text, title)` + `_POSTING_SYSTEM` (fence, no-authority,
       verbatim quote per field, multi_role_detected, language).
-- [ ] E2 `ingestion/jd_merge.py` — `verify_span(text, quote)` (extracted/shared with ranker's
+- [x] E2 `ingestion/jd_merge.py` — `verify_span(text, quote)` (extracted/shared with ranker's
       logic), per-field merge table (agree→high, regex-exact→high, LLM+verified→medium,
       conflict/unverified→low), clamps (dates/pay/enums/URL/skill caps 4/12/10), skill
       resolution via `_skill_ids_from_names`, dual-detector skill agreement, adjacency dedup.
-- [ ] E3 `ingestion/posting_extract.py` — orchestrator `extract_posting_draft(text|file bytes,
+- [x] E3 `ingestion/posting_extract.py` — orchestrator `extract_posting_draft(text|file bytes,
       filename, backend)` running P0→P5 with `_EXTRACT_CACHE`-style caching + fail-open
       (LLM down → P1+P2 draft flagged `llm_unavailable`).
-- [ ] E4 Tests: `tests/test_jd_merge.py` (quote verification, merge matrix, clamps),
+- [x] E4 Tests: `tests/test_jd_merge.py` (quote verification, merge matrix, clamps),
       `tests/test_posting_extract.py` (hermetic `_arm`-style: LLM ok / junk / down / injection
       fixture → flags fire, nothing red auto-accepts).
 
