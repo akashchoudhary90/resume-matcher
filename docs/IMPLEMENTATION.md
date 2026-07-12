@@ -116,16 +116,16 @@ pushes stay safe to auto-deploy.
       coordinator approve→live(+disclosure), role denials (student can't post, employer can't
       approve), org-link gate blocks submit until approved.
 
-## Slice G — the two UIs
+## Slice G — the two UIs ✅
 
-- [ ] G1 `static/employer.html` — paste/upload JD → poll → two-pane review (source with span
+- [x] G1 `static/employer.html` — paste/upload JD → poll → two-pane review (source with span
       highlight on field focus; right-pane form with per-field method/confidence badges, green/
       amber/red policy rendering, skill chips + typeahead, publish gating per policy table) →
       create+submit. Vanilla fetch idioms from demo.html.
-- [ ] G2 `static/coordinator.html` — queue list, open posting (same evidence view read-only),
+- [x] G2 `static/coordinator.html` — queue list, open posting (same evidence view read-only),
       approve/reject with note, org-link approvals.
-- [ ] G3 Pages routed (`GET /employer`, `GET /coordinator`) behind the platform flag; nav links.
-- [ ] G4 Verified in browser (preview server, mock backend): full employer flow + coordinator
+- [x] G3 Pages routed (`GET /employer`, `GET /coordinator`) behind the platform flag; nav links.
+- [x] G4 Verified in browser (preview server, mock backend): full employer flow + coordinator
       approve; console clean. (Playwright E2E deferred — manual verify via Browser pane.)
 
 ## Slice H — hardening + ship

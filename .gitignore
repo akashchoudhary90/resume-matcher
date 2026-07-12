@@ -29,3 +29,4 @@ data/accounts.db
 
 # Local Claude Code config (machine-specific paths, dev creds)
 .claude/
+data/eval/jd_extraction_corrections.jsonl

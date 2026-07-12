@@ -197,6 +197,14 @@ def create_app():
         app.include_router(platform_router)
         start_worker_pool()  # re-queues stale running jobs from a dead process, then polls
 
+        @app.get("/employer", include_in_schema=False)
+        def employer_page():
+            return FileResponse(str(_STATIC / "employer.html"))
+
+        @app.get("/coordinator", include_in_schema=False)
+        def coordinator_page():
+            return FileResponse(str(_STATIC / "coordinator.html"))
+
     # DoS guards for the public demo (defense in depth — the app is also admin-auth gated):
     demo_rate = _RateLimiter(
         demo_mod._int_env("RM_DEMO_RATE_BURST", 15),

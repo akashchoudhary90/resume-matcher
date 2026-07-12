@@ -1,0 +1,192 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>Campus Recruiting — Coordinator</title>
+<style>
+  :root { --bg:#0f1419; --panel:#1a2029; --panel2:#222b36; --line:#2c3744; --text:#e6edf3;
+          --muted:#9aa7b4; --accent:#4f9dde; --red:#f85149; --amber:#d29922; --green:#3fb950; }
+  * { box-sizing:border-box; }
+  body { margin:0; font:14px/1.55 -apple-system,Segoe UI,Roboto,Helvetica,Arial,sans-serif;
+         background:var(--bg); color:var(--text); }
+  header { display:flex; align-items:center; gap:14px; padding:14px 22px; border-bottom:1px solid var(--line); }
+  header h1 { font-size:17px; margin:0; } header h1 span { color:var(--accent); }
+  header .spacer { flex:1; }
+  main { max-width:1100px; margin:0 auto; padding:18px 22px 60px; }
+  .card { background:var(--panel); border:1px solid var(--line); border-radius:10px; padding:18px; margin-bottom:18px; }
+  h2 { font-size:15px; margin:0 0 10px; }
+  label { display:block; font-size:11.5px; color:var(--muted); margin:10px 0 3px; text-transform:uppercase; letter-spacing:.03em; }
+  input, textarea { width:100%; background:var(--panel2); border:1px solid var(--line); color:var(--text);
+          border-radius:6px; padding:8px 10px; font:inherit; }
+  button { background:var(--accent); color:#06121f; border:0; padding:8px 13px; border-radius:6px;
+           font-weight:600; cursor:pointer; font-size:13px; }
+  button.ghost { background:var(--panel2); color:var(--text); border:1px solid var(--line); }
+  button.danger { background:var(--red); color:#fff; }
+  .muted { color:var(--muted); font-size:12.5px; }
+  .err { color:var(--red); min-height:16px; font-size:12.5px; margin-top:8px; }
+  .row { display:flex; gap:10px; align-items:center; }
+  table { width:100%; border-collapse:collapse; font-size:13px; }
+  td, th { padding:7px 8px; border-bottom:1px solid var(--line); text-align:left; vertical-align:top; }
+  .status { font-size:12px; padding:2px 8px; border-radius:999px; border:1px solid var(--line); }
+  .chip { display:inline-block; background:var(--panel2); border:1px solid var(--line); border-radius:999px;
+          padding:2px 9px; font-size:12px; margin:2px 3px 0 0; }
+  .chip.must_have { border-color:var(--red); } .chip.preferred { border-color:var(--line); color:var(--muted); }
+  .chip.required { border-color:var(--accent); }
+  pre.desc { background:var(--panel2); border:1px solid var(--line); border-radius:8px; padding:12px;
+             white-space:pre-wrap; font:12.5px/1.6 ui-monospace,Consolas,monospace; max-height:50vh; overflow:auto; }
+  .flags { color:var(--amber); font-size:12.5px; margin:6px 0; }
+  .hidden { display:none !important; }
+  a { color:var(--accent); cursor:pointer; }
+</style>
+</head>
+<body>
+<header>
+  <h1>Campus <span>Recruiting</span> — coordinator</h1>
+  <span class="muted">approve employers and postings</span>
+  <div class="spacer"></div>
+  <span id="who" class="muted"></span>
+  <button id="signoutBtn" class="ghost hidden">Sign out</button>
+</header>
+<main>
+
+  <section class="card" id="authCard">
+    <h2>Coordinator sign in</h2>
+    <div class="row">
+      <div style="flex:1"><label>Email</label><input id="authEmail" type="email" /></div>
+      <div style="flex:1"><label>Password</label><input id="authPw" type="password" /></div>
+      <div style="align-self:end"><button id="loginBtn">Sign in</button></div>
+    </div>
+    <div class="muted" style="margin-top:8px">Coordinator accounts are seeded by an admin
+      (<code>python scripts/create_user.py you@york.ca --password … --role coordinator</code>).</div>
+    <div class="err" id="authErr"></div>
+  </section>
+
+  <section class="card hidden" id="linksCard">
+    <h2>Employers awaiting approval</h2>
+    <table id="linksTable"><thead><tr><th>Organization</th><th>Requested</th><th></th></tr></thead><tbody></tbody></table>
+  </section>
+
+  <section class="card hidden" id="queueCard">
+    <h2>Postings awaiting review</h2>
+    <table id="queueTable"><thead><tr><th>Title</th><th>Employer</th><th>Type</th><th>Pay</th><th></th></tr></thead><tbody></tbody></table>
+  </section>
+
+  <section class="card hidden" id="detailCard">
+    <h2 id="dTitle"></h2>
+    <div class="muted" id="dMeta"></div>
+    <div class="flags" id="dFlags"></div>
+    <div id="dSkills" style="margin:8px 0"></div>
+    <pre class="desc" id="dDesc"></pre>
+    <label>Note (shown to the employer on reject)</label>
+    <input id="dNote" placeholder="optional note…" />
+    <div class="row" style="margin-top:10px">
+      <button id="approveBtn">Approve &amp; publish</button>
+      <button id="rejectBtn" class="danger">Reject</button>
+      <button id="backBtn" class="ghost">Back to queue</button>
+    </div>
+    <div class="muted" id="dEvents" style="margin-top:12px"></div>
+    <div class="err" id="dErr"></div>
+  </section>
+
+  <section class="card hidden" id="allCard">
+    <h2>All postings</h2>
+    <table id="allTable"><thead><tr><th>Title</th><th>Employer</th><th>Status</th><th>Updated</th></tr></thead><tbody></tbody></table>
+  </section>
+</main>
+
+<script>
+const $ = s => document.querySelector(s);
+const esc = s => String(s ?? '').replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+const api = async (url, opts={}) => {
+  const r = await fetch(url, {headers:{'Content-Type':'application/json'}, ...opts});
+  const body = await r.json().catch(()=> ({}));
+  if (!r.ok) throw Object.assign(new Error(body.detail || r.statusText), {status:r.status});
+  return body;
+};
+let currentId = null;
+
+async function refreshAuth() {
+  const me = (await api('/api/account/me').catch(()=>({user:null}))).user;
+  const ok = me && (me.role === 'coordinator' || me.role === 'admin');
+  $('#authCard').classList.toggle('hidden', !!ok);
+  for (const id of ['linksCard','queueCard','allCard']) $('#'+id).classList.toggle('hidden', !ok);
+  $('#signoutBtn').classList.toggle('hidden', !ok);
+  $('#who').textContent = me ? `${me.email} (${me.role})` : '';
+  if (me && !ok) $('#authErr').textContent = 'You are signed in as ' + me.role + ' — this page needs a coordinator account.';
+  if (ok) loadAll();
+}
+$('#loginBtn').onclick = async () => {
+  $('#authErr').textContent = '';
+  try { await api('/api/account/login', {method:'POST', body: JSON.stringify({email:$('#authEmail').value, password:$('#authPw').value})}); await refreshAuth(); }
+  catch (e) { $('#authErr').textContent = e.message; }
+};
+$('#signoutBtn').onclick = async () => { await api('/api/account/logout', {method:'POST'}); location.reload(); };
+
+async function loadAll() {
+  const q = await api('/api/coordinator/queue').catch(()=>({postings:[], org_links:[]}));
+  $('#linksTable tbody').innerHTML = q.org_links.map(l => `<tr>
+      <td>${esc(l.org_name)}</td><td class="muted">${new Date(l.created_at*1000).toLocaleDateString()}</td>
+      <td><button data-approvelink="${l.org_id}">Approve employer</button></td></tr>`).join('')
+    || '<tr><td colspan="3" class="muted">No pending employers.</td></tr>';
+  $('#queueTable tbody').innerHTML = q.postings.map(p => `<tr>
+      <td><a data-open="${esc(p.id)}">${esc(p.title)}</a></td><td>${esc(p.org_name || '—')}</td>
+      <td>${esc(p.employment_type || '—')}</td>
+      <td>${p.pay_min ? esc(`${p.pay_min}–${p.pay_max} ${p.pay_currency || ''}/${p.pay_period || ''}`) : '—'}</td>
+      <td><button class="ghost" data-open="${esc(p.id)}">Review</button></td></tr>`).join('')
+    || '<tr><td colspan="5" class="muted">Queue is empty.</td></tr>';
+  const all = (await api('/api/postings').catch(()=>({postings:[]}))).postings;
+  $('#allTable tbody').innerHTML = all.map(p => `<tr>
+      <td><a data-open="${esc(p.id)}">${esc(p.title)}</a></td><td>${esc(p.org_name || '—')}</td>
+      <td><span class="status">${esc(p.status)}</span></td>
+      <td class="muted">${new Date(p.updated_at*1000).toLocaleString()}</td></tr>`).join('')
+    || '<tr><td colspan="4" class="muted">No postings yet.</td></tr>';
+}
+document.body.addEventListener('click', e => {
+  if (e.target.dataset.open) openDetail(e.target.dataset.open);
+  if (e.target.dataset.approvelink) approveLink(e.target.dataset.approvelink);
+});
+async function approveLink(orgId) {
+  try { await api(`/api/coordinator/org-links/${orgId}/approve`, {method:'POST'}); loadAll(); }
+  catch (e) { alert(e.message); }
+}
+async function openDetail(pid) {
+  const p = await api('/api/postings/' + pid).catch(e => { alert(e.message); return null; });
+  if (!p) return;
+  currentId = pid;
+  $('#detailCard').classList.remove('hidden');
+  $('#dTitle').textContent = p.title;
+  $('#dMeta').textContent = [p.org_name, p.employment_type, p.work_mode, p.location,
+    p.pay_min ? `${p.pay_min}–${p.pay_max} ${p.pay_currency || ''}/${p.pay_period || ''}` : null,
+    p.apply_deadline ? 'apply by ' + p.apply_deadline : null].filter(Boolean).join(' · ')
+    + ` · status: ${p.status}`;
+  const flags = (p.extraction && p.extraction.draft && p.extraction.draft.extraction_meta
+                 && p.extraction.draft.extraction_meta.flags) || [];
+  $('#dFlags').textContent = flags.length ? '⚠ extraction flags: ' + flags.join(' · ') : '';
+  $('#dSkills').innerHTML = (p.skills || []).map(s =>
+    `<span class="chip ${esc(s.bucket)}">${esc(s.skill_id)} <small class="muted">${esc(s.bucket)}</small></span>`).join('');
+  $('#dDesc').textContent = p.description || '';
+  $('#dEvents').textContent = (p.events || []).map(ev =>
+    `${new Date(ev.at*1000).toLocaleString()}: ${ev.from_status || '∅'} → ${ev.to_status} (${ev.note})`).join('  ·  ');
+  $('#dErr').textContent = '';
+  $('#detailCard').scrollIntoView({behavior:'smooth'});
+  const reviewable = p.status === 'pending_review';
+  $('#approveBtn').disabled = !reviewable;
+  $('#rejectBtn').disabled = !reviewable;
+}
+$('#approveBtn').onclick = () => act('approve');
+$('#rejectBtn').onclick = () => act('reject');
+$('#backBtn').onclick = () => { $('#detailCard').classList.add('hidden'); currentId = null; };
+async function act(kind) {
+  try {
+    await api(`/api/coordinator/postings/${currentId}/${kind}`,
+              {method:'POST', body: JSON.stringify({note: $('#dNote').value})});
+    $('#detailCard').classList.add('hidden');
+    loadAll();
+  } catch (e) { $('#dErr').textContent = e.message; }
+}
+
+refreshAuth();
+</script>
+</body>
+</html>

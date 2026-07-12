@@ -1,0 +1,407 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>Campus Recruiting — Post a job</title>
+<style>
+  :root { --bg:#0f1419; --panel:#1a2029; --panel2:#222b36; --line:#2c3744; --text:#e6edf3;
+          --muted:#9aa7b4; --accent:#4f9dde; --red:#f85149; --amber:#d29922; --green:#3fb950; }
+  * { box-sizing:border-box; }
+  body { margin:0; font:14px/1.55 -apple-system,Segoe UI,Roboto,Helvetica,Arial,sans-serif;
+         background:var(--bg); color:var(--text); }
+  header { display:flex; align-items:center; gap:14px; padding:14px 22px; border-bottom:1px solid var(--line); }
+  header h1 { font-size:17px; margin:0; } header h1 span { color:var(--accent); }
+  header .spacer { flex:1; }
+  main { max-width:1280px; margin:0 auto; padding:18px 22px 60px; }
+  .card { background:var(--panel); border:1px solid var(--line); border-radius:10px; padding:18px; margin-bottom:18px; }
+  h2 { font-size:15px; margin:0 0 10px; }
+  label { display:block; font-size:11.5px; color:var(--muted); margin:10px 0 3px; text-transform:uppercase; letter-spacing:.03em; }
+  input, textarea, select { width:100%; background:var(--panel2); border:1px solid var(--line); color:var(--text);
+          border-radius:6px; padding:8px 10px; font:inherit; }
+  textarea { min-height:180px; resize:vertical; }
+  button { background:var(--accent); color:#06121f; border:0; padding:9px 14px; border-radius:6px;
+           font-weight:600; cursor:pointer; font-size:13.5px; }
+  button.ghost { background:var(--panel2); color:var(--text); border:1px solid var(--line); }
+  button:disabled { opacity:.5; cursor:not-allowed; }
+  .muted { color:var(--muted); font-size:12.5px; }
+  .err { color:var(--red); min-height:16px; font-size:12.5px; margin-top:8px; }
+  .row { display:flex; gap:10px; } .row > * { flex:1; }
+  .twopane { display:grid; grid-template-columns: minmax(320px,42%) 1fr; gap:18px; }
+  #src { background:var(--panel2); border:1px solid var(--line); border-radius:8px; padding:12px;
+         white-space:pre-wrap; font:12.5px/1.6 ui-monospace,Consolas,monospace; max-height:75vh; overflow:auto; }
+  #src mark { background:#3a4d1f; color:#d8f0a8; border-radius:3px; padding:0 1px; }
+  .field { border:1px solid var(--line); border-left-width:4px; border-radius:8px; padding:8px 12px 12px; margin-bottom:10px; background:var(--panel); }
+  .field.auto { border-left-color:var(--green); }
+  .field.needs_review { border-left-color:var(--amber); }
+  .field.conflict { border-left-color:var(--red); }
+  .field.missing { border-left-color:var(--line); }
+  .field.confirmed { border-left-color:var(--green); }
+  .fhead { display:flex; align-items:center; gap:8px; }
+  .fhead .name { font-weight:600; font-size:12.5px; }
+  .badge { font-size:10.5px; padding:1px 7px; border-radius:999px; border:1px solid var(--line); color:var(--muted); }
+  .badge.m { color:#9fc4e8; } .confirmbtn { margin-left:auto; padding:3px 9px; font-size:11.5px; }
+  .cand { margin-top:6px; font-size:12px; color:var(--muted); }
+  .cand button { padding:2px 8px; font-size:11px; margin-left:6px; }
+  .chips { display:flex; flex-wrap:wrap; gap:6px; margin-top:8px; }
+  .chip { display:flex; align-items:center; gap:6px; background:var(--panel2); border:1px solid var(--line);
+          border-radius:999px; padding:3px 8px; font-size:12px; }
+  .chip.conflict { border-color:var(--red); opacity:.65; } .chip.auto { border-color:var(--green); }
+  .chip select { width:auto; padding:1px 4px; font-size:11px; background:transparent; border:0; color:var(--muted); }
+  .chip .x { cursor:pointer; color:var(--muted); }
+  .status { font-size:12px; padding:2px 8px; border-radius:999px; border:1px solid var(--line); }
+  .flags { color:var(--amber); font-size:12.5px; margin:8px 0; }
+  table { width:100%; border-collapse:collapse; font-size:13px; }
+  td, th { padding:7px 8px; border-bottom:1px solid var(--line); text-align:left; }
+  a { color:var(--accent); }
+  .hidden { display:none !important; }
+</style>
+</head>
+<body>
+<header>
+  <h1>Campus <span>Recruiting</span> — post a job</h1>
+  <span class="muted">upload a JD, review the pre-filled form, submit for approval</span>
+  <div class="spacer"></div>
+  <span id="who" class="muted"></span>
+  <button id="signoutBtn" class="ghost hidden">Sign out</button>
+</header>
+<main>
+
+  <!-- auth -->
+  <section class="card" id="authCard">
+    <h2>Sign in or create an employer account</h2>
+    <div class="row">
+      <div><label>Email</label><input id="authEmail" type="email" autocomplete="email" /></div>
+      <div><label>Password</label><input id="authPw" type="password" autocomplete="current-password" /></div>
+      <div><label>Organization (new accounts)</label><input id="authOrg" placeholder="Acme Corp" /></div>
+    </div>
+    <div class="row" style="margin-top:12px">
+      <button id="loginBtn" class="ghost">Sign in</button>
+      <button id="registerBtn">Create employer account</button>
+    </div>
+    <div class="err" id="authErr"></div>
+  </section>
+
+  <!-- step 1: JD in -->
+  <section class="card hidden" id="jdCard">
+    <h2>1 · Job description in</h2>
+    <label>Paste the posting</label>
+    <textarea id="jdText" placeholder="Paste the full job description…"></textarea>
+    <div class="row" style="margin-top:10px; align-items:center">
+      <div><label style="margin-top:0">…or upload a file (.pdf .docx .txt)</label>
+        <input id="jdFile" type="file" accept=".pdf,.docx,.txt,.md" /></div>
+      <div style="flex:0 0 auto; align-self:end"><button id="extractBtn">Extract fields</button></div>
+    </div>
+    <div class="muted" id="extractStatus"></div>
+    <div class="err" id="extractErr"></div>
+  </section>
+
+  <!-- step 2: two-pane review -->
+  <section class="card hidden" id="reviewCard">
+    <h2>2 · Review — every value shows where it came from</h2>
+    <div class="flags" id="flagBanner"></div>
+    <div class="muted" id="confirmCount"></div>
+    <div class="twopane" style="margin-top:10px">
+      <div id="src"></div>
+      <div id="form"></div>
+    </div>
+    <div class="row" style="margin-top:14px">
+      <button id="submitBtn">Create &amp; submit for review</button>
+      <button id="draftBtn" class="ghost">Save as draft only</button>
+    </div>
+    <div class="err" id="submitErr"></div>
+  </section>
+
+  <!-- my postings -->
+  <section class="card hidden" id="mineCard">
+    <h2>My postings</h2>
+    <table id="mineTable"><thead><tr><th>Title</th><th>Status</th><th>Updated</th><th></th></tr></thead><tbody></tbody></table>
+  </section>
+</main>
+
+<script>
+const $ = s => document.querySelector(s);
+const esc = s => String(s ?? '').replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+const api = async (url, opts={}) => {
+  const r = await fetch(url, {headers:{'Content-Type':'application/json'}, ...opts});
+  const body = await r.json().catch(()=> ({}));
+  if (!r.ok) throw Object.assign(new Error(body.detail || r.statusText), {status:r.status, body});
+  return body;
+};
+
+let draft = null;          // the extraction draft (verbatim, sent back with the posting)
+let skills = [];           // [{skill_id, bucket, name, status}]
+const confirmed = new Set();  // field names the human has confirmed/edited
+let pending = [];             // field names requiring confirmation
+
+// ---- auth ---------------------------------------------------------------------------------------
+async function refreshAuth() {
+  const me = (await api('/api/account/me').catch(()=>({user:null}))).user;
+  const ok = me && (me.role === 'employer' || me.role === 'coordinator' || me.role === 'admin');
+  $('#authCard').classList.toggle('hidden', !!ok);
+  $('#jdCard').classList.toggle('hidden', !ok);
+  $('#mineCard').classList.toggle('hidden', !ok);
+  $('#signoutBtn').classList.toggle('hidden', !ok);
+  $('#who').textContent = me ? `${me.email} (${me.role})` : '';
+  if (me && !ok) $('#authErr').textContent = 'This page needs an employer account — you are signed in as ' + me.role + '.';
+  if (ok) loadMine();
+}
+$('#loginBtn').onclick = async () => {
+  $('#authErr').textContent = '';
+  try { await api('/api/account/login', {method:'POST', body: JSON.stringify({email:$('#authEmail').value, password:$('#authPw').value})}); await refreshAuth(); }
+  catch (e) { $('#authErr').textContent = e.message; }
+};
+$('#registerBtn').onclick = async () => {
+  $('#authErr').textContent = '';
+  try { await api('/api/account/register', {method:'POST', body: JSON.stringify({email:$('#authEmail').value, password:$('#authPw').value, role:'employer', org_name:$('#authOrg').value})}); await refreshAuth(); }
+  catch (e) { $('#authErr').textContent = e.message; }
+};
+$('#signoutBtn').onclick = async () => { await api('/api/account/logout', {method:'POST'}); location.reload(); };
+
+// ---- extract ------------------------------------------------------------------------------------
+$('#extractBtn').onclick = async () => {
+  $('#extractErr').textContent = ''; $('#extractStatus').textContent = 'Extracting…';
+  $('#extractBtn').disabled = true;
+  try {
+    let resp;
+    const file = $('#jdFile').files[0];
+    if (file) {
+      const fd = new FormData();
+      fd.append('jd', file); fd.append('job_text', $('#jdText').value || '');
+      const r = await fetch('/api/postings/extract', {method:'POST', body:fd});
+      resp = await r.json(); if (!r.ok) throw new Error(resp.detail || r.statusText);
+    } else {
+      resp = await api('/api/postings/extract', {method:'POST', body: JSON.stringify({job_text: $('#jdText').value})});
+    }
+    const job = await poll(resp.poll);
+    if (job.status === 'error') throw new Error(job.error || 'Extraction failed.');
+    draft = job.result.draft;
+    renderReview();
+  } catch (e) { $('#extractErr').textContent = e.message; }
+  $('#extractStatus').textContent = ''; $('#extractBtn').disabled = false;
+};
+async function poll(url) {
+  for (;;) {
+    const j = await api(url);
+    if (j.status === 'done' || j.status === 'error') return j;
+    $('#extractStatus').textContent = `Extracting… (${j.progress.done}/${j.progress.total || '?'})`;
+    await new Promise(res => setTimeout(res, 700));
+  }
+}
+
+// ---- review form --------------------------------------------------------------------------------
+// [key, label, input kind, draft field, posting column]
+const FIELDS = [
+  ['title', 'Title', 'text'],
+  ['employer_name', 'Employer', 'text'],
+  ['locations', 'Location', 'text'],
+  ['work_mode', 'Work mode', 'select', ['','onsite','hybrid','remote']],
+  ['employment_type', 'Employment type', 'select', ['','full_time','part_time','internship','co_op','contract','new_grad','work_study']],
+  ['pay', 'Pay', 'pay'],
+  ['application_deadline', 'Application deadline', 'date'],
+  ['start_date', 'Start date', 'date'],
+  ['min_education', 'Minimum education', 'select', ['','highschool','diploma','associate','bachelor','master','phd']],
+  ['min_years', 'Minimum years of experience', 'number'],
+  ['application', 'How to apply', 'application'],
+];
+
+function fieldValue(f) { return (draft[f] && draft[f].value !== undefined) ? draft[f].value : null; }
+
+function renderReview() {
+  $('#reviewCard').classList.remove('hidden');
+  $('#src').textContent = draft.description || '';
+  const flags = (draft.extraction_meta && draft.extraction_meta.flags) || [];
+  $('#flagBanner').textContent = flags.length ? ('⚠ ' + flags.join(' · ')) : '';
+  confirmed.clear(); pending = [];
+  const form = $('#form'); form.innerHTML = '';
+  for (const [key, label, kind, options] of FIELDS) {
+    const f = draft[key] || {status:'missing'};
+    const status = f.status || 'missing';
+    if (status === 'needs_review' || status === 'conflict') pending.push(key);
+    const div = document.createElement('div');
+    div.className = 'field ' + status;
+    div.dataset.key = key;
+    const conf = f.confidence ? `<span class="badge">${esc(f.confidence)}</span>` : '';
+    const method = f.method ? `<span class="badge m">${esc(f.method)}</span>` : '';
+    const needsBtn = (status === 'needs_review' || status === 'conflict')
+      ? `<button class="confirmbtn ghost" data-confirm="${key}">✓ confirm</button>` : '';
+    let input = '';
+    const v = fieldValue(key);
+    if (kind === 'text') input = `<input data-f="${key}" value="${esc(Array.isArray(v) ? v.join('; ') : (v ?? ''))}" />`;
+    else if (kind === 'number') input = `<input data-f="${key}" type="number" min="0" max="30" value="${esc(v ?? '')}" />`;
+    else if (kind === 'date') input = `<input data-f="${key}" type="date" value="${esc(v ?? '')}" />`;
+    else if (kind === 'select') input = `<select data-f="${key}">` + options.map(o =>
+      `<option value="${o}" ${o === (v ?? '') ? 'selected' : ''}>${o || '—'}</option>`).join('') + '</select>';
+    else if (kind === 'pay') {
+      const p = v || {};
+      input = `<div class="row">
+        <input data-f="pay_min" type="number" placeholder="min" value="${esc(p.min ?? '')}" />
+        <input data-f="pay_max" type="number" placeholder="max" value="${esc(p.max ?? '')}" />
+        <select data-f="pay_currency">${['CAD','USD'].map(c=>`<option ${c===(p.currency||'CAD')?'selected':''}>${c}</option>`).join('')}</select>
+        <select data-f="pay_period">${['hour','week','month','year','stipend','unpaid'].map(c=>`<option ${c===(p.period||'hour')?'selected':''}>${c}</option>`).join('')}</select>
+      </div>`;
+    } else if (kind === 'application') {
+      const a = v || {};
+      input = `<div class="row">
+        <select data-f="application_method">${['','platform','external_url','email'].map(c=>`<option value="${c}" ${c===(a.method||'')?'selected':''}>${c||'—'}</option>`).join('')}</select>
+        <input data-f="application_url" placeholder="https://… apply link" value="${esc(a.url ?? '')}" />
+        <input data-f="application_email" placeholder="apply email" value="${esc(a.email ?? '')}" />
+      </div>`;
+    }
+    const cands = (f.candidates || []).map((c,i) =>
+      `<div class="cand">also found: <b>${esc(JSON.stringify(c.value))}</b>
+       <button class="ghost" data-usecand="${key}:${i}">use this</button></div>`).join('');
+    div.innerHTML = `<div class="fhead"><span class="name">${esc(label)}</span>${method}${conf}
+      <span class="badge">${esc(status.replace('_',' '))}</span>${needsBtn}</div>${input}${cands}`;
+    div.addEventListener('focusin', () => highlight(f.source_span));
+    form.appendChild(div);
+  }
+  renderSkills();
+  updateGate();
+  $('#form').addEventListener('input', e => { const k = e.target.closest('.field'); if (k) confirmField(k.dataset.key); });
+  $('#form').addEventListener('click', e => {
+    const c = e.target.dataset.confirm; if (c) { confirmField(c); e.preventDefault(); }
+    const u = e.target.dataset.usecand;
+    if (u) {
+      const [key, idx] = u.split(':');
+      const cand = draft[key].candidates[+idx];
+      const el = $(`[data-f="${key}"]`);
+      if (el) el.value = Array.isArray(cand.value) ? cand.value.join('; ') : cand.value;
+      confirmField(key); e.preventDefault();
+    }
+  });
+}
+
+function confirmField(key) {
+  if (!key || confirmed.has(key)) return;
+  confirmed.add(key);
+  const div = document.querySelector(`.field[data-key="${key}"]`);
+  if (div) { div.classList.remove('needs_review','conflict'); div.classList.add('confirmed');
+             const b = div.querySelector(`[data-confirm="${key}"]`); if (b) b.remove(); }
+  updateGate();
+}
+
+function updateGate() {
+  const left = pending.filter(k => !confirmed.has(k)).length
+             + skills.filter(s => s.status === 'conflict' && !s.ok).length;
+  $('#confirmCount').textContent = left
+    ? `${left} field(s) still need your confirmation before submitting.`
+    : 'All flagged fields confirmed — ready to submit.';
+  $('#submitBtn').disabled = left > 0;
+}
+
+function highlight(span) {
+  const text = draft.description || '';
+  if (!span) { $('#src').textContent = text; return; }
+  const [a, b] = span;
+  $('#src').innerHTML = esc(text.slice(0, a)) + '<mark>' + esc(text.slice(a, b)) + '</mark>' + esc(text.slice(b));
+  const m = $('#src').querySelector('mark');
+  if (m) m.scrollIntoView({block:'center', behavior:'smooth'});
+}
+
+// ---- skills chips -------------------------------------------------------------------------------
+function renderSkills() {
+  skills = (draft.skills || []).map(s => ({...s, ok: s.status !== 'conflict'}));
+  const wrap = document.createElement('div');
+  wrap.className = 'field needs_review'; wrap.dataset.key = '_skills';
+  wrap.innerHTML = `<div class="fhead"><span class="name">Skills</span>
+      <span class="badge">grey = unverified AI suggestion — click ✓ to keep, × to drop</span></div>
+    <div class="chips" id="chips"></div>
+    <div class="row" style="margin-top:8px"><input id="skillAdd" list="skillList" placeholder="add a skill…" />
+    <datalist id="skillList"></datalist></div>`;
+  $('#form').appendChild(wrap);
+  drawChips();
+  $('#skillAdd').addEventListener('input', async e => {
+    const q = e.target.value;
+    if (q.length < 2) return;
+    const found = (await api('/api/skills?q=' + encodeURIComponent(q)).catch(()=>({skills:[]}))).skills;
+    $('#skillList').innerHTML = found.map(s => `<option value="${esc(s.name)}" data-id="${esc(s.id)}">`).join('');
+  });
+  $('#skillAdd').addEventListener('change', e => {
+    const opt = [...$('#skillList').options].find(o => o.value === e.target.value);
+    const id = opt ? opt.dataset.id : e.target.value.toLowerCase().replace(/[^\w+#.]+/g, '_');
+    if (id && !skills.some(s => s.skill_id === id)) {
+      skills.push({skill_id:id, name:e.target.value, bucket:'required', status:'auto', method:'user', ok:true});
+      drawChips();
+    }
+    e.target.value = '';
+  });
+}
+function drawChips() {
+  $('#chips').innerHTML = skills.map((s, i) => `
+    <span class="chip ${s.status === 'conflict' && !s.ok ? 'conflict' : (s.status === 'auto' ? 'auto' : '')}">
+      ${esc(s.name || s.skill_id)}
+      <select data-bucket="${i}">${['must_have','required','preferred'].map(b=>`<option ${b===s.bucket?'selected':''}>${b}</option>`).join('')}</select>
+      ${s.status === 'conflict' && !s.ok ? `<span class="x" data-keep="${i}" title="keep">✓</span>` : ''}
+      <span class="x" data-del="${i}" title="remove">×</span>
+    </span>`).join('');
+  $('#chips').onclick = e => {
+    if (e.target.dataset.del !== undefined) { skills.splice(+e.target.dataset.del, 1); drawChips(); updateGate(); }
+    if (e.target.dataset.keep !== undefined) { skills[+e.target.dataset.keep].ok = true; drawChips(); updateGate(); }
+  };
+  $('#chips').onchange = e => {
+    if (e.target.dataset.bucket !== undefined) skills[+e.target.dataset.bucket].bucket = e.target.value;
+  };
+}
+
+// ---- create + submit ----------------------------------------------------------------------------
+function collect() {
+  const get = k => { const el = document.querySelector(`[data-f="${k}"]`); return el ? el.value.trim() : ''; };
+  return {
+    fields: {
+      title: get('title'), description: draft.description,
+      location: get('locations'), work_mode: get('work_mode') || null,
+      employment_type: get('employment_type') || null,
+      pay_min: get('pay_min') ? +get('pay_min') : null, pay_max: get('pay_max') ? +get('pay_max') : null,
+      pay_currency: get('pay_currency') || null, pay_period: get('pay_period') || null,
+      apply_deadline: get('application_deadline') || null, start_date: get('start_date') || null,
+      min_education: get('min_education') || null, min_years: get('min_years') ? +get('min_years') : null,
+      application_method: get('application_method') || null, application_url: get('application_url') || null,
+    },
+    skills: skills.filter(s => s.ok !== false).map(s => ({skill_id:s.skill_id, bucket:s.bucket, source:s.method || 'user'})),
+    extraction: {draft},
+  };
+}
+async function createPosting(submit) {
+  $('#submitErr').textContent = '';
+  try {
+    const made = await api('/api/postings', {method:'POST', body: JSON.stringify(collect())});
+    if (submit) {
+      try { await api(`/api/postings/${made.posting_id}/submit`, {method:'POST'}); alert('Submitted — career services will review it.'); }
+      catch (e) {
+        if (e.status === 409) alert('Saved as draft. ' + e.message);
+        else throw e;
+      }
+    } else { alert('Draft saved.'); }
+    $('#reviewCard').classList.add('hidden');
+    loadMine();
+  } catch (e) { $('#submitErr').textContent = e.message; }
+}
+$('#submitBtn').onclick = () => createPosting(true);
+$('#draftBtn').onclick = () => createPosting(false);
+
+// ---- my postings --------------------------------------------------------------------------------
+async function loadMine() {
+  const rows = (await api('/api/postings').catch(()=>({postings:[]}))).postings;
+  $('#mineTable tbody').innerHTML = rows.map(p => `<tr>
+    <td>${esc(p.title)}</td><td><span class="status">${esc(p.status)}</span></td>
+    <td class="muted">${new Date(p.updated_at * 1000).toLocaleString()}</td>
+    <td>${p.status === 'draft' || p.status === 'rejected'
+        ? `<button class="ghost" data-submit="${esc(p.id)}">Submit for review</button>`
+        : (p.status === 'live' ? `<button class="ghost" data-close="${esc(p.id)}">Close</button>` : '')}</td>
+    </tr>`).join('')
+    || '<tr><td colspan="4" class="muted">Nothing yet.</td></tr>';
+}
+$('#mineTable').addEventListener('click', async e => {
+  const submitId = e.target.dataset.submit, closeId = e.target.dataset.close;
+  if (!submitId && !closeId) return;
+  try {
+    await api(`/api/postings/${submitId || closeId}/${submitId ? 'submit' : 'close'}`, {method:'POST'});
+    loadMine();
+  } catch (err) { alert(err.message); }
+});
+
+refreshAuth();
+</script>
+</body>
+</html>
