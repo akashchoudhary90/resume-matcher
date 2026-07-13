@@ -7,6 +7,9 @@ venv/
 .pytest_cache/
 .mypy_cache/
 .ruff_cache/
+.coverage
+.coverage.*
+htmlcov/
 
 # Local data — NEVER commit real student PII. Synthetic data is regenerable.
 data/synthetic/*
