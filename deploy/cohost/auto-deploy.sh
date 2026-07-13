@@ -29,6 +29,14 @@ flock -n 9 || { echo "$(date -Is) another run in progress — skipping"; exit 0;
 echo "===== $(date -Is) autodeploy check ====="
 cd "$REPO_DIR"
 
+# Never pull/reset over an uncommitted hotfix: `git reset --hard` on the rollback path would destroy
+# it. Check TRACKED changes only (git diff --quiet HEAD) so a stray ignored/untracked file — e.g.
+# deploy/cohost/.env — can't false-refuse and silently freeze the unattended timer.
+if ! git diff --quiet HEAD 2>/dev/null; then
+    echo "working tree has uncommitted tracked changes — refusing autodeploy (manual fix needed)"
+    exit 1
+fi
+
 git fetch --quiet origin "$BRANCH"
 LOCAL=$(git rev-parse HEAD)
 REMOTE=$(git rev-parse "origin/$BRANCH")
