@@ -1,0 +1,439 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="description" content="Plain-language product walkthrough of the campus hiring platform — what it does, how each feature works, and how to access it.">
+<style>
+  html{-webkit-text-size-adjust:100%}
+</style>
+<title>Campus Hiring Platform — Product Walkthrough</title>
+<style>
+  :root{
+    --ground:#F5F7F8; --surface:#FFFFFF; --surface-2:#EDF3F2;
+    --ink:#14212B; --ink-soft:#4C5A66; --ink-faint:#7A8791; --line:#E2E8E9;
+    --accent:#0F766E; --accent-strong:#0B5D57; --accent-wash:#E4F1EF;
+    --live:#15803D; --live-wash:#E7F3EB;
+    --pending:#B45309; --pending-wash:#F7EEDD;
+    --off:#64748B; --off-wash:#EEF1F3;
+    --shadow:0 1px 2px rgba(20,33,43,.04),0 6px 24px -12px rgba(20,33,43,.14);
+    --maxw:min(760px,92vw);
+    --serif:"Iowan Old Style","Palatino Linotype",Palatino,Georgia,"Times New Roman",serif;
+    --sans:system-ui,-apple-system,"Segoe UI",Roboto,Helvetica,Arial,sans-serif;
+    --mono:ui-monospace,"SF Mono","Cascadia Code",Consolas,monospace;
+  }
+  @media (prefers-color-scheme:dark){
+    :root{
+      --ground:#0E1620; --surface:#16212C; --surface-2:#1C2A36;
+      --ink:#E9EFF3; --ink-soft:#AAB8C2; --ink-faint:#7F8E9A; --line:#26333F;
+      --accent:#2DD4BF; --accent-strong:#5EEAD4; --accent-wash:#0E322F;
+      --live:#4ADE80; --live-wash:#12301F;
+      --pending:#F0B366; --pending-wash:#3A2A12;
+      --off:#94A3B8; --off-wash:#1E2A34;
+      --shadow:0 1px 2px rgba(0,0,0,.3),0 8px 30px -14px rgba(0,0,0,.6);
+    }
+  }
+  :root[data-theme="light"]{
+    --ground:#F5F7F8; --surface:#FFFFFF; --surface-2:#EDF3F2;
+    --ink:#14212B; --ink-soft:#4C5A66; --ink-faint:#7A8791; --line:#E2E8E9;
+    --accent:#0F766E; --accent-strong:#0B5D57; --accent-wash:#E4F1EF;
+    --live:#15803D; --live-wash:#E7F3EB; --pending:#B45309; --pending-wash:#F7EEDD;
+    --off:#64748B; --off-wash:#EEF1F3;
+    --shadow:0 1px 2px rgba(20,33,43,.04),0 6px 24px -12px rgba(20,33,43,.14);
+  }
+  :root[data-theme="dark"]{
+    --ground:#0E1620; --surface:#16212C; --surface-2:#1C2A36;
+    --ink:#E9EFF3; --ink-soft:#AAB8C2; --ink-faint:#7F8E9A; --line:#26333F;
+    --accent:#2DD4BF; --accent-strong:#5EEAD4; --accent-wash:#0E322F;
+    --live:#4ADE80; --live-wash:#12301F; --pending:#F0B366; --pending-wash:#3A2A12;
+    --off:#94A3B8; --off-wash:#1E2A34;
+    --shadow:0 1px 2px rgba(0,0,0,.3),0 8px 30px -14px rgba(0,0,0,.6);
+  }
+
+  *{box-sizing:border-box}
+  body{
+    margin:0;background:var(--ground);color:var(--ink);
+    font-family:var(--sans);font-size:17px;line-height:1.65;
+    -webkit-font-smoothing:antialiased;
+  }
+  .wrap{max-width:var(--maxw);margin:0 auto;padding:0 4px}
+  section{padding:clamp(2.4rem,6vw,4rem) 0;border-top:1px solid var(--line)}
+  section:first-of-type{border-top:none}
+
+  h1,h2,h3{font-family:var(--serif);font-weight:600;letter-spacing:-.01em;text-wrap:balance;line-height:1.15}
+  h1{font-size:clamp(2.1rem,6vw,3.3rem);margin:.2em 0 .35em}
+  h2{font-size:clamp(1.5rem,4vw,2rem);margin:0 0 .2em}
+  h3{font-size:1.16rem;margin:0 0 .3em;letter-spacing:-.005em}
+  p{margin:0 0 1rem;max-width:64ch}
+  a{color:var(--accent-strong);text-underline-offset:2px}
+  strong{font-weight:640;color:var(--ink)}
+  .lede{font-size:1.16rem;color:var(--ink-soft);max-width:60ch}
+
+  .eyebrow{font-family:var(--sans);font-size:.74rem;font-weight:700;letter-spacing:.14em;
+    text-transform:uppercase;color:var(--accent);margin:0 0 .1em}
+  .kicker{color:var(--ink-faint);font-size:.95rem}
+
+  /* hero */
+  .hero{padding-top:clamp(2.8rem,7vw,4.6rem)}
+  .hero .rule{width:52px;height:3px;background:var(--accent);border-radius:2px;margin:0 0 1.6rem}
+  .status-row{display:flex;flex-wrap:wrap;gap:.6rem;margin-top:1.6rem}
+
+  /* pills */
+  .pill{display:inline-flex;align-items:center;gap:.45rem;font-family:var(--sans);
+    font-size:.78rem;font-weight:650;letter-spacing:.02em;padding:.34rem .7rem;border-radius:999px;
+    border:1px solid transparent;white-space:nowrap}
+  .pill .dot{width:7px;height:7px;border-radius:50%;flex:none}
+  .pill.live{background:var(--live-wash);color:var(--live);border-color:color-mix(in srgb,var(--live) 26%,transparent)}
+  .pill.live .dot{background:var(--live)}
+  .pill.pending{background:var(--pending-wash);color:var(--pending);border-color:color-mix(in srgb,var(--pending) 30%,transparent)}
+  .pill.pending .dot{background:var(--pending)}
+
+  /* pillars */
+  .pillars{display:grid;gap:1rem;grid-template-columns:1fr;margin-top:1.8rem}
+  @media(min-width:640px){.pillars{grid-template-columns:repeat(3,1fr)}}
+  .pillar{background:var(--surface);border:1px solid var(--line);border-radius:14px;padding:1.3rem;box-shadow:var(--shadow)}
+  .pillar .num{font-family:var(--serif);font-size:1.5rem;color:var(--accent);line-height:1}
+  .pillar h3{margin-top:.5rem}
+  .pillar p{font-size:.96rem;color:var(--ink-soft);margin:0}
+
+  /* roles */
+  .roles{display:grid;gap:1rem;grid-template-columns:1fr;margin-top:1.6rem}
+  @media(min-width:720px){.roles{grid-template-columns:repeat(3,1fr)}}
+  .role{background:var(--surface);border:1px solid var(--line);border-radius:14px;padding:1.3rem 1.3rem 1.4rem;box-shadow:var(--shadow)}
+  .role .ic{width:40px;height:40px;border-radius:10px;background:var(--accent-wash);color:var(--accent);
+    display:grid;place-items:center;margin-bottom:.7rem}
+  .role .ic svg{width:22px;height:22px}
+  .role ul{margin:.6rem 0 0;padding-left:1.05rem}
+  .role li{margin:.28rem 0;font-size:.95rem;color:var(--ink-soft)}
+
+  /* feature groups */
+  .group{margin-top:2rem}
+  .group-head{display:flex;align-items:baseline;justify-content:space-between;gap:1rem;
+    padding-bottom:.55rem;border-bottom:2px solid var(--line);margin-bottom:1.1rem;flex-wrap:wrap}
+  .group-head h3{font-size:1.3rem;margin:0}
+  .feat{display:grid;gap:1rem;grid-template-columns:1fr}
+  @media(min-width:640px){.feat{grid-template-columns:1fr 1fr}}
+  .card{background:var(--surface);border:1px solid var(--line);border-radius:13px;padding:1.15rem 1.2rem;box-shadow:var(--shadow)}
+  .card h4{font-family:var(--sans);font-size:1.02rem;font-weight:680;margin:0 0 .3rem;letter-spacing:-.005em}
+  .card p{font-size:.93rem;color:var(--ink-soft);margin:0}
+  .card .how{margin-top:.7rem;padding-top:.7rem;border-top:1px dashed var(--line);font-size:.9rem}
+  .card .how b{font-family:var(--sans);font-size:.7rem;letter-spacing:.1em;text-transform:uppercase;
+    color:var(--ink-faint);display:block;margin-bottom:.15rem;font-weight:700}
+  .full{grid-column:1/-1}
+
+  /* pipeline diagram */
+  .flow{display:flex;flex-wrap:wrap;align-items:stretch;gap:.5rem;margin:1.4rem 0 .4rem}
+  .flow .step{flex:1 1 120px;background:var(--surface);border:1px solid var(--line);border-radius:11px;
+    padding:.7rem .8rem;position:relative;box-shadow:var(--shadow)}
+  .flow .step .s{font-family:var(--sans);font-size:.68rem;font-weight:700;letter-spacing:.1em;
+    text-transform:uppercase;color:var(--accent)}
+  .flow .step .t{font-size:.92rem;font-weight:600;margin-top:.15rem}
+  .flow .step .d{font-size:.82rem;color:var(--ink-faint);margin-top:.15rem;line-height:1.4}
+
+  /* access */
+  .access{display:grid;gap:1.1rem;grid-template-columns:1fr;margin-top:1.6rem}
+  @media(min-width:720px){.access{grid-template-columns:1fr 1fr}}
+  .panel{border-radius:16px;padding:1.4rem;border:1px solid var(--line);background:var(--surface);box-shadow:var(--shadow)}
+  .panel.now{border-color:color-mix(in srgb,var(--live) 34%,var(--line))}
+  .panel.soon{border-color:color-mix(in srgb,var(--pending) 34%,var(--line))}
+  .panel h3{font-family:var(--sans);font-size:1.12rem;font-weight:700;margin:.7rem 0 .2rem}
+  .steps{counter-reset:s;margin:.8rem 0 0;padding:0;list-style:none}
+  .steps li{counter-increment:s;position:relative;padding:.35rem 0 .35rem 2rem;font-size:.95rem;color:var(--ink-soft)}
+  .steps li::before{content:counter(s);position:absolute;left:0;top:.2rem;width:1.4rem;height:1.4rem;
+    background:var(--accent);color:#fff;border-radius:50%;display:grid;place-items:center;
+    font-family:var(--sans);font-size:.78rem;font-weight:700}
+  :root[data-theme="dark"] .steps li::before,@media(prefers-color-scheme:dark){}
+  .kv{font-family:var(--mono);font-size:.86rem;background:var(--surface-2);border:1px solid var(--line);
+    border-radius:8px;padding:.7rem .8rem;margin:.7rem 0;display:grid;gap:.2rem;overflow-x:auto}
+  .kv span{white-space:nowrap}
+  .kv .lbl{color:var(--ink-faint)}
+  .note{font-size:.86rem;color:var(--ink-faint);margin-top:.7rem}
+
+  /* callout */
+  .callout{background:var(--accent-wash);border:1px solid color-mix(in srgb,var(--accent) 28%,transparent);
+    border-radius:14px;padding:1.2rem 1.3rem;margin-top:1.4rem}
+  .callout p{margin:0;color:var(--ink);font-size:.98rem}
+  .callout p+p{margin-top:.6rem}
+
+  /* what we did list */
+  .did{list-style:none;padding:0;margin:1.3rem 0 0;display:grid;gap:.7rem}
+  .did li{display:flex;gap:.75rem;align-items:flex-start;font-size:.98rem;color:var(--ink-soft)}
+  .did li svg{flex:none;width:20px;height:20px;color:var(--accent);margin-top:.15rem}
+  .did b{color:var(--ink)}
+
+  /* next steps timeline */
+  .tl{margin:1.4rem 0 0;padding:0;list-style:none;position:relative}
+  .tl li{position:relative;padding:0 0 1.15rem 1.6rem;border-left:2px solid var(--line);margin-left:.4rem}
+  .tl li:last-child{padding-bottom:0}
+  .tl li::before{content:"";position:absolute;left:-7px;top:.3rem;width:12px;height:12px;border-radius:50%;
+    background:var(--surface);border:2px solid var(--accent)}
+  .tl li.done::before{background:var(--accent)}
+  .tl .th{font-weight:650;color:var(--ink)}
+  .tl .td{font-size:.93rem;color:var(--ink-soft)}
+
+  footer{border-top:1px solid var(--line);padding:2rem 0 3rem;color:var(--ink-faint);font-size:.85rem}
+  footer p{max-width:64ch;margin:.3rem 0}
+
+  @media (prefers-reduced-motion:no-preference){
+    section,.hero>*{animation:rise .6s cubic-bezier(.2,.7,.2,1) both}
+    .hero .eyebrow{animation-delay:.02s}.hero h1{animation-delay:.06s}
+    .hero .lede{animation-delay:.12s}.hero .status-row{animation-delay:.18s}
+    @keyframes rise{from{opacity:0;transform:translateY(10px)}to{opacity:1;transform:none}}
+  }
+</style>
+</head>
+<body>
+<div class="wrap">
+
+  <section class="hero">
+    <div class="rule"></div>
+    <p class="eyebrow">Product Walkthrough · for our partners</p>
+    <h1>A smarter, fairer way to connect students, employers, and careers</h1>
+    <p class="lede">We've built a private campus-hiring platform — an AI that matches people to jobs and explains why, plus a network that surfaces <em>warm introductions</em> through connections people actually agree to share. This page explains what it does, how each part works, and how you can see it today.</p>
+    <div class="status-row">
+      <span class="pill live"><span class="dot"></span>AI matcher — live to try now</span>
+      <span class="pill pending"><span class="dot"></span>Full platform — built &amp; deployed, switching on soon</span>
+    </div>
+  </section>
+
+  <section>
+    <p class="eyebrow">The short version</p>
+    <h2>What we built</h2>
+    <p>Think of it as a private, smarter version of Handshake — the platform universities use to connect students with employers. We rebuilt it around two ideas most job sites miss:</p>
+    <p><strong>1. An AI that reads resumes and job posts</strong> and ranks candidates against a role — and, crucially, explains its reasoning in plain English instead of a mystery score. <strong>2. A relationship network</strong> — warm introductions, referrals, mentorship — built <em>only</em> from connections people choose to share. No scraping, no cold outreach. Around both, we built genuine fairness checks and strong privacy controls, because a hiring tool touches people's careers and their data.</p>
+  </section>
+
+  <section>
+    <p class="eyebrow">Why it's different</p>
+    <h2>Three ideas at the core</h2>
+    <div class="pillars">
+      <div class="pillar">
+        <div class="num">01</div>
+        <h3>Matching you can trust</h3>
+        <p>The AI scores each candidate against a job and shows <em>why</em> — the skills that matched, what's missing, where they'd need to grow. It flags resumes that try to game the system, and it never invents a fake "chance of getting hired."</p>
+      </div>
+      <div class="pillar">
+        <div class="num">02</div>
+        <h3>Relationship-based hiring</h3>
+        <p>The best jobs come through people you know. The platform finds a path from a student to a hiring manager through mutual connections and asks <em>both sides</em> before introducing them — plus mentorship, alumni, and verified references.</p>
+      </div>
+      <div class="pillar">
+        <div class="num">03</div>
+        <h3>Fair &amp; private by design</h3>
+        <p>Bias is measured and flagged, never used to make decisions. Everything needs consent, people can delete their data in one step, and reports are built so no single individual can ever be picked out of a small group.</p>
+      </div>
+    </div>
+  </section>
+
+  <section>
+    <p class="eyebrow">Who it's for</p>
+    <h2>Three kinds of people use it</h2>
+    <div class="roles">
+      <div class="role">
+        <div class="ic" aria-hidden="true"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M22 10 12 5 2 10l10 5 10-5Z"/><path d="M6 12v5c0 1 2.7 2.5 6 2.5s6-1.5 6-2.5v-5"/></svg></div>
+        <h3>Students</h3>
+        <ul>
+          <li>Build a profile and upload a resume</li>
+          <li>Search and apply to jobs, get AI-matched</li>
+          <li>Ask for a warm introduction</li>
+          <li>Find a mentor; collect verified references</li>
+        </ul>
+      </div>
+      <div class="role">
+        <div class="ic" aria-hidden="true"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="7" width="18" height="13" rx="2"/><path d="M8 7V5a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/></svg></div>
+        <h3>Employers</h3>
+        <ul>
+          <li>Post a job — AI fills in the requirements</li>
+          <li>Review candidates ranked by fit</li>
+          <li>Message applicants, schedule interviews</li>
+          <li>See who in the network can vouch for them</li>
+        </ul>
+      </div>
+      <div class="role">
+        <div class="ic" aria-hidden="true"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M22 21v-2a4 4 0 0 0-3-3.87M16 3.13A4 4 0 0 1 16 11"/></svg></div>
+        <h3>Career-centre staff</h3>
+        <ul>
+          <li>Approve postings before students see them</li>
+          <li>Read fairness &amp; outcome reports</li>
+          <li>Spot under-connected students and bridge them</li>
+          <li>Manage employer relationships</li>
+        </ul>
+      </div>
+    </div>
+  </section>
+
+  <section>
+    <p class="eyebrow">The features · and how to use them</p>
+    <h2>What's inside</h2>
+    <p>Every feature below is built and deployed. The ones marked <span class="pill live" style="padding:.15rem .5rem;font-size:.72rem"><span class="dot"></span>Live</span> you can try today; the rest switch on together once the privacy review is complete.</p>
+
+    <div class="group">
+      <div class="group-head"><h3>Jobs &amp; applications</h3><span class="pill pending"><span class="dot"></span>Built</span></div>
+      <div class="feat">
+        <div class="card">
+          <h4>Post a job with AI autofill</h4>
+          <p>The employer pastes in a job description and the AI pulls out the required skills and qualifications automatically — no long form to fill in.</p>
+          <div class="how"><b>How to use</b>Paste the job posting → review the skills the AI detected → adjust if needed → publish.</div>
+        </div>
+        <div class="card">
+          <h4>Coordinator approval</h4>
+          <p>Postings go to the career centre for a quick review before students see them, so the job board stays trustworthy.</p>
+          <div class="how"><b>How to use</b>New postings appear in the coordinator's queue → approve or send back with a note.</div>
+        </div>
+        <div class="card">
+          <h4>Search, apply &amp; withdraw</h4>
+          <p>Students filter the job board by keyword and sort it, apply in a click, and can withdraw an application if plans change.</p>
+          <div class="how"><b>How to use</b>Browse jobs → open one → Apply. Change your mind? Open the application → Withdraw.</div>
+        </div>
+        <div class="card">
+          <h4>Hiring pipeline</h4>
+          <p>Employers move candidates through clear stages and everyone sees where things stand.</p>
+          <div class="how"><b>How to use</b>On a posting's applicants, move each person Applied → Shortlisted → Interview → Hired.</div>
+        </div>
+      </div>
+    </div>
+
+    <div class="group">
+      <div class="group-head"><h3>The AI matcher</h3><span class="pill live"><span class="dot"></span>Live to try now</span></div>
+      <div class="feat">
+        <div class="card full">
+          <h4>Score, rank &amp; explain — with anti-gaming built in</h4>
+          <p>Upload resumes and a job description and the AI ranks every candidate against the role, showing the matched skills, the gaps, and a short coaching note. It also catches resumes stuffed with hidden keywords, and it deliberately never fabricates a "probability of being hired" — it reports fit and readiness honestly.</p>
+          <div class="how"><b>How to try it today</b>See “How to access” below — this is the piece that's already live.</div>
+        </div>
+      </div>
+    </div>
+
+    <div class="group">
+      <div class="group-head"><h3>The relationship network</h3><span class="pill pending"><span class="dot"></span>Built</span></div>
+      <div class="feat">
+        <div class="card">
+          <h4>Warm introductions</h4>
+          <p>Finds a path from a student to a hiring manager through people they both know — and asks <em>both</em> sides before connecting them. Never a cold message.</p>
+          <div class="how"><b>How it works</b>Student requests an intro on a job → a mutual connection is asked → if they and the manager both say yes, the intro is made.</div>
+        </div>
+        <div class="card">
+          <h4>Mentorship</h4>
+          <p>Students opt in to find a mentor; alumni and professionals opt in to offer time. The platform matches them by program and interest.</p>
+          <div class="how"><b>How to use</b>Turn on “looking for a mentor” → get matched → the mentor accepts before any contact happens.</div>
+        </div>
+        <div class="card">
+          <h4>Alumni network</h4>
+          <p>Graduates keep a verified place in the network — the connection between “who’s hiring” and “who was once in your seat.”</p>
+          <div class="how"><b>How to use</b>The career centre confirms alumni status; alumni choose whether to mentor or take intros.</div>
+        </div>
+        <div class="card">
+          <h4>Event check-ins → connections</h4>
+          <p>Checking in at a career fair or info session creates real, consented connections with the people who were actually there.</p>
+          <div class="how"><b>How to use</b>Scan in at the event → attendees you overlapped with become part of your network.</div>
+        </div>
+        <div class="card">
+          <h4>Verified references</h4>
+          <p>A professor or manager vouches for a student. It becomes a portable, verifiable reference employers can see — stronger than a PDF letter.</p>
+          <div class="how"><b>How to use</b>Student sends a private request link → the referee writes a short structured vouch → the career centre can verify it.</div>
+        </div>
+        <div class="card">
+          <h4>Coordinator relationship dashboard</h4>
+          <p>Career staff can see which students are under-connected — purely from network structure, never personal traits — and bridge them to a willing mentor in one click.</p>
+          <div class="how"><b>How to use</b>Open the dashboard → see the under-connected list → pick a mentor → Bridge.</div>
+        </div>
+      </div>
+    </div>
+
+    <div class="group">
+      <div class="group-head"><h3>Fairness &amp; privacy</h3><span class="pill pending"><span class="dot"></span>Built-in throughout</span></div>
+      <div class="feat">
+        <div class="card">
+          <h4>Consent for everything</h4>
+          <p>Nothing about a person is shared or used without their explicit yes — and turning a consent off actually removes the data, not just hides it.</p>
+        </div>
+        <div class="card">
+          <h4>Bias is watched, never used</h4>
+          <p>The system measures fairness across groups and flags problems for humans — but personal traits never touch a score or a ranking.</p>
+        </div>
+        <div class="card">
+          <h4>One-click data deletion</h4>
+          <p>A person can delete their account and every trace of their data across the whole system, permanently.</p>
+        </div>
+        <div class="card">
+          <h4>Small-group protection</h4>
+          <p>Reports never show a number small enough to identify an individual — a privacy guardrail on every summary.</p>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <section>
+    <p class="eyebrow">The employer + student journey</p>
+    <h2>How a hire actually flows</h2>
+    <div class="flow">
+      <div class="step"><div class="s">Step 1</div><div class="t">Post</div><div class="d">Employer pastes a job; AI fills the requirements.</div></div>
+      <div class="step"><div class="s">Step 2</div><div class="t">Approve</div><div class="d">Career centre reviews and publishes it.</div></div>
+      <div class="step"><div class="s">Step 3</div><div class="t">Match &amp; apply</div><div class="d">Students find it, apply; AI ranks them with reasons.</div></div>
+      <div class="step"><div class="s">Step 4</div><div class="t">Warm intro</div><div class="d">A mutual connection can vouch and open a door.</div></div>
+      <div class="step"><div class="s">Step 5</div><div class="t">Interview → hire</div><div class="d">Message, schedule, and move through the pipeline.</div></div>
+    </div>
+  </section>
+
+  <section>
+    <p class="eyebrow">How to access it</p>
+    <h2>Seeing it for yourself</h2>
+    <div class="access">
+      <div class="panel now">
+        <span class="pill live"><span class="dot"></span>Live now</span>
+        <h3>Try the AI matcher</h3>
+        <p>The matching engine is up and running. Give it a few resumes and a job posting and watch it rank and explain.</p>
+        <ol class="steps">
+          <li>Open the link below in any browser.</li>
+          <li>Sign in with the username and password (ask us for the password).</li>
+          <li>Paste a job description, then upload a few resumes (PDF or Word).</li>
+          <li>Run it — see each candidate scored, ranked, and explained.</li>
+        </ol>
+        <div class="kv">
+          <span><span class="lbl">Link&nbsp;&nbsp;</span>https://schulich.edufund.ca:8443</span>
+          <span><span class="lbl">User&nbsp;&nbsp;</span>admin</span>
+          <span><span class="lbl">Pass&nbsp;&nbsp;</span>ask us — we'll share it privately</span>
+        </div>
+        <p class="note">Early demo: up to 10 resumes at a time, about 5 runs a day. Please use sample resumes — don't upload anyone's confidential information. (The <code>:8443</code> in the link is normal.)</p>
+      </div>
+      <div class="panel soon">
+        <span class="pill pending"><span class="dot"></span>Switching on soon</span>
+        <h3>The full platform</h3>
+        <p>Everything else — job postings, applications, warm intros, mentorship, alumni, references, and the coordinator dashboards — is <strong>finished and already deployed to the server</strong>. It's held behind a single switch that's deliberately off for one reason:</p>
+        <p>Turning it on means collecting real people's personal information — including who knows whom. We're finishing the privacy and data-protection sign-off first (the standard review for handling student data). Once that's cleared, it's one switch to turn the whole experience on.</p>
+        <p class="note">Want to click through the full experience sooner? We can stand up a separate sample-data demo — no real information involved.</p>
+      </div>
+    </div>
+  </section>
+
+  <section>
+    <p class="eyebrow">What we did this round</p>
+    <h2>The latest work, in plain terms</h2>
+    <p>This round closed the gap between “looks done” and “is genuinely ready for real people”:</p>
+    <ul class="did">
+      <li><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="M20 6 9 17l-5-5"/></svg><span><b>Finished the relationship features</b> — mentorship, alumni, verified references, event check-ins, and the coordinator relationship dashboard.</span></li>
+      <li><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="M20 6 9 17l-5-5"/></svg><span><b>Made every privacy promise real</b> — consent that actually removes data, true one-click account deletion, and fairness reports that can't be quietly gamed.</span></li>
+      <li><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="M20 6 9 17l-5-5"/></svg><span><b>Hardened it and had it independently reviewed</b> — a thorough adversarial security &amp; privacy pass, with every real issue found and fixed.</span></li>
+      <li><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="M20 6 9 17l-5-5"/></svg><span><b>Deployed safely</b> — the system now backs up its database automatically before every update, so upgrades can't lose anyone's data. 700+ automated checks pass.</span></li>
+    </ul>
+  </section>
+
+  <section>
+    <p class="eyebrow">What's next</p>
+    <h2>The road from here</h2>
+    <ul class="tl">
+      <li class="done"><div class="th">Built &amp; deployed</div><div class="td">The full platform and all relationship features are done and live on the server — switched off.</div></li>
+      <li><div class="th">Privacy &amp; data-protection sign-off</div><div class="td">Complete the standard review for handling real student data. This is the one gate before the switch flips.</div></li>
+      <li><div class="th">Turn it on for a pilot</div><div class="td">Flip the switch for a first real group, with the career centre involved.</div></li>
+      <li><div class="th">(Optional) a sample-data demo site</div><div class="td">So partners can click the full experience anytime, with no real information at stake.</div></li>
+    </ul>
+  </section>
+
+  <footer>
+    <p><strong>A note on the demo.</strong> This is early, working software shared for feedback. The live matcher sends resume text to an AI service to do its analysis, so please use sample data — don't upload confidential resumes. The full platform stays off until the privacy review is complete.</p>
+    <p>Questions, or want a live walkthrough? Just ask — happy to screen-share it end to end.</p>
+  </footer>
+
+</div>
+</body>
+</html>
