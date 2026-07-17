@@ -11,9 +11,17 @@ from resume_matcher.matching.taxonomy import normalize_skills
 
 @pytest.fixture(autouse=True)
 def _isolate_accounts_db(tmp_path, monkeypatch):
-    """Point the accounts SQLite DB at a per-test temp file so the suite never writes to the repo and
-    each test gets a fresh, isolated accounts store."""
+    """Point BOTH SQLite planes at per-test temp files so the suite never writes to the repo and each
+    test gets a fresh, isolated store.
+
+    RM_ACCOUNTS_DB covers the scoring plane: `platform_db_path()` falls back to it. The audit plane
+    needs its own var — `audit_db_path()` reads only RM_AUDIT_DB and otherwise lands on the repo's
+    `data/audit.db`. That leak is not merely untidy: Phase-5 A8 pins reports as snapshots in the
+    audit plane, so an un-isolated run can serve a snapshot a PREVIOUS test wrote and pass on stale
+    data. Both planes stay physically separate (boundary #2) — separate files, just under tmp_path.
+    """
     monkeypatch.setenv("RM_ACCOUNTS_DB", str(tmp_path / "accounts.db"))
+    monkeypatch.setenv("RM_AUDIT_DB", str(tmp_path / "audit.db"))
 
 
 def finish_demo_run(client, response, timeout: float = 30.0):

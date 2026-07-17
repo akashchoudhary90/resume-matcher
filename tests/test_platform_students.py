@@ -14,7 +14,9 @@ from resume_matcher import notify  # noqa: E402
 from resume_matcher.api.accounts import get_account_store  # noqa: E402
 from resume_matcher.api.app import create_app  # noqa: E402
 from resume_matcher.stores.db import connect  # noqa: E402
-from resume_matcher.stores.students import StudentStore  # noqa: E402
+from resume_matcher.stores.students import (  # noqa: E402
+    ApplicationStore, StudentError, StudentStore,
+)
 
 JD = """Python Developer Intern
 
@@ -225,3 +227,88 @@ def test_notifications_fire_when_configured(platform, monkeypatch):
 def test_notify_noop_without_smtp(monkeypatch):
     monkeypatch.delenv("RM_SMTP_HOST", raising=False)
     assert notify.send("x@y.z", "s", "b") is False      # silent no-op, no exception
+
+
+# ---- Phase 5 S1: withdrawal (B7), consent filter (A7), alumni helpers (C4) -------------------------
+def _mk_user(conn, uid, email, school_id=1):
+    conn.execute("INSERT INTO users(id, email, pw_hash, salt, created_at, school_id) "
+                 "VALUES(?,?,?,?,0,?)", (uid, email, "h", "s", school_id))
+
+
+def test_withdraw_transition_matrix():
+    store = ApplicationStore()
+    # withdrawable from every non-terminal stage; 'withdrawn' itself is terminal
+    for start in ("applied", "shortlisted", "advanced"):
+        app_id = store.apply(f"p-{start}", 7, None)
+        if start != "applied":
+            store.set_status(app_id, start)
+        assert store.withdraw(app_id, 7)["status"] == "withdrawn"
+        with pytest.raises(StudentError):
+            store.withdraw(app_id, 7)             # already terminal
+        with pytest.raises(StudentError):
+            store.set_status(app_id, "hired")     # nothing leaves 'withdrawn'
+    app_id = store.apply("p-hired", 7, None)
+    store.set_status(app_id, "shortlisted")
+    store.set_status(app_id, "hired")
+    with pytest.raises(StudentError):
+        store.withdraw(app_id, 7)                 # terminal outcomes aren't withdrawable
+
+
+def test_withdraw_is_owner_only_and_never_via_set_status():
+    store = ApplicationStore()
+    app_id = store.apply("p1", 7, None)
+    with pytest.raises(StudentError):
+        store.withdraw(app_id, 8)                 # not the owner -> looks absent
+    with pytest.raises(StudentError):
+        store.set_status(app_id, "withdrawn")     # employers can't withdraw for a student (B7)
+    assert store.get(app_id)["status"] == "applied"
+
+
+def test_for_posting_excludes_withdrawn_by_default():
+    store = ApplicationStore()
+    with closing(connect()) as conn:
+        _mk_user(conn, 7, "s7@york.ca")
+        _mk_user(conn, 8, "s8@york.ca")
+        conn.commit()
+    keep = store.apply("p1", 7, None)
+    gone = store.apply("p1", 8, None)
+    store.withdraw(gone, 8)
+    assert [a["id"] for a in store.for_posting("p1")] == [keep]
+    both = {a["id"]: a["status"] for a in store.for_posting("p1", include_withdrawn=True)}
+    assert both == {keep: "applied", gone: "withdrawn"}
+
+
+def test_filter_by_consent_preserves_order_and_scopes_purpose():
+    store = StudentStore()
+    for uid in (3, 1):
+        store.set_consent(uid, "network_analytics", True)
+    store.set_consent(9, "warm_intro", True)      # different purpose -> filtered out
+    assert store.filter_by_consent([9, 3, 1, 4], "network_analytics") == [3, 1]
+    assert store.filter_by_consent([], "network_analytics") == []
+
+
+def test_alumni_helpers_school_scoped_and_queue_has_no_grad_year():
+    store = StudentStore()
+    with closing(connect()) as conn:
+        _mk_user(conn, 21, "alum@york.ca", school_id=1)
+        _mk_user(conn, 22, "other@uoft.ca", school_id=2)
+        conn.commit()
+    store.upsert_profile(21, program="CS", grad_year=2020)  # grad_year lives on the profile only
+    with pytest.raises(StudentError):
+        store.set_alumni_status(21, 2, "self_claimed")      # cross-tenant id looks absent (D13)
+    with pytest.raises(StudentError):
+        store.set_alumni_status(21, 1, "emeritus")          # unknown status refused
+    store.set_alumni_status(21, 1, "self_claimed")
+    queue = store.alumni_queue(1)
+    assert [(q["user_id"], q["email"], q["program"]) for q in queue] \
+        == [(21, "alum@york.ca", "CS")]
+    assert all("grad_year" not in q for q in queue)         # privacy F2: never surfaced
+    assert store.alumni_queue(2) == []
+    store.set_alumni_status(21, 1, "verified", attested_by=99)
+    assert store.alumni_queue(1) == []
+    with closing(connect()) as conn:
+        n = conn.execute("SELECT COUNT(*) FROM events WHERE action='alumni_verified' "
+                         "AND actor_user_id=99 AND entity='user' AND entity_id='21'").fetchone()[0]
+        assert n == 1
+        assert conn.execute("SELECT alumni_status FROM users WHERE id=21").fetchone()[0] \
+            == "verified"

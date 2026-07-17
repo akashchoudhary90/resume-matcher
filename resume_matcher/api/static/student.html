@@ -39,6 +39,20 @@
   .why td { font-size:12.5px; } .quote { color:var(--muted); font-style:italic; }
   .hidden { display:none !important; }
   a { color:var(--accent); }
+  .chip { font-size:11.5px; padding:1px 7px; border-radius:999px; border:1px solid var(--line);
+          color:var(--muted); }
+  .chip.ok { color:var(--green); border-color:var(--green); }
+  .chip.warn { color:var(--amber); border-color:var(--amber); }
+
+  /* notification bell (B4) — the feed is a dropdown, not a page: it points at cards, never at data */
+  .bell { position:relative; }
+  #bellCount { background:var(--red); color:#fff; border-radius:999px; padding:0 5px; font-size:11px; }
+  #bellFeed { position:absolute; right:0; top:34px; width:330px; max-height:60vh; overflow-y:auto;
+              background:var(--panel2); border:1px solid var(--line); border-radius:8px;
+              padding:8px; z-index:20; text-align:left; }
+  #bellFeed .n { padding:7px 4px; border-bottom:1px solid var(--line); cursor:pointer; }
+  #bellFeed .n.unread { border-left:2px solid var(--accent); padding-left:8px; }
+  .landing { border:1px solid var(--accent); }
 
   /* mobile (Slice U): stack panes, wrap rows, scrollable tables, touch targets */
   @media (max-width: 900px) {
@@ -60,9 +74,26 @@
   <span class="muted">your profile, live postings, and the roles that fit you</span>
   <div class="spacer"></div>
   <span id="who" class="muted"></span>
+  <div class="bell">
+    <button id="bellBtn" class="ghost hidden">Notifications <span id="bellCount" class="hidden"></span></button>
+    <div id="bellFeed" class="hidden"></div>
+  </div>
   <button id="signoutBtn" class="ghost hidden">Sign out</button>
 </header>
 <main>
+
+  <!-- Landing panels for the two capability links (D15/D10). Both are hash params, never query
+       params: a claim id and an invite token are capabilities, and the fragment is the one part of
+       a URL that browsers keep out of Referer headers and server logs. -->
+  <section class="card landing hidden" id="affilConfirmCard">
+    <h2>Confirm a classmate's claim</h2>
+    <div id="affilConfirmBody" class="muted"></div>
+  </section>
+
+  <section class="card landing hidden" id="vouchInviteCard">
+    <h2>Someone asked you for a reference</h2>
+    <div id="vouchInviteBody" class="muted"></div>
+  </section>
 
   <section class="card" id="authCard">
     <h2>Sign in or create a student account</h2>
@@ -84,6 +115,14 @@
         <select id="visibility"><option value="1">Yes</option><option value="0">No</option></select></div>
       <div style="flex:0 0 auto"><button id="saveProfileBtn" class="ghost">Save profile</button></div>
     </div>
+    <!-- C4: no grad-year field anywhere near this (P-F2 — it is an age proxy). The coordinator
+         checks graduation records against SIS by email, out of band; the claim carries nothing. -->
+    <div class="row" style="margin-top:12px">
+      <div class="muted" id="alumniMsg">Graduated already? Alumni can offer to mentor current
+        students. A coordinator checks the record before anything changes.</div>
+      <div style="flex:0 0 auto"><span id="alumniChip" class="chip hidden"></span>
+        <button id="alumniBtn" class="ghost">I'm an alum</button></div>
+    </div>
     <div style="margin-top:12px" id="consents"></div>
     <div class="row" style="margin-top:12px">
       <div><label>Resume (.pdf .docx .txt) — contact details are redacted before any scoring</label>
@@ -102,7 +141,32 @@
 
   <section class="card hidden" id="browseCard">
     <h2>Live postings</h2>
-    <table id="browseTable"><thead><tr><th>Title</th><th>Employer</th><th>Type</th><th>Pay</th><th>Apply by</th><th></th></tr></thead><tbody></tbody></table>
+    <div class="row">
+      <div><label>Keyword</label><input id="bqQ" placeholder="title, description, or employer" /></div>
+      <div><label>Employment type</label><select id="bqType">
+        <option value="">any</option><option value="full_time">full time</option>
+        <option value="part_time">part time</option><option value="internship">internship</option>
+        <option value="co_op">co-op</option><option value="contract">contract</option>
+        <option value="new_grad">new grad</option><option value="work_study">work study</option>
+      </select></div>
+      <div><label>Work mode</label><select id="bqMode">
+        <option value="">any</option><option value="onsite">onsite</option>
+        <option value="hybrid">hybrid</option><option value="remote">remote</option>
+      </select></div>
+      <div><label>Min pay</label><input id="bqPay" type="number" min="0" step="1" /></div>
+      <div><label>Apply by on/after</label><input id="bqDeadline" type="date" /></div>
+      <div><label>Sort</label><select id="bqSort">
+        <option value="newest">newest</option><option value="deadline">deadline</option>
+        <option value="pay">pay</option></select></div>
+      <div style="flex:0 0 auto"><button id="bqGo" class="ghost">Search</button>
+        <button id="bqClear" class="ghost">Clear</button></div>
+    </div>
+    <table id="browseTable" style="margin-top:12px"><thead><tr><th>Title</th><th>Employer</th><th>Type</th><th>Pay</th><th>Apply by</th><th></th></tr></thead><tbody></tbody></table>
+    <div class="row" style="margin-top:10px">
+      <div class="muted" id="browseCount"></div>
+      <div style="flex:0 0 auto"><button id="bqPrev" class="ghost">Previous</button>
+        <button id="bqNext" class="ghost">Next</button></div>
+    </div>
   </section>
 
   <section class="card hidden" id="appsCard">
@@ -159,6 +223,75 @@
         <button id="deleteNetBtn" class="ghost">Delete my network</button></div>
     </div>
     <div class="muted" id="netMsg"></div>
+    <!-- B3 pointer: the people this link is for are the ones with no account and no other way in. -->
+    <div class="muted" style="margin-top:10px">Not a member, and someone uploaded contacts naming
+      you? <a href="/repudiate">Remove yourself from the network</a> — no account needed.</div>
+  </section>
+
+  <!-- C4 mentor panel: shown only to VERIFIED alumni (self-claimed is not standing). The gate here
+       is cosmetic — the routes re-check the attribute; this just avoids offering a dead form. -->
+  <section class="card hidden" id="mentorCard">
+    <h2>Mentoring <span class="muted">— you're a verified alum; you can offer to be someone's first
+      connection</span></h2>
+    <div class="row">
+      <div><label>Program you can speak to</label><input id="mtProgram" placeholder="e.g. Computer Science" /></div>
+      <div><label>Topics (shown to students you're matched with)</label>
+        <input id="mtTopics" maxlength="200" placeholder="e.g. backend interviews, first-job questions" /></div>
+      <div><label>How many at once</label><input id="mtCapacity" type="number" min="1" max="20" value="3" /></div>
+      <div><label>Active</label><select id="mtActive"><option value="1">Yes</option><option value="0">Paused</option></select></div>
+      <div style="flex:0 0 auto"><button id="mtSave" class="ghost">Save</button>
+        <button id="mtDelete" class="ghost">Opt out</button></div>
+    </div>
+    <div class="muted" id="mtMsg"></div>
+    <h2 style="margin-top:16px">Students matched to you</h2>
+    <div id="mentorOffers" class="muted"></div>
+  </section>
+
+  <!-- C6: a claim is self-disclosure and buys nothing on its own. The confirm LINK is the whole
+       mechanism (D15) — there is no directory of classmates to browse, by design. -->
+  <section class="card hidden" id="affilCard">
+    <h2>Classes &amp; clubs <span class="muted">— self-reported; a connection only exists once
+      someone who was there confirms you, and you confirm them</span></h2>
+    <div class="row">
+      <div><label>Kind</label><select id="afKind">
+        <option value="course_section">course section</option><option value="club">club</option>
+      </select></div>
+      <div><label>Label</label><input id="afLabel" placeholder="e.g. CSC369 or Robotics Club" /></div>
+      <div><label>Term (optional)</label><input id="afTerm" placeholder="e.g. W26" /></div>
+      <div><label>Your role — shown to others, self-reported</label><select id="afRole">
+        <option value="member">member</option><option value="ta">TA</option>
+        <option value="instructor">instructor</option><option value="exec">exec</option>
+      </select></div>
+      <div style="flex:0 0 auto"><button id="afAdd" class="ghost">Add claim</button></div>
+    </div>
+    <div class="err" id="afErr"></div>
+    <div id="affilList" style="margin-top:12px" class="muted"></div>
+  </section>
+
+  <!-- C7: invite-by-link. There is no member search anywhere in this app (D10) — you send your own
+       link to someone who already knows you. -->
+  <section class="card hidden" id="refCard">
+    <h2>Reference ledger <span class="muted">— ask someone who knows your work; send them the link
+      yourself</span></h2>
+    <div class="row">
+      <div><label>How do they know you? (optional)</label><select id="viHint">
+        <option value="">not specified</option>
+        <option value="worked_together">worked together</option>
+        <option value="managed_them">managed me</option>
+        <option value="ta_instructor">TA / instructor</option>
+        <option value="classmate">classmate</option>
+        <option value="mentored_them">mentored me</option>
+        <option value="other">other</option>
+      </select></div>
+      <div style="flex:0 0 auto"><button id="viCreate" class="ghost">Create invite link</button></div>
+    </div>
+    <div class="muted" id="viMsg"></div>
+    <div class="row" style="margin-top:10px">
+      <div><label>Changed your mind? Paste a link back to revoke it — we only ever stored its
+        fingerprint, so you are the one holding it</label><input id="viRevoke" /></div>
+      <div style="flex:0 0 auto"><button id="viRevokeBtn" class="ghost">Revoke</button></div>
+    </div>
+    <div id="viList" class="muted" style="margin-top:10px"></div>
   </section>
 
   <section class="card hidden" id="introInboxCard">
@@ -181,6 +314,16 @@ const api = async (url, opts={}) => {
   if (!r.ok) throw Object.assign(new Error(body.detail || r.statusText), {status:r.status});
   return body;
 };
+// Text the STORE already HTML-escaped at write (phase5._safe_text: affiliation label_display/term).
+// A plain esc() on top of that double-encodes: a club called "R&D" renders as "R&amp;D" and
+// "O'Brien Society" as "O&#x27;Brien Society". Decode exactly once, then escape — the textarea
+// parses its content as RCDATA, so a payload in there creates no element and fires no handler, and
+// the net result is one level of escaping no matter what the store did (or stops doing).
+const escStored = s => {
+  const t = document.createElement('textarea');
+  t.innerHTML = String(s ?? '');
+  return esc(t.value);
+};
 const CONSENT_LABELS = {
   resume_storage: 'Store my resume so I can apply and be matched',
   profile_matching: 'Include me in employer match rankings',
@@ -188,14 +331,18 @@ const CONSENT_LABELS = {
   contact: 'Share my email with employers I applied to',
 };
 
+let ME = null;
 async function refreshAuth() {
   const me = (await api('/api/account/me').catch(()=>({user:null}))).user;
+  ME = me;
   const ok = me && me.role === 'student';
   $('#authCard').classList.toggle('hidden', !!ok);
   for (const id of ['profileCard','matchesCard','browseCard','appsCard','eventsCard',
-                    'interviewsCard','selfIdCard','networkCard','introInboxCard','vouchCard'])
+                    'interviewsCard','selfIdCard','networkCard','introInboxCard','vouchCard',
+                    'affilCard','refCard'])
     $('#'+id).classList.toggle('hidden', !ok);
   $('#signoutBtn').classList.toggle('hidden', !ok);
+  $('#bellBtn').classList.toggle('hidden', !ok);
   $('#who').textContent = me ? `${me.email} (${me.role})` : '';
   if (me && !ok) $('#authErr').textContent = 'This page is for student accounts — you are signed in as ' + me.role + '.';
   if (ok) loadAll();
@@ -230,9 +377,127 @@ async function loadAll() {
     if (p) await api('/api/students/me/consents', {method:'POST', body: JSON.stringify({purpose:p, granted:e.target.checked})}).catch(err => alert(err.message));
     loadAll();
   };
+  renderAlumni(ME && ME.alumni_status);
   loadMatches(); loadBrowse(); loadApps(); loadEvents(); loadInterviews();
   loadGraphConsents(); loadIntroInbox(); loadVouches();
+  loadAffiliations(); loadInvites(); loadLandings(); startBell();
 }
+
+// ---- B4: notification bell ----------------------------------------------------------------------
+// Notification titles/bodies are server-composed, but they quote employer free text (posting titles),
+// so every one of them goes through esc() — "the server wrote it" is not the same as "the server
+// authored it" (security L1). The feed deep-links by ENTITY only: it points at the card that owns
+// the thing, and never carries data the card wouldn't already show you.
+const ENTITY_CARD = {application:'appsCard', vouch:'vouchCard', mentorship_offer:'mentorCard',
+                     intro:'introInboxCard', affiliation:'affilCard', posting:'browseCard'};
+let BELL_TIMER = null;
+
+function startBell() {
+  pollBell();
+  if (BELL_TIMER === null) BELL_TIMER = setInterval(pollBell, 60000);
+}
+async function pollBell() {
+  const d = await api('/api/notifications?unread=1').catch(()=>null);
+  if (!d) return;
+  const n = d.unread || 0;
+  $('#bellCount').textContent = n > 99 ? '99+' : String(n);
+  $('#bellCount').classList.toggle('hidden', n === 0);
+}
+async function renderBell() {
+  const d = await api('/api/notifications').catch(()=>({items:[]}));
+  $('#bellFeed').innerHTML = (d.items.length ? d.items.map(n => `
+    <div class="n ${n.read_at ? '' : 'unread'}" data-entity="${esc(n.entity || '')}">
+      <b>${esc(n.title)}</b>
+      ${n.body ? `<div class="muted">${esc(n.body)}</div>` : ''}
+      <div class="muted">${new Date(n.created_at*1000).toLocaleString()}</div>
+    </div>`).join('') : '<div class="muted">Nothing new.</div>')
+    + '<div style="margin-top:8px"><button class="ghost" id="bellRead">Mark all read</button></div>';
+}
+$('#bellBtn').onclick = async () => {
+  const feed = $('#bellFeed');
+  if (!feed.classList.contains('hidden')) { feed.classList.add('hidden'); return; }
+  await renderBell();
+  feed.classList.remove('hidden');
+};
+$('#bellFeed').onclick = async e => {
+  if (e.target.id === 'bellRead') {
+    await api('/api/notifications/read', {method:'POST', body: JSON.stringify({all:true})})
+      .catch(err=>alert(err.message));
+    await renderBell(); pollBell();
+    return;
+  }
+  const row = e.target.closest('.n');
+  if (!row) return;
+  const card = ENTITY_CARD[row.dataset.entity];
+  $('#bellFeed').classList.add('hidden');
+  if (card && !$('#'+card).classList.contains('hidden'))
+    $('#'+card).scrollIntoView({behavior:'smooth', block:'start'});
+};
+
+// ---- C4: alumni claim ----------------------------------------------------------------------------
+// A claim is a request to be checked, not a status: only a coordinator (against SIS, by email, out
+// of band) can move anyone to 'verified' (SC-C2). No grad year is asked for here or anywhere —
+// it is an age proxy, and the cheapest way to keep it out of the scoring plane is to never hold it.
+const ALUMNI_LABEL = {self_claimed:'alum claim under review', verified:'verified alum'};
+function renderAlumni(status) {
+  const s = status || 'none';
+  const chip = $('#alumniChip');
+  chip.textContent = ALUMNI_LABEL[s] || '';
+  chip.className = 'chip ' + ({self_claimed:'warn', verified:'ok'}[s] || '')
+                 + (ALUMNI_LABEL[s] ? '' : ' hidden');
+  $('#alumniBtn').classList.toggle('hidden', s !== 'none');
+  $('#mentorCard').classList.toggle('hidden', s !== 'verified');
+  if (s === 'verified') loadMentorOffers();
+}
+$('#alumniBtn').onclick = async () => {
+  try {
+    const r = await api('/api/alumni/claim', {method:'POST'});
+    renderAlumni(r.alumni_status);
+    $('#alumniMsg').textContent = 'Sent — a coordinator checks the graduation record before this '
+      + 'changes anything. Nothing about your account changes in the meantime.';
+  } catch (e) { $('#alumniMsg').textContent = e.message; }
+};
+
+// ---- C4: mentor panel (verified alumni only) -----------------------------------------------------
+// The form is write-only: there is no GET /api/mentorship/profile in the Phase-5 surface, so we
+// upsert rather than prefill. PUT is idempotent, so re-saving is the read.
+$('#mtSave').onclick = async () => {
+  $('#mtMsg').textContent = '';
+  try {
+    await api('/api/mentorship/profile', {method:'PUT', body: JSON.stringify({
+      program: $('#mtProgram').value, topics: $('#mtTopics').value,
+      capacity: +$('#mtCapacity').value || 3, active: $('#mtActive').value === '1'})});
+    $('#mtMsg').textContent = 'Saved. Students are proposed to you — nobody is connected to you '
+      + 'until you accept, and declining tells them nothing.';
+  } catch (e) { $('#mtMsg').textContent = e.message; }
+};
+$('#mtDelete').onclick = async () => {
+  if (!confirm('Opt out of mentoring? Your mentor profile is deleted — deleting it IS the opt-out.'))
+    return;
+  await api('/api/mentorship/profile', {method:'DELETE'}).catch(err=>alert(err.message));
+  $('#mtMsg').textContent = 'Opted out — your mentor profile is gone.';
+  loadMentorOffers();
+};
+async function loadMentorOffers() {
+  const rows = (await api('/api/mentorship/offers').catch(()=>({offers:[]}))).offers;
+  $('#mentorOffers').innerHTML = rows.length ? rows.map(o => `
+    <div style="border-bottom:1px solid var(--line); padding:8px 0">
+      <b>${esc(o.student_email)}</b>${o.program ? ` <span class="muted">· ${esc(o.program)}</span>` : ''}
+      ${o.rationale ? `<div class="quote">${esc(o.rationale)}</div>` : ''}
+      <div style="margin-top:6px"><button data-moa="${esc(o.id)}">Accept</button>
+        <button class="ghost" data-mod="${esc(o.id)}">Decline</button></div>
+    </div>`).join('') : 'No students are waiting on you right now.';
+}
+$('#mentorOffers').onclick = async e => {
+  const acc = e.target.dataset.moa, dec = e.target.dataset.mod;
+  if (!acc && !dec) return;
+  // D8: a decline is silent — nobody is told, no coordinator surface shows it, and this UI says
+  // nothing about "letting them know" because nothing is sent.
+  if (dec && !confirm('Decline this match? Nobody is told either way.')) return;
+  await api(`/api/mentorship/offers/${acc || dec}/respond`,
+            {method:'POST', body: JSON.stringify({accept: !!acc})}).catch(err=>alert(err.message));
+  loadMentorOffers();
+};
 
 const GRAPH_CONSENT_LABELS = {
   contacts_upload: 'Let me upload my own contacts export',
@@ -309,11 +574,181 @@ async function loadIntroInbox() {
   };
 }
 
+// ---- C6: classes & clubs ------------------------------------------------------------------------
+// There is no classmate directory to browse and no "request confirmation" broadcast (P-F1): you
+// copy YOUR OWN confirm link and hand it to someone who was actually there (D15). An unconfirmed
+// claim shows you nothing about anyone — the claimant list 404s until you are confirmed yourself.
+// label_display/term come back HTML-escaped from the store, so they render through escStored().
+async function loadAffiliations() {
+  const rows = (await api('/api/affiliations/mine').catch(()=>({claims:[]}))).claims;
+  $('#affilList').innerHTML = rows.length ? rows.map(c => `
+    <div style="border-bottom:1px solid var(--line); padding:8px 0">
+      <b>${escStored(c.label_display)}</b>
+      <span class="muted">${esc(c.kind)}${c.term ? ' · ' + escStored(c.term) : ''} · ${esc(c.claim_role)}</span>
+      <span class="chip ${c.status === 'confirmed' ? 'ok' : 'warn'}">${esc(c.status)}</span>
+      <div class="muted">${c.status === 'confirmed'
+        ? 'Confirmed — this can now connect you to others confirmed here.'
+        : (c.confirmed_by
+            ? 'Someone attested you. It counts once you confirm one of them back.'
+            : 'Nobody has confirmed you yet — send your confirm link to someone who was there.')}</div>
+      <div style="margin-top:6px">
+        <button class="ghost" data-afcopy="${esc(c.confirm_url)}">Copy confirm link</button>
+        ${c.status === 'confirmed'
+          ? `<button class="ghost" data-afwho="${esc(c.affiliation_id)}">Who else is confirmed</button>` : ''}
+        <button class="ghost" data-afdel="${esc(c.claim_id)}">Remove</button>
+      </div>
+      <div class="muted" id="afwho-${esc(c.affiliation_id)}"></div>
+    </div>`).join('') : 'No class or club claims yet.';
+}
+$('#afAdd').onclick = async () => {
+  $('#afErr').textContent = '';
+  try {
+    await api('/api/affiliations/claim', {method:'POST', body: JSON.stringify({
+      kind: $('#afKind').value, label: $('#afLabel').value, term: $('#afTerm').value,
+      claim_role: $('#afRole').value})});
+    $('#afLabel').value = ''; $('#afTerm').value = '';
+    loadAffiliations();
+  } catch (e) { $('#afErr').textContent = e.message; }
+};
+async function copyLink(url, btn) {
+  try { await navigator.clipboard.writeText(url); btn.textContent = 'Copied'; }
+  catch (e) { prompt('Copy this link:', url); }   // clipboard needs a secure context; fall back
+}
+$('#affilList').onclick = async e => {
+  const copy = e.target.dataset.afcopy;
+  if (copy) { copyLink(location.origin + copy, e.target); return; }
+  const who = e.target.dataset.afwho;
+  if (who) {
+    const rows = (await api(`/api/affiliations/${encodeURIComponent(who)}/claimants`)
+                  .catch(()=>({claimants:[]}))).claimants;
+    // emails arrive masked unless you and they attested each other — the store decides that, not us
+    $('#afwho-' + who).innerHTML = rows.length
+      ? rows.map(m => `<div>${esc(m.email_masked)} <span class="muted">${esc(m.claim_role)}</span></div>`).join('')
+      : 'Nobody else is confirmed here yet.';
+    return;
+  }
+  const del = e.target.dataset.afdel;
+  if (del && confirm('Remove this claim? Any connections it created are deleted with it.')) {
+    await api(`/api/affiliations/claims/${encodeURIComponent(del)}`, {method:'DELETE'})
+      .catch(err=>alert(err.message));
+    loadAffiliations();
+  }
+};
+
+// ---- C7: reference ledger (invite-by-link) -------------------------------------------------------
+// The token is shown ONCE, at creation: only its sha256 is stored, so the list below can't re-serve
+// it and neither can a database read (D10/FL-L2). Revoking therefore takes the link back from you —
+// paste it in — because you are the only party who still holds it.
+$('#viCreate').onclick = async () => {
+  $('#viMsg').textContent = '';
+  try {
+    const r = await api('/api/vouches/invites', {method:'POST', body: JSON.stringify({
+      relationship_hint: $('#viHint').value || null})});
+    const url = location.origin + r.invite_url;
+    $('#viMsg').innerHTML = 'Send this to them yourself — it is shown once and expires '
+      + esc(new Date(r.expires_at*1000).toLocaleDateString()) + ': <code>' + esc(url) + '</code> '
+      + `<button class="ghost" data-vicopy="${esc(url)}">Copy</button>`;
+    loadInvites();
+  } catch (e) { $('#viMsg').textContent = e.message; }
+};
+$('#viMsg').onclick = e => {
+  const url = e.target.dataset.vicopy;
+  if (url) copyLink(url, e.target);
+};
+$('#viRevokeBtn').onclick = async () => {
+  const raw = $('#viRevoke').value.trim();
+  const token = raw.split('#vouch-invite=').pop().trim();
+  if (!token) { $('#viMsg').textContent = 'Paste the invite link you sent.'; return; }
+  const r = await api(`/api/vouches/invites/${encodeURIComponent(token)}`, {method:'DELETE'})
+    .catch(()=>({revoked:false}));
+  $('#viMsg').textContent = r.revoked ? 'That link is dead now.'
+    : 'Nothing to revoke — that link is already used, expired, or not one of yours.';
+  $('#viRevoke').value = '';
+  loadInvites();
+};
+async function loadInvites() {
+  const rows = (await api('/api/vouches/invites').catch(()=>({invites:[]}))).invites;
+  $('#viList').innerHTML = rows.length
+    ? '<b>Links you have out</b>' + rows.map(i => `
+      <div style="border-bottom:1px solid var(--line); padding:6px 0">
+        ${esc(i.relationship_hint || 'relationship not specified')}
+        <span class="muted">· sent ${new Date(i.created_at*1000).toLocaleDateString()}
+        · expires ${new Date(i.expires_at*1000).toLocaleDateString()}</span>
+      </div>`).join('')
+    : 'No open invite links.';
+}
+
+// ---- capability landings (#affil-confirm=, #vouch-invite=) ---------------------------------------
+function hashParam(name) {
+  const m = location.hash.match(new RegExp('[#&]' + name + '=([^&]+)'));
+  return m ? decodeURIComponent(m[1]) : '';
+}
+const REL_OPTIONS = ['worked_together','managed_them','ta_instructor','classmate','mentored_them',
+                     'other'];
+async function loadLandings() {
+  const claimId = hashParam('affil-confirm');
+  $('#affilConfirmCard').classList.toggle('hidden', !claimId);
+  if (claimId) {
+    $('#affilConfirmBody').innerHTML = `
+      <p>Someone gave you their class/club link so you can attest them. Confirm it only if you were
+      genuinely there with them — this is what mints the connection, and it runs both ways.</p>
+      <p>You need your own claim on the same class or club first (add it in “Classes &amp; clubs”
+      below). If you both start unconfirmed, this counts once they confirm you back.</p>
+      <button data-afconfirm="${esc(claimId)}">Confirm I was there with them</button>
+      <div class="err" id="afConfirmErr"></div>`;
+  }
+  const token = hashParam('vouch-invite');
+  $('#vouchInviteCard').classList.toggle('hidden', !token);
+  if (token) {
+    const inv = await api(`/api/vouches/invites/${encodeURIComponent(token)}`).catch(()=>null);
+    $('#vouchInviteBody').innerHTML = inv ? `
+      <p><b>${esc(inv.subject_email)}</b> asked you to say how you know their work${
+        inv.relationship_hint ? ` — they suggested: ${esc(inv.relationship_hint)}` : ''}.</p>
+      <p>Job-related facts only. Contact details are stripped before anything is stored, they can
+      read every word of it, and they can contest it. It is recorded as self-reported until a
+      coordinator says otherwise.</p>
+      <div class="row">
+        <div><label>How you know them</label><select id="viRel">${
+          REL_OPTIONS.map(r => `<option value="${esc(r)}">${esc(r.replace(/_/g, ' '))}</option>`).join('')
+        }</select></div>
+        <div><label>One line of job-related context</label>
+          <input id="viEvidence" maxlength="300" placeholder="e.g. built the payments service with them for two terms" /></div>
+        <div style="flex:0 0 auto"><button data-visubmit="${esc(token)}">Submit reference</button></div>
+      </div>
+      <div class="err" id="viSubmitErr"></div>`
+      : '<p>That invite link is no longer valid — it may have been used, revoked, or expired.</p>';
+  }
+}
+$('#affilConfirmBody').onclick = async e => {
+  const id = e.target.dataset.afconfirm;
+  if (!id) return;
+  try {
+    const r = await api(`/api/affiliations/claims/${encodeURIComponent(id)}/confirm`,
+                        {method:'POST'});
+    $('#affilConfirmBody').innerHTML = r.status === 'confirmed'
+      ? '<p>Confirmed — you are both attested for that class or club now.</p>'
+      : '<p>Recorded. It counts once they confirm you back, so send them your own confirm link.</p>';
+    loadAffiliations();
+  } catch (err) { $('#afConfirmErr').textContent = err.message; }
+};
+$('#vouchInviteBody').onclick = async e => {
+  const token = e.target.dataset.visubmit;
+  if (!token) return;
+  try {
+    await api(`/api/vouches/invites/${encodeURIComponent(token)}/submit`, {method:'POST',
+      body: JSON.stringify({relationship: $('#viRel').value, evidence: $('#viEvidence').value})});
+    $('#vouchInviteBody').innerHTML = '<p>Thank you — they can read it in their reference ledger.</p>';
+  } catch (err) { $('#viSubmitErr').textContent = err.message; }
+};
+
+const VOUCH_TIER = {self:'self-reported', employer_verified:'employer-verified',
+                    coordinator:'staff-verified', alumni_verified:'alum-verified'};
 async function loadVouches() {
   const rows = (await api('/api/vouches/about-me').catch(()=>({vouches:[]}))).vouches;
   $('#vouchList').innerHTML = rows.length ? rows.map(v => `
     <div style="border-bottom:1px solid var(--line); padding:6px 0">
-      <b>${esc(v.voucher_role)}</b> · ${esc(v.relationship || '—')} · ${esc(v.verify_level)}
+      <b>${esc(v.voucher_role)}</b> · ${esc(v.relationship || '—')}
+      · <span class="chip ${v.verify_level === 'self' ? '' : 'ok'}">${esc(VOUCH_TIER[v.verify_level] || v.verify_level)}</span>
       · <span class="status">${esc(v.status)}</span>
       ${v.evidence_redacted ? `<div class="quote">${esc(v.evidence_redacted)}</div>` : ''}
       ${v.status !== 'contested' ? `<button class="ghost" data-contest="${esc(v.id)}">Contest</button>` : ''}
@@ -377,21 +812,58 @@ function why(m) {
     <div class="muted" style="margin-top:6px">${esc(ex.summary || '')}${gaps ? ' · Gaps to close: ' + gaps : ''}</div>`;
 }
 
+// ---- B6: student posting search ------------------------------------------------------------------
+// The student branch of GET /api/postings is a search, so it answers {postings,total,page,page_size}
+// where the employer/coordinator branches still answer {postings}. Filter state lives in these
+// inputs and is serialized straight to query params — no client-side filtering, so the page count
+// is the server's count.
+let BROWSE_PAGE = 1;
+function browseParams() {
+  const p = new URLSearchParams();
+  const q = $('#bqQ').value.trim();
+  if (q) p.set('q', q);                                  // LIKE metacharacters are escaped server-side
+  if ($('#bqType').value) p.set('employment_type', $('#bqType').value);
+  if ($('#bqMode').value) p.set('work_mode', $('#bqMode').value);
+  if ($('#bqPay').value) p.set('pay_min', $('#bqPay').value);
+  if ($('#bqDeadline').value) p.set('deadline_after', $('#bqDeadline').value);
+  p.set('sort', $('#bqSort').value);
+  p.set('page', String(BROWSE_PAGE));
+  return p;
+}
 async function loadBrowse() {
-  const rows = (await api('/api/postings').catch(()=>({postings:[]}))).postings;
+  const data = await api('/api/postings?' + browseParams().toString())
+    .catch(()=>({postings:[], total:0, page:1, page_size:20}));
+  const rows = data.postings || [];
   $('#browseTable tbody').innerHTML = rows.map(p => `<tr>
     <td>${esc(p.title)}</td><td>${esc(p.org_name || '—')}</td><td>${esc(p.employment_type || '—')}</td>
     <td>${p.pay_min ? esc(`${p.pay_min}–${p.pay_max} ${p.pay_currency || ''}/${p.pay_period || ''}`) : '—'}</td>
     <td>${esc(p.apply_deadline || '—')}</td>
     <td><button data-apply="${esc(p.id)}">Apply</button></td></tr>`).join('')
-    || '<tr><td colspan="6" class="muted">No live postings right now.</td></tr>';
+    || '<tr><td colspan="6" class="muted">No live postings match those filters.</td></tr>';
+  const total = data.total ?? rows.length, page = data.page || 1, size = data.page_size || 20;
+  $('#browseCount').textContent = total
+    ? `${(page - 1) * size + 1}–${Math.min(total, page * size)} of ${total}` : '';
+  $('#bqPrev').disabled = page <= 1;
+  $('#bqNext').disabled = page * size >= total;
 }
+$('#bqGo').onclick = () => { BROWSE_PAGE = 1; loadBrowse(); };
+$('#bqQ').onkeydown = e => { if (e.key === 'Enter') { BROWSE_PAGE = 1; loadBrowse(); } };
+$('#bqClear').onclick = () => {
+  for (const id of ['bqQ','bqType','bqMode','bqPay','bqDeadline']) $('#'+id).value = '';
+  $('#bqSort').value = 'newest';
+  BROWSE_PAGE = 1; loadBrowse();
+};
+$('#bqPrev').onclick = () => { if (BROWSE_PAGE > 1) { BROWSE_PAGE--; loadBrowse(); } };
+$('#bqNext').onclick = () => { BROWSE_PAGE++; loadBrowse(); };
 document.body.addEventListener('click', async e => {
   const pid = e.target.dataset.apply;
   if (!pid) return;
   try { await api(`/api/postings/${pid}/apply`, {method:'POST', body:'{}'}); loadApps(); loadMatches(); }
   catch (err) { alert(err.message); }
 });
+// B7: withdrawal is terminal and student-owned. Nothing leaves 'withdrawn', so the row's actions go
+// with it — and no reason is ever asked for: a withdrawal is a fact, not a confession.
+const APP_TERMINAL = ['rejected', 'hired', 'withdrawn'];
 async function loadApps() {
   const rows = (await api('/api/students/me/applications').catch(()=>({applications:[]}))).applications;
   const unread = (await api('/api/messages/unread-count').catch(()=>({unread:0}))).unread;
@@ -399,10 +871,12 @@ async function loadApps() {
   $('#appsTable tbody').innerHTML = rows.map(a => `<tr>
     <td>${esc(a.title)}</td><td><span class="status">${esc(a.status)}</span>
       ${a.human_review_requested ? '<span class="muted">· human review requested</span>' : ''}</td>
-    <td>${a.human_review_requested ? '' :
+    <td>${a.human_review_requested || APP_TERMINAL.includes(a.status) ? '' :
       `<button class="ghost" data-hr="${esc(a.id)}">Request human review</button>`}
       <button class="ghost" data-msg="${esc(a.id)}">Messages</button>
-      <button class="ghost" data-intro="${esc(a.id)}" data-posting="${esc(a.posting_id)}">Warm intro</button></td></tr>
+      ${APP_TERMINAL.includes(a.status) ? '' :
+      `<button class="ghost" data-intro="${esc(a.id)}" data-posting="${esc(a.posting_id)}">Warm intro</button>
+       <button class="ghost" data-wd="${esc(a.id)}">Withdraw</button>`}</td></tr>
     <tr class="hidden" id="thread-${esc(a.id)}"><td colspan="3"></td></tr>`).join('')
     || '<tr><td colspan="3" class="muted">No applications yet.</td></tr>';
   $('#appsTable').onclick = async e => {
@@ -410,6 +884,12 @@ async function loadApps() {
     if (id) { await api(`/api/applications/${id}/request-human-review`, {method:'POST'}); loadApps(); }
     const mid = e.target.dataset.msg;
     if (mid) toggleThread(mid);
+    const wd = e.target.dataset.wd;
+    if (wd && confirm('Withdraw this application? This is final — the employer sees the status '
+                      + 'change, and you are not asked for a reason.')) {
+      await api(`/api/applications/${wd}/withdraw`, {method:'POST'}).catch(err=>alert(err.message));
+      loadApps();
+    }
     const introApp = e.target.dataset.intro, introPosting = e.target.dataset.posting;
     if (introApp) {
       const avail = await api(`/api/intros/available/${introPosting}`).catch(()=>({warm_intro_available:false}));

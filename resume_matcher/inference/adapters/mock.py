@@ -19,13 +19,9 @@ from ..schema import (
 import re
 
 from ..adapter import InferenceAdapter
-from ...matching.taxonomy import canonical_name, related_skills
+from ...matching.taxonomy import canonical_name, related_skills, surface_forms
 
 _SPAN_CONTEXT = 40  # chars of surrounding context quoted with the skill name
-
-
-def _surface_forms(skill_id: str) -> list[str]:
-    return [canonical_name(skill_id), skill_id.replace("_", " "), skill_id]
 
 
 def _find_span(text: str, skill_id: str) -> str | None:
@@ -34,8 +30,13 @@ def _find_span(text: str, skill_id: str) -> str | None:
     would (correctly) be down-graded by the ranker's named-is-not-demonstrated check.
 
     Matches use the SAME word boundaries as the taxonomy scanner — a naive substring search let the
-    one-letter skill "R" match inside "developer", which surfaced as phantom adjacency credit."""
-    for form in _surface_forms(skill_id):
+    one-letter skill "R" match inside "developer", which surfaced as phantom adjacency credit.
+
+    Surfaces come from the taxonomy's own alias-inclusive list (the one the ranker's bare-mention
+    check uses), not a canonical-name-only guess: a resume writing "JS" or "Postgres" demonstrates
+    the skill, and scoring it as a gap made the mock's floor a property of our synonym list rather
+    than of the candidate."""
+    for form in surface_forms(skill_id):
         # Skip one-letter surfaces (the taxonomy scanner's own precision guard): even with word
         # boundaries, "R" matches inside "R&D" / "R-squared" and poisons adjacency proposals.
         if not form or len(re.sub(r"[\W_]+", "", form)) < 2:

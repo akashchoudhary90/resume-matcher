@@ -40,6 +40,22 @@
   .flags { color:var(--amber); font-size:12.5px; margin:6px 0; }
   .hidden { display:none !important; }
   a { color:var(--accent); cursor:pointer; }
+  select { background:var(--panel2); border:1px solid var(--line); color:var(--text);
+           border-radius:6px; padding:7px 8px; font:inherit; max-width:100%; }
+  .tab { background:var(--panel2); color:var(--muted); border:1px solid var(--line); }
+  .tab.on { background:var(--accent); color:#06121f; }
+
+  /* notification bell (B4-lite) — server-composed titles, but posting/org text inside them is
+     employer free text, so every render still goes through esc(). */
+  .bell { position:relative; }
+  .badge { display:inline-block; min-width:16px; background:var(--red); color:#fff; border-radius:999px;
+           padding:0 5px; font-size:11px; font-weight:700; }
+  .notif-menu { position:absolute; right:0; top:38px; width:320px; max-height:60vh; overflow:auto;
+                background:var(--panel); border:1px solid var(--line); border-radius:10px;
+                padding:10px; z-index:30; box-shadow:0 8px 24px rgba(0,0,0,.4); }
+  .notif { border-bottom:1px solid var(--line); padding:7px 2px; font-size:12.5px; }
+  .notif.unread { border-left:2px solid var(--accent); padding-left:6px; }
+  .code { font:34px/1.3 ui-monospace,Consolas,monospace; letter-spacing:.14em; color:var(--accent); }
 
   /* mobile (Slice U): stack panes, wrap rows, scrollable tables, touch targets */
   @media (max-width: 900px) {
@@ -52,6 +68,8 @@
     .row { flex-wrap: wrap; } .row > div { flex: 1 1 100%; }
     table { display: block; overflow-x: auto; white-space: nowrap; }
     button { padding: 11px 16px; }
+    .notif-menu { width: 84vw; }
+    .code { font-size: 26px; }
   }
 </style>
 </head>
@@ -60,6 +78,14 @@
   <h1>Campus <span>Recruiting</span> — coordinator</h1>
   <span class="muted">approve employers and postings</span>
   <div class="spacer"></div>
+  <div class="bell hidden" id="bellWrap">
+    <button id="bellBtn" class="ghost">Alerts <span id="bellCount" class="badge hidden">0</span></button>
+    <div id="bellMenu" class="notif-menu hidden">
+      <div class="row" style="justify-content:space-between"><b>Notifications</b>
+        <a id="markReadLink">mark all read</a></div>
+      <div id="notifList"></div>
+    </div>
+  </div>
   <span id="who" class="muted"></span>
   <button id="signoutBtn" class="ghost hidden">Sign out</button>
 </header>
@@ -122,6 +148,72 @@
     <table id="coordEventsTable" style="margin-top:12px"><thead><tr><th>When</th><th>Event</th><th>Status</th><th>Registered</th><th></th></tr></thead><tbody></tbody></table>
   </section>
 
+  <section class="card hidden" id="codeCard">
+    <h2>Check-in code <span class="muted">— read it out or project it; attendees enter it on their
+      own device</span></h2>
+    <div class="code" id="codeValue"></div>
+    <div class="muted" style="margin-top:6px">The code is only a second factor: it works solely for
+      people already registered for this event, and generating a new one retires the old.</div>
+  </section>
+
+  <section class="card hidden" id="rosterCard">
+    <h2>Attendee roster <span class="muted">— check people in at the door (verified presence, not
+      an RSVP)</span></h2>
+    <table id="rosterTable"><thead><tr><th>Who</th><th>Role</th><th>Presence</th><th></th></tr></thead><tbody></tbody></table>
+    <div class="err" id="rosterErr"></div>
+  </section>
+
+  <section class="card hidden" id="healthCard">
+    <h2>Relationship health <span class="muted">— structural under-networking &amp; mentor
+      bridges</span></h2>
+    <div class="muted" id="mentorStats"></div>
+    <div class="row" style="margin-top:10px">
+      <button id="matchBtn" class="ghost">Run mentor matching</button>
+      <span class="muted">Structural trigger only: zero shareable connections. No self-ID
+        attribute is anywhere near this list.</span>
+    </div>
+    <h2 style="margin-top:16px">Under-networked students
+      <span class="muted">(<span id="underNetTotal">0</span>) — discoverable, consented to network
+      analytics, zero connections</span></h2>
+    <table id="underNetTable"><thead><tr><th>Student</th><th>Program</th><th>Connections</th>
+      <th>Mentor</th><th></th></tr></thead><tbody></tbody></table>
+    <div class="muted" style="margin-top:8px">Every read of this roster is access-logged. An offer
+      is a proposal to the mentor, not a match: whether they accept is theirs to know.</div>
+  </section>
+
+  <section class="card hidden" id="alumniCard">
+    <h2>Alumni verification <span class="muted">— check the email against your SIS records out of
+      band; this click is the attestation</span></h2>
+    <table id="alumniTable"><thead><tr><th>Claimant</th><th>Program</th><th></th></tr></thead><tbody></tbody></table>
+  </section>
+
+  <section class="card hidden" id="vouchCard">
+    <h2>Vouch review queue</h2>
+    <div class="row">
+      <button class="tab on" data-vouchtab="contested">Contested</button>
+      <button class="tab" data-vouchtab="self">Self-attested</button>
+    </div>
+    <table id="vouchTable" style="margin-top:10px"><thead><tr><th>Subject</th><th>Voucher</th>
+      <th>Relationship</th><th>Evidence</th><th></th></tr></thead><tbody></tbody></table>
+  </section>
+
+  <section class="card hidden" id="repudCard">
+    <h2>Removal requests <span class="muted">— people who are not members, named in someone else's
+      uploaded contacts</span></h2>
+    <table id="repudTable"><thead><tr><th>Asserted name</th><th>Company</th>
+      <th>What approval does</th><th>Requested</th><th></th></tr></thead><tbody></tbody></table>
+    <div class="muted" style="margin-top:8px">The requester is anonymous and unverified, so an
+      approval may never touch a member's own data — it only blocks future derivation and clears
+      matching employer-contact rows.</div>
+  </section>
+
+  <section class="card hidden" id="ermCard">
+    <h2>Employer engagement <span class="muted">— org-level counts only; no student appears
+      here</span></h2>
+    <table id="ermTable"><thead><tr><th>Organization</th><th>Link</th><th>Postings live/total</th>
+      <th>Applications</th><th>Hires</th><th>Events</th><th>Last activity</th><th></th></tr></thead><tbody></tbody></table>
+  </section>
+
   <section class="card hidden" id="reportsCard">
     <h2>Reports — selection funnel &amp; aggregate self-ID
       <a id="csvLink" href="/api/coordinator/reports/funnel?format=csv" download="funnel.csv" style="font-size:12.5px">download CSV</a></h2>
@@ -134,6 +226,11 @@
     <h2 style="margin-top:16px">Network coverage <span class="muted">— structural under-networking,
       the positive-action shut-off dashboard</span></h2>
     <div id="netCoverage" class="muted"></div>
+    <h2 style="margin-top:16px">Intro outcomes <span class="muted">— does a bridged intro convert
+      like an organic one?</span>
+      <a id="outcomesCsvLink" href="/api/coordinator/reports/intro-outcomes?format=csv"
+         download="intro-outcomes.csv" style="font-size:12.5px">download CSV</a></h2>
+    <div id="introOutcomes" class="muted"></div>
   </section>
 </main>
 
@@ -152,12 +249,13 @@ async function refreshAuth() {
   const me = (await api('/api/account/me').catch(()=>({user:null}))).user;
   const ok = me && (me.role === 'coordinator' || me.role === 'admin');
   $('#authCard').classList.toggle('hidden', !!ok);
-  for (const id of ['linksCard','queueCard','allCard','eventsCard','reportsCard'])
+  for (const id of ['linksCard','queueCard','allCard','eventsCard','reportsCard','healthCard',
+                    'alumniCard','vouchCard','repudCard','ermCard','bellWrap'])
     $('#'+id).classList.toggle('hidden', !ok);
   $('#signoutBtn').classList.toggle('hidden', !ok);
   $('#who').textContent = me ? `${me.email} (${me.role})` : '';
   if (me && !ok) $('#authErr').textContent = 'You are signed in as ' + me.role + ' — this page needs a coordinator account.';
-  if (ok) loadAll();
+  if (ok) { loadAll(); startBellPoll(); }
 }
 $('#loginBtn').onclick = async () => {
   $('#authErr').textContent = '';
@@ -186,11 +284,28 @@ async function loadAll() {
     || '<tr><td colspan="4" class="muted">No postings yet.</td></tr>';
 }
 document.body.addEventListener('click', e => {
-  if (e.target.dataset.open) openDetail(e.target.dataset.open);
-  if (e.target.dataset.approvelink) approveLink(e.target.dataset.approvelink);
+  const d = e.target.dataset;
+  if (d.open) openDetail(d.open);
+  if (d.approvelink) approveLink(d.approvelink);
+  if (d.revokelink) revokeLink(d.revokelink);
+  if (d.code) showCheckinCode(d.code);
+  if (d.roster) showRoster(d.roster);
+  if (d.checkin) rosterCheckin(d.checkin);
+  if (d.offer) offerMentor(d.offer, e.target.closest('tr').querySelector('select'));
+  if (d.alumni) verifyAlumni(d.alumni, d.approve === '1');
+  if (d.vouch) resolveVouch(d.vouch, d.action);
+  if (d.repud) decideRepudiation(d.repud, d.approve === '1');
+  if (d.vouchtab) { _vouchTab = d.vouchtab; loadVouches(); }
+  // the bell menu is the only thing that closes on an outside click
+  if (!e.target.closest('#bellWrap')) $('#bellMenu').classList.add('hidden');
 });
 async function approveLink(orgId) {
   try { await api(`/api/coordinator/org-links/${orgId}/approve`, {method:'POST'}); loadAll(); }
+  catch (e) { alert(e.message); }
+}
+async function revokeLink(orgId) {
+  if (!confirm('Revoke this employer\'s link to your school? Their postings stop being visible.')) return;
+  try { await api(`/api/coordinator/org-links/${orgId}/revoke`, {method:'POST'}); loadAll(); }
   catch (e) { alert(e.message); }
 }
 async function openDetail(pid) {
@@ -247,6 +362,8 @@ async function loadEvents() {
     <td><span class="status">${esc(e.status)}</span></td>
     <td>${e.registrations}</td>
     <td>${e.status === 'draft' ? `<button data-pub="${esc(e.id)}">Publish</button>` : ''}
+        ${e.status === 'published' ? `<button class="ghost" data-code="${esc(e.id)}">Check-in code</button>
+          <button class="ghost" data-roster="${esc(e.id)}">Roster</button>` : ''}
         ${e.status !== 'cancelled' ? `<button class="danger" data-cxl="${esc(e.id)}">Cancel</button>` : ''}</td>
     </tr>`).join('') || '<tr><td colspan="5" class="muted">No events yet.</td></tr>';
   $('#coordEventsTable').onclick = async e => {
@@ -259,6 +376,190 @@ async function loadEvents() {
     }
   };
 }
+
+// ---- C3: verified presence (check-in code + door roster) --------------------------------------------
+let _rosterEvent = null;
+async function showCheckinCode(eid) {
+  try {
+    const r = await api(`/api/events/${eid}/checkin-code`, {method:'POST'});
+    $('#codeValue').textContent = r.code;
+    $('#codeCard').classList.remove('hidden');
+    $('#codeCard').scrollIntoView({behavior:'smooth'});
+  } catch (e) { alert(e.message); }
+}
+async function showRoster(eid) {
+  _rosterEvent = eid;
+  const [reg, chk] = await Promise.all([
+    api(`/api/events/${eid}/attendees`).catch(()=>({attendees:[]})),
+    api(`/api/events/${eid}/checkins`).catch(()=>({checkins:[]})),
+  ]);
+  const present = new Map(chk.checkins.map(c => [c.user_id, c]));
+  $('#rosterErr').textContent = '';
+  $('#rosterTable tbody').innerHTML = reg.attendees.map(a => {
+    const c = present.get(a.user_id);
+    return `<tr><td>${esc(a.email)}</td>
+      <td>${esc(a.role)}${a.org_name ? ' <span class="muted">' + esc(a.org_name) + '</span>' : ''}</td>
+      <td>${c ? `<span class="status">checked in · ${esc(c.method)}</span>`
+              : '<span class="muted">registered only</span>'}</td>
+      <td>${c ? '' : `<button data-checkin="${a.user_id}">Check in</button>`}</td></tr>`;
+  }).join('') || '<tr><td colspan="4" class="muted">Nobody has registered for this event.</td></tr>';
+  $('#rosterCard').classList.remove('hidden');
+  $('#rosterCard').scrollIntoView({behavior:'smooth'});
+}
+async function rosterCheckin(userId) {
+  try {
+    await api(`/api/coordinator/events/${_rosterEvent}/checkins`,
+              {method:'POST', body: JSON.stringify({user_id: Number(userId)})});
+    showRoster(_rosterEvent);
+  } catch (e) { $('#rosterErr').textContent = e.message; }
+}
+
+// ---- C1: relationship health ------------------------------------------------------------------------
+async function loadHealth() {
+  // D8/privacy F9: aggregates are the ONLY mentorship telemetry here — a mentor's answer to any
+  // individual offer is deliberately absent from every coordinator surface.
+  const stats = await api('/api/coordinator/mentorship-stats').catch(()=>null);
+  if (stats) {
+    const cell = n => n == null ? `<span class="muted">n&lt;${stats.min_cell}</span>` : n;
+    $('#mentorStats').innerHTML = `Offers made: ${cell(stats.offers_made)} · accepted: ` +
+      `${cell(stats.accepted)} · active mentors: ${cell(stats.active_mentors)}` +
+      `<div class="muted">Aggregate counts, suppressed below ${stats.min_cell}. Whether a given
+       mentor accepted or declined is between them and the student.</div>`;
+  }
+  const mentors = (await api('/api/coordinator/mentors').catch(()=>({mentors:[]}))).mentors;
+  const options = mentors.map(m => `<option value="${m.user_id}">${esc(m.email)}` +
+    `${m.program ? ' — ' + esc(m.program) : ''} (${m.capacity_left} free)</option>`).join('');
+  const un = await api('/api/coordinator/under-networked').catch(()=>({students:[], total:0}));
+  $('#underNetTotal').textContent = un.total;
+  $('#underNetTable tbody').innerHTML = un.students.map(s => `<tr>
+      <td>${esc(s.email)}</td><td>${esc(s.program || '—')}</td><td>${s.degree}</td>
+      <td>${mentors.length ? `<select data-mentorsel="${s.user_id}">${options}</select>`
+                           : '<span class="muted">no eligible mentors</span>'}</td>
+      <td>${mentors.length ? `<button data-offer="${s.user_id}">Offer mentor</button>` : ''}</td>
+      </tr>`).join('')
+    || '<tr><td colspan="5" class="muted">Nobody in the consenting cohort is without connections.</td></tr>';
+}
+async function offerMentor(studentId, sel) {
+  if (!sel || !sel.value) return;
+  const cell = sel.closest('tr').lastElementChild;
+  try {
+    await api('/api/coordinator/mentorship-offers', {method:'POST', body: JSON.stringify(
+      {student_id: Number(studentId), mentor_id: Number(sel.value)})});
+    // Fire-and-forget by design (D8): "offered" is the last thing this page ever learns about it.
+    cell.innerHTML = '<span class="muted">offer sent to the mentor</span>';
+  } catch (e) { alert(e.message); }
+}
+$('#matchBtn').onclick = async () => {
+  try { await api('/api/coordinator/mentor-match', {method:'POST'});
+        alert('Mentor matching queued — offers go to mentors, who decide.'); }
+  catch (e) { alert(e.message); }
+};
+
+// ---- C4: alumni verification -------------------------------------------------------------------------
+async function loadAlumni() {
+  const claims = (await api('/api/coordinator/alumni').catch(()=>({claims:[]}))).claims;
+  $('#alumniTable tbody').innerHTML = claims.map(c => `<tr>
+      <td>${esc(c.email)}</td><td>${esc(c.program || '—')}</td>
+      <td><button data-alumni="${c.user_id}" data-approve="1">Verify</button>
+          <button class="ghost" data-alumni="${c.user_id}" data-approve="0">Deny</button></td>
+      </tr>`).join('')
+    || '<tr><td colspan="3" class="muted">No alumni claims awaiting verification.</td></tr>';
+}
+async function verifyAlumni(userId, approve) {
+  try {
+    await api(`/api/coordinator/alumni/${userId}/verify`,
+              {method:'POST', body: JSON.stringify({approve})});
+    loadAlumni(); loadHealth();
+  } catch (e) { alert(e.message); }
+}
+
+// ---- B10: vouch review queue -------------------------------------------------------------------------
+let _vouchTab = 'contested';
+async function loadVouches() {
+  for (const b of document.querySelectorAll('[data-vouchtab]'))
+    b.classList.toggle('on', b.dataset.vouchtab === _vouchTab);
+  const rows = (await api('/api/coordinator/vouches?status=' + encodeURIComponent(_vouchTab))
+                  .catch(()=>({vouches:[]}))).vouches;
+  $('#vouchTable tbody').innerHTML = rows.map(v => `<tr>
+      <td>${esc(v.subject_email)}</td><td>${esc(v.voucher_email)}</td>
+      <td>${esc(v.relationship)} <span class="muted">${esc(v.verify_level)}</span></td>
+      <td>${esc(v.evidence_redacted || '—')}
+        ${v.contested_note ? `<div class="flags">disputed: ${esc(v.contested_note)}</div>` : ''}</td>
+      <td><button data-vouch="${esc(v.id)}" data-action="verify">Verify</button>
+          <button class="danger" data-vouch="${esc(v.id)}" data-action="dismiss">Dismiss</button></td>
+      </tr>`).join('')
+    || `<tr><td colspan="5" class="muted">Nothing in this queue.</td></tr>`;
+}
+async function resolveVouch(vouchId, action) {
+  try { await api(`/api/vouches/${vouchId}/resolve`,
+                  {method:'POST', body: JSON.stringify({action})}); loadVouches(); }
+  catch (e) { alert(e.message); }
+}
+
+// ---- A1: repudiation review --------------------------------------------------------------------------
+// SH-H1: first/last/company are PUBLIC, unauthenticated input. They are capped + redact_text()'d at
+// ingest; esc() here is the second line — this card is where public text meets an admin session.
+async function loadRepudiations() {
+  const rows = (await api('/api/coordinator/repudiations').catch(()=>({requests:[]}))).requests;
+  $('#repudTable tbody').innerHTML = rows.map(r => `<tr>
+      <td>${esc([r.first, r.last].filter(Boolean).join(' ')) || '—'}</td>
+      <td>${esc(r.company || '—')}</td>
+      <td>${r.member_matched
+            ? '<span class="flags">matches an active member — approval will NOT touch their data; '
+              + 'they are notified to use their own controls instead.</span>'
+            : `blocks future derivation · matches ${r.contact_matches} employer-contact row(s)`}</td>
+      <td class="muted">${new Date(r.created_at*1000).toLocaleDateString()}</td>
+      <td><button data-repud="${esc(r.id)}" data-approve="1">Approve</button>
+          <button class="ghost" data-repud="${esc(r.id)}" data-approve="0">Deny</button></td>
+      </tr>`).join('')
+    || '<tr><td colspan="5" class="muted">No removal requests awaiting review.</td></tr>';
+}
+async function decideRepudiation(rid, approve) {
+  try { await api(`/api/coordinator/repudiations/${rid}/decide`,
+                  {method:'POST', body: JSON.stringify({approve})}); loadRepudiations(); }
+  catch (e) { alert(e.message); }
+}
+
+// ---- C5: employer engagement (ERM) -------------------------------------------------------------------
+async function loadOrgs() {
+  const orgs = (await api('/api/coordinator/orgs').catch(()=>({orgs:[]}))).orgs;
+  $('#ermTable tbody').innerHTML = orgs.map(o => `<tr>
+      <td>${esc(o.name)}</td><td><span class="status">${esc(o.link_status)}</span></td>
+      <td>${o.postings_live} / ${o.postings_total}</td><td>${o.applications}</td>
+      <td>${o.hires}</td><td>${o.events_attended}</td>
+      <td class="muted">${o.last_activity ? new Date(o.last_activity*1000).toLocaleDateString() : '—'}</td>
+      <td>${o.link_status === 'approved' ? `<button class="ghost" data-revokelink="${o.org_id}">Revoke link</button>`
+                                         : `<button data-approvelink="${o.org_id}">Approve</button>`}</td>
+      </tr>`).join('')
+    || '<tr><td colspan="8" class="muted">No employers linked to your school yet.</td></tr>';
+}
+
+// ---- B4-lite: notification bell ----------------------------------------------------------------------
+let _bellTimer = null;
+async function loadNotifications() {
+  const feed = await api('/api/notifications').catch(()=>null);
+  if (!feed) return;
+  $('#bellCount').textContent = feed.unread;
+  $('#bellCount').classList.toggle('hidden', !feed.unread);
+  $('#notifList').innerHTML = feed.items.map(n => `<div class="notif ${n.read_at ? '' : 'unread'}">
+      <b>${esc(n.title)}</b><div class="muted">${esc(n.body)}</div>
+      <div class="muted">${new Date(n.created_at*1000).toLocaleString()}</div></div>`).join('')
+    || '<div class="muted">Nothing yet.</div>';
+}
+function startBellPoll() {
+  if (_bellTimer) return;
+  loadNotifications();
+  _bellTimer = setInterval(loadNotifications, 60000);
+}
+$('#bellBtn').onclick = e => {
+  e.stopPropagation();
+  $('#bellMenu').classList.toggle('hidden');
+  loadNotifications();
+};
+$('#markReadLink').onclick = async () => {
+  try { await api('/api/notifications/read', {method:'POST', body: JSON.stringify({all:true})}); }
+  finally { loadNotifications(); }
+};
 
 // ---- reports ---------------------------------------------------------------------------------------
 async function loadReports() {
@@ -295,9 +596,35 @@ async function loadReports() {
       `students with an accepted intro: ${cov.students_with_accepted_intro}` +
       `<div class="muted">${esc(cov.note)}</div>`;
   }
+  const io = await api('/api/coordinator/reports/intro-outcomes').catch(()=>null);
+  if (io) {
+    // C2. Stage/origin keys are our own constants; only the broker edge kind comes from a row, and
+    // it still goes through esc(). Suppressed cells arrive as null and must read as suppressed —
+    // never as zero.
+    const stages = ['accepted','shortlisted','hired'];
+    const bo = io.by_origin, ratios = bo.bridged_over_organic;
+    const cell = c => `${c.n}${c.rate != null ? ` (${(c.rate*100).toFixed(1)}%)` : ''}`;
+    $('#introOutcomes').innerHTML =
+      '<table><thead><tr><th>Origin</th><th>Requested</th>' +
+      stages.map(s => `<th>${s}</th>`).join('') + '</tr></thead><tbody>' +
+      ['organic','bridged'].map(o => `<tr><td>${o}</td><td>${bo.by_origin[o].requested}</td>` +
+        stages.map(s => `<td>${cell(bo.by_origin[o].stages[s])}</td>`).join('') + '</tr>').join('') +
+      '<tr><td class="muted">bridged ÷ organic</td><td class="muted">—</td>' +
+      stages.map(s => `<td class="muted">${ratios[s].ratio ?? 'below threshold'}</td>`).join('') +
+      '</tr></tbody></table>' +
+      Object.entries(io.by_broker_kind).map(([kind, counts]) =>
+        `<div><b>${esc(kind)}</b> — ` + Object.entries(counts).map(([stage, n]) =>
+          `${esc(stage)}: ${n ?? 'n&lt;' + io.min_cell}`).join(' · ') + '</div>').join('') +
+      `<div class="muted">Aggregate only, every cell below n=${io.min_cell} suppressed, cohort
+       limited to students who granted network analytics.</div>`;
+  }
 }
 const _origLoadAll = loadAll;
-loadAll = async () => { await _origLoadAll(); loadEvents(); loadReports(); };
+loadAll = async () => {
+  await _origLoadAll();
+  loadEvents(); loadReports(); loadHealth(); loadAlumni(); loadVouches(); loadRepudiations();
+  loadOrgs();
+};
 
 refreshAuth();
 </script>

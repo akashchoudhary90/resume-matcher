@@ -10,7 +10,7 @@ from contextlib import closing
 import pytest
 
 from resume_matcher.stores import db as platform_db
-from resume_matcher.stores.data_planes import PROTECTED_KEYS
+from resume_matcher.stores.data_planes import PROTECTED_KEYS, ProtectedDataError, ScoringStore
 
 # Entity-name columns (a school's or org's name is not a person's name — the PROTECTED_KEYS
 # "name" proxy is about candidates). Anything else matching PROTECTED_KEYS fails the suite.
@@ -112,3 +112,13 @@ def test_no_protected_columns_in_scoring_plane(tmp_path):
                 if name in PROTECTED_KEYS and (table, name) not in _ALLOWED_NAME_COLUMNS:
                     offenders.append(f"{table}.{name}")
         assert not offenders, f"protected attribute/proxy column(s) in scoring plane: {offenders}"
+
+
+def test_assert_no_protected_blocks_alumni_status_and_grad_year_features():
+    """Phase 5 (privacy F2): alumni_status and grad_year are legitimate platform columns but may
+    never enter a scoring feature dict; graduation_year is a full protected proxy (no column
+    exists, and the schema scan above trips on any future one)."""
+    ScoringStore.assert_no_protected({"skills": 3, "years_experience": 2})  # benign features pass
+    for bad in ({"alumni_status": "verified"}, {"grad_year": 2020}, {"graduation_year": 2020}):
+        with pytest.raises(ProtectedDataError):
+            ScoringStore.assert_no_protected(bad)

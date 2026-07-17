@@ -28,7 +28,12 @@ def test_access_disparity_suppresses_small_denominator_and_reports_threshold():
     denom2 = {"a": 10, "b": 10}
     out2 = access_disparity({"a": 6}, denom2)
     assert out2["rates"]["b"]["note"] == "below reporting threshold"
-    assert out2["four_fifths_pass"] is None           # <2 comparable groups
+    # Phase 5 (A4): the suppressed group is BOUNDED, not unknown — b got at most 4/10 = 0.40, which
+    # cannot reach 0.8 * 0.60. The old None ("<2 comparable groups") let suppression hide a provable
+    # disparity behind an undecided verdict; it is now a FAIL wherever b's true rate sits.
+    assert out2["rates"]["b"]["rate_bound_upper"] == 0.4
+    assert out2["four_fifths_pass"] is False
+    assert "suppressed group cannot exceed 0.8 threshold — human review required" in out2["notes"]
 
 
 # ---- Slice AI: the network-feature scoring-plane guard (boundary #2 extended) ---------------------

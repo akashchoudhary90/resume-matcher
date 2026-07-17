@@ -130,10 +130,34 @@ def test_import_disabled_without_key(tmp_path, monkeypatch):
 
 
 def test_repudiation_tombstones_token(tmp_path, monkeypatch):
+    """Phase 5 (A1): the instant public `repudiate()` is gone — a non-member is tombstoned only
+    once a coordinator approves the queued review (the name path) or the requester proves control
+    of the address (the email path). The tombstone itself is unchanged."""
     monkeypatch.setenv("RM_ACCOUNTS_DB", str(tmp_path / "platform.db"))
     store = NetworkStore()
-    store.repudiate(1, first="Jane", last="Doe", company="Acme")
+    rid = store.create_repudiation(1, kind="name_review", first="Jane", last="Doe",
+                                   company="Acme")["request_id"]
     tok = graph_tokens.identity_token(1, first="Jane", last="Doe", company="Acme")[0]
+    with closing(connect()) as conn:   # queued only: nothing is suppressed before a decision
+        assert conn.execute("SELECT COUNT(*) FROM graph_suppressions").fetchone()[0] == 0
+    store.decide_repudiation(1, rid, coordinator_id=9, approve=True)
     with closing(connect()) as conn:
         assert conn.execute("SELECT COUNT(*) FROM graph_suppressions WHERE identity_token=?",
                             (tok,)).fetchone()[0] == 1
+
+
+def test_delete_my_network_clears_broker_blocks(tmp_path, monkeypatch):
+    """A17: the docstring promised EVERYTHING graph-related; broker_blocks rows (in both
+    directions) were surviving the erasure."""
+    monkeypatch.setenv("RM_ACCOUNTS_DB", str(tmp_path / "platform.db"))
+    store = NetworkStore()
+    with closing(connect()) as conn:
+        _member(conn, 10, "leaver@york.ca")
+        _member(conn, 20, "other@york.ca")
+        for a, b in ((10, 20), (20, 10)):
+            conn.execute("INSERT INTO broker_blocks(broker_user_id, blocked_user_id, created_at) "
+                         "VALUES(?,?,?)", (a, b, time.time()))
+        conn.commit()
+    store.delete_my_network(10)
+    with closing(connect()) as conn:
+        assert conn.execute("SELECT COUNT(*) FROM broker_blocks").fetchone()[0] == 0

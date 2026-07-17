@@ -121,6 +121,38 @@ def test_save_requires_login():
     assert client.post(f"/api/demo/session/{sid}/save", json={"name": "x"}).status_code == 401
 
 
+def test_admin_logout_kills_a_replayed_cookie(monkeypatch):
+    """A15 end-to-end: /api/logout destroys the SERVER-SIDE session, so re-presenting a copy of the
+    cookie (as a thief would) fails. Under the pre-A15 stateless HMAC it would have kept working."""
+    monkeypatch.setenv("RM_ADMIN_USER", "admin")
+    monkeypatch.setenv("RM_ADMIN_PASSWORD", "s3cret-and-long")
+    client = _api_client()
+    assert client.post("/api/login",
+                       json={"username": "admin", "password": "s3cret-and-long"}).status_code == 200
+    stolen = client.cookies["rm_admin"]
+    assert client.get("/api/status").status_code == 200
+    client.post("/api/logout")
+
+    thief = _api_client()
+    thief.cookies.set("rm_admin", stolen)
+    assert thief.get("/api/status").status_code == 401
+
+
+def test_admin_session_expiry_is_enforced_server_side(monkeypatch, tmp_path):
+    # Not just the cookie max-age: age the row and the same cookie stops working.
+    monkeypatch.setenv("RM_ADMIN_USER", "admin")
+    monkeypatch.setenv("RM_ADMIN_PASSWORD", "s3cret-and-long")
+    client = _api_client()
+    client.post("/api/login", json={"username": "admin", "password": "s3cret-and-long"})
+    assert client.get("/api/status").status_code == 200
+
+    from resume_matcher.stores.db import platform_db_path
+    with sqlite3.connect(platform_db_path()) as conn:
+        conn.execute("UPDATE admin_sessions SET expires_at=?", (time.time() - 1,))
+        conn.commit()
+    assert client.get("/api/status").status_code == 401
+
+
 def test_login_is_rate_limited(monkeypatch):
     # Password brute force on /api/account/login is throttled after the burst (security-review fix).
     monkeypatch.setenv("RM_AUTH_RATE_BURST", "3")

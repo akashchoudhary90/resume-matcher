@@ -15,6 +15,11 @@ from __future__ import annotations
 from .defense_file import _canonical, _make_signer, _make_verifier, _sha256
 
 COMPLIANCE_VERSION = 1
+# Semantics tag, not a format version: a v2 pack reports an undecided four-fifths verdict as
+# "indeterminate" instead of a falsy None, so a pack signed before the bounded-suppression change
+# (where None could be read as "not flagged") is distinguishable from one signed after it.
+PACK_SEMANTICS = "v2-bounded-suppression"
+_INDETERMINATE = "indeterminate"
 
 _METHODOLOGY = (
     "Scores are produced by a deterministic ranker (the LLM only extracts evidence; it never decides "
@@ -22,7 +27,9 @@ _METHODOLOGY = (
     "detect-and-flag only. 'Selected' = appears on any per-job shortlist. Four-fifths impact ratio is "
     "each group's selection rate over the most-selected group's, with Fisher's exact significance and a "
     "min-cell-5 suppression; exposure parity is position-discounted; proxy leakage trains an auxiliary "
-    "classifier to predict the protected attribute from the scoring features."
+    "classifier to predict the protected attribute from the scoring features. A suppressed group is "
+    "bounded, not assumed absent: where suppression makes the four-fifths verdict undecidable it is "
+    "reported as 'indeterminate' (human review), and it can never yield a pass."
 )
 _DISCLAIMER = (
     "Continuous INTERNAL monitoring + audit-ready evidence, computed on the same engine that made the "
@@ -31,12 +38,26 @@ _DISCLAIMER = (
 )
 
 
+def _render_verdicts(node):
+    """Render every `four_fifths_pass: None` in the audit tree as the explicit string
+    "indeterminate". A regulator reading a signed pack must not be able to mistake "we could not
+    decide this under suppression" for "no disparate impact found" — and a JSON None in a boolean
+    field reads as exactly that (it is falsy in every consumer). Copies; never mutates the input."""
+    if isinstance(node, dict):
+        return {k: (_INDETERMINATE if k == "four_fifths_pass" and v is None else _render_verdicts(v))
+                for k, v in node.items()}
+    if isinstance(node, list):
+        return [_render_verdicts(v) for v in node]
+    return node
+
+
 def build_compliance_pack(audit: dict, *, generated_at: float) -> dict:
     """Wrap an audit() result into a signed, self-verifying compliance pack."""
     signer = _make_signer()
     body = {
         "format": "resume-matcher-compliance-pack",
         "version": COMPLIANCE_VERSION,
+        "pack_semantics": PACK_SEMANTICS,
         "generated_at": generated_at,
         "standard_refs": [
             "NYC Local Law 144 (four-fifths impact-ratio bias audit)",
@@ -46,7 +67,7 @@ def build_compliance_pack(audit: dict, *, generated_at: float) -> dict:
         "score_kind": "fit_readiness_not_hire_probability",
         "methodology": _METHODOLOGY,
         "disclaimer": _DISCLAIMER,
-        "audit": audit,
+        "audit": _render_verdicts(audit),
     }
     digest = _sha256(_canonical(body))
     return {

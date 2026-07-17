@@ -7,6 +7,11 @@ never a boolean on the org).
 
 The Ontario Working-for-Workers AI-disclosure block is appended AT APPROVAL — mandatory, not
 employer-optional (docs/PLATFORM.md graft #8).
+
+Phase-5 B6 (docs/PHASE5.md §2.14) adds `PostingStore.search` — the student browse surface. It is a
+separate method rather than more keyword arguments on `list()` because it is the only read here that
+takes UNTRUSTED text: the keyword term goes into a LIKE, so its metacharacters are escaped and the
+pattern carries an explicit ESCAPE clause (security L4). It is also the only paged read.
 """
 from __future__ import annotations
 
@@ -35,6 +40,28 @@ _TRANSITIONS: dict[str, dict[str, str]] = {
 _EDITABLE = {"title", "description", "location", "work_mode", "employment_type", "pay_min",
              "pay_max", "pay_currency", "pay_period", "apply_deadline", "start_date",
              "min_education", "min_years", "application_method", "application_url"}
+
+# B6 sort whitelist — the value reaches an ORDER BY, so it is looked up, never interpolated.
+# NULLs sort last in both keyed sorts (a posting without a deadline/pay is not "soonest"/"best paid").
+_SEARCH_SORTS = {
+    "newest": "p.created_at DESC",
+    "deadline": "p.apply_deadline IS NULL, p.apply_deadline ASC, p.created_at DESC",
+    "pay": "p.pay_min IS NULL, p.pay_min DESC, p.created_at DESC",
+}
+_SEARCH_MAX_PAGE_SIZE = 50
+
+# The list projection, shared by list() and search() so the two surfaces can't drift apart.
+_SUMMARY_COLS = ("p.id, p.title, p.status, p.org_id, o.name AS org_name, p.location, "
+                 "p.work_mode, p.employment_type, p.pay_min, p.pay_max, p.pay_currency, "
+                 "p.pay_period, p.apply_deadline, p.created_at, p.updated_at")
+
+
+def _like_term(q: str) -> str:
+    """Escape a user term for a LIKE ... ESCAPE '\\' pattern (security L4). '%' and '_' are LIKE
+    wildcards: unescaped, a search box becomes a full-table wildcard scan and '_' silently matches
+    any character. The escape character itself is escaped FIRST, or escaping would be reversible."""
+    out = q.replace("\\", "\\\\").replace("%", "\\%").replace("_", "\\_")
+    return f"%{out}%"
 
 
 class PostingError(Exception):
@@ -130,14 +157,59 @@ class PostingStore:
             params.append(org_id)
         with closing(self._conn()) as conn:
             rows = conn.execute(
-                "SELECT p.id, p.title, p.status, p.org_id, o.name AS org_name, p.location, "
-                "p.work_mode, p.employment_type, p.pay_min, p.pay_max, p.pay_currency, "
-                "p.pay_period, p.apply_deadline, p.created_at, p.updated_at "
-                "FROM postings p LEFT JOIN orgs o ON o.id = p.org_id "
+                f"SELECT {_SUMMARY_COLS} FROM postings p LEFT JOIN orgs o ON o.id = p.org_id "
                 f"WHERE {' AND '.join(where)} ORDER BY p.updated_at DESC",
                 params,
             ).fetchall()
         return [dict(r) for r in rows]
+
+    def search(self, *, school_id: int, status: str = "live", q: str = "",
+               employment_type: str = "", work_mode: str = "", pay_min: float | None = None,
+               deadline_after: str = "", sort: str = "newest",
+               page: int = 1, page_size: int = 20) -> dict:
+        """B6 student browse: filter + sort + page over one school's postings.
+
+        `school_id` is required and always applied — this is the surface a student drives, and the
+        school scope is the tenant boundary, not a convenience filter. Every value is bound; `sort`
+        is whitelisted (it lands in ORDER BY) and `q` is LIKE-escaped with an explicit ESCAPE
+        clause (security L4)."""
+        where, params = ["p.school_id=?"], [school_id]
+        if status:
+            where.append("p.status=?")
+            params.append(status)
+        term = (q or "").strip()
+        if term:
+            where.append("(p.title LIKE ? ESCAPE '\\' OR p.description LIKE ? ESCAPE '\\' "
+                         "OR o.name LIKE ? ESCAPE '\\')")
+            params += [_like_term(term)] * 3
+        if employment_type:
+            where.append("p.employment_type=?")
+            params.append(employment_type)
+        if work_mode:
+            where.append("p.work_mode=?")
+            params.append(work_mode)
+        if pay_min is not None:
+            where.append("p.pay_min IS NOT NULL AND p.pay_min >= ?")
+            params.append(float(pay_min))
+        if deadline_after:
+            # apply_deadline is an ISO 'YYYY-MM-DD' string: lexical >= is chronological >=
+            where.append("p.apply_deadline IS NOT NULL AND p.apply_deadline >= ?")
+            params.append(str(deadline_after))
+        page = max(1, int(page or 1))
+        page_size = max(1, min(int(page_size or 20), _SEARCH_MAX_PAGE_SIZE))
+        order = _SEARCH_SORTS.get(sort, _SEARCH_SORTS["newest"])
+        clause = " AND ".join(where)
+        with closing(self._conn()) as conn:
+            total = conn.execute(
+                f"SELECT COUNT(*) FROM postings p LEFT JOIN orgs o ON o.id = p.org_id "
+                f"WHERE {clause}", params).fetchone()[0]
+            rows = conn.execute(
+                f"SELECT {_SUMMARY_COLS} FROM postings p LEFT JOIN orgs o ON o.id = p.org_id "
+                f"WHERE {clause} ORDER BY {order} LIMIT ? OFFSET ?",
+                (*params, page_size, (page - 1) * page_size),
+            ).fetchall()
+        return {"postings": [dict(r) for r in rows], "total": total, "page": page,
+                "page_size": page_size}
 
     # ---- update / lifecycle ----------------------------------------------------------------------
     def update_fields(self, posting_id: str, fields: dict,

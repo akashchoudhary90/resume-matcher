@@ -41,6 +41,33 @@ def test_mock_finds_quotable_evidence(strong_candidate, python_job):
         assert m.evidence_span and m.evidence_span.lower() in strong_candidate.text.lower()
 
 
+def test_mock_credits_taxonomy_aliases_without_fabricating(python_job):
+    # A11: the mock only knew canonical names, so a resume writing "JS" or "Postgres" — the way real
+    # resumes do — scored those skills as GAPS. It now scans the taxonomy's own alias-inclusive
+    # surfaces, and the quote is still a verbatim slice of the resume (no fabricated evidence).
+    from resume_matcher.inference.schema import CandidateProfile, JobSpec
+
+    def cand_of(cid: str, text: str) -> CandidateProfile:
+        return CandidateProfile(candidate_id=cid, skills=[], text=text, years_experience=2.0)
+
+    cand = cand_of("A1", "Shipped dashboards in JS and stored events in Postgres.")
+    job = JobSpec(job_id="J9", title="Dev", employer="X", description="Web work.",
+                  required_skills=["javascript", "postgresql"])
+    ext = get_adapter("mock").extract(cand, job)
+    matched = {m.skill_id: m for m in ext.skill_matches if m.status.value == "match"}
+    assert set(matched) == {"javascript", "postgresql"}
+    for m in matched.values():
+        assert m.evidence_span in cand.text          # verbatim, not invented
+        assert m.adjacent_to is None                 # an alias is the skill itself, not adjacency
+    assert not ext.gaps
+
+    # the >=2-alnum guard still holds: one-letter surfaces never match inside a longer word
+    r_job = JobSpec(job_id="J10", title="Dev", employer="X", description="Stats.",
+                    required_skills=["r"])
+    r_ext = get_adapter("mock").extract(cand_of("A2", "Senior developer, R&D lead."), r_job)
+    assert [g.skill_id for g in r_ext.gaps] == ["r"]
+
+
 def test_non_local_adapter_refuses_unredacted_pii(python_job):
     # #20: the redaction tripwire — a non-local adapter must REFUSE un-redacted PII, and accept clean text.
     from resume_matcher.inference.adapter import InferenceAdapter, InferenceError

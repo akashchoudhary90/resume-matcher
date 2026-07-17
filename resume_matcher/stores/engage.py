@@ -7,9 +7,17 @@ Design stances:
     and coordinators. There is deliberately no cold-outreach channel (anti-spam + privacy).
   * Interviews: an employer proposes 1..N slots on an application; the student accepts exactly
     one (siblings auto-decline); either side can cancel.
+
+Phase-5 (C3, docs/PHASE5.md §2.5): check-ins are VERIFIED PRESENCE and are deliberately a
+different table from RSVPs — an RSVP is an intention, and folding peer edges from intentions would
+mint relationships between people who never met. Two ways in, both attestations: the attendee
+enters the event's code (a second factor on top of their own registration — the code is a
+low-entropy shared secret, so the ROUTE rate-limits it), or a coordinator checks them in off the
+roster. Every coordinator entry point is school-scoped (D13/security M3).
 """
 from __future__ import annotations
 
+import hmac
 import secrets
 import time
 from contextlib import closing
@@ -120,6 +128,72 @@ class EventStore(_Store):
             rows = conn.execute("SELECT event_id FROM event_registrations WHERE user_id=? "
                                 "AND status='registered'", (user_id,)).fetchall()
         return {r["event_id"] for r in rows}
+
+    # ---- Phase 5 (C3): verified check-ins --------------------------------------------------------
+    def set_checkin_code(self, event_id: str, school_id: int) -> str:
+        """(Re)generate the event's check-in code. School-scoped (D13): an event in another tenant
+        is absent, so the coordinator route answers 404. Regenerating invalidates the old code."""
+        code = secrets.token_urlsafe(6)
+        with closing(self._conn()) as conn:
+            cur = conn.execute(
+                "UPDATE campus_events SET checkin_code=?, updated_at=? WHERE id=? AND school_id=?",
+                (code, time.time(), event_id, school_id))
+            if not cur.rowcount:
+                raise EngageError("No such event.")
+            conn.commit()
+        return code
+
+    def checkin_by_code(self, event_id: str, user_id: int, code: str) -> None:
+        """Self check-in. The code alone is NOT the authorization — the caller must already hold a
+        live registration for this published event. The code is only the presence factor (it is
+        short and shared aloud in a room, so it is guessable by design; the route rate-limits)."""
+        with closing(self._conn()) as conn:
+            event = conn.execute("SELECT status, checkin_code FROM campus_events WHERE id=?",
+                                 (event_id,)).fetchone()
+            if event is None or event["status"] != "published":
+                raise EngageError("That event isn't open for check-in.")
+            reg = conn.execute(
+                "SELECT role FROM event_registrations WHERE event_id=? AND user_id=? "
+                "AND status='registered'", (event_id, user_id)).fetchone()
+            if reg is None:
+                raise EngageError("That event isn't open for check-in.")   # same neutral message
+            if not event["checkin_code"] or not hmac.compare_digest(
+                    str(event["checkin_code"]), str(code or "")):
+                raise EngageError("That check-in code isn't right.")
+            conn.execute(
+                "INSERT INTO event_checkins(event_id, user_id, checked_in_by, method, at) "
+                "VALUES(?,?,?,'code',?) ON CONFLICT(event_id, user_id) DO NOTHING",
+                (event_id, user_id, user_id, time.time()))
+            conn.commit()
+
+    def checkin_roster(self, event_id: str, user_id: int, coordinator_id: int,
+                       school_id: int) -> None:
+        """Coordinator roster check-in. D13/security M3: BOTH the event and the target user must
+        belong to the coordinator's school — otherwise a coordinator could attest presence for
+        another tenant's student and mint peer edges in a graph they don't administer."""
+        with closing(self._conn()) as conn:
+            event = conn.execute("SELECT status FROM campus_events WHERE id=? AND school_id=?",
+                                 (event_id, school_id)).fetchone()
+            target = conn.execute("SELECT 1 FROM users WHERE id=? AND school_id=?",
+                                  (user_id, school_id)).fetchone()
+            if event is None or target is None:
+                raise EngageError("No such event.")
+            if event["status"] != "published":
+                raise EngageError("That event isn't open for check-in.")
+            conn.execute(
+                "INSERT INTO event_checkins(event_id, user_id, checked_in_by, method, at) "
+                "VALUES(?,?,?,'roster',?) ON CONFLICT(event_id, user_id) DO NOTHING",
+                (event_id, user_id, coordinator_id, time.time()))
+            conn.commit()
+
+    def checkins(self, event_id: str, school_id: int) -> list[dict]:
+        with closing(self._conn()) as conn:
+            rows = conn.execute(
+                "SELECT c.user_id, c.method, c.at, u.email FROM event_checkins c "
+                "JOIN users u ON u.id=c.user_id JOIN campus_events ev ON ev.id=c.event_id "
+                "WHERE c.event_id=? AND ev.school_id=? ORDER BY c.at", (event_id, school_id),
+            ).fetchall()
+        return [dict(r) for r in rows]
 
 
 # ---- Slice S: application-thread messaging ---------------------------------------------------------

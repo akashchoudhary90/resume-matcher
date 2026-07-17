@@ -167,8 +167,11 @@ class AccountStore:
         th = self._token_hash(token)
         with self._lock, closing(self._conn()) as conn:
             row = conn.execute(
+                # alumni_status is an ATTRIBUTE, never a role (PHASE5.md D4): the C4 mentor
+                # surfaces and the _BROKER_VERIFY_LEVEL mapping read it straight off the user dict.
                 "SELECT u.id AS id, u.email AS email, u.role AS role, u.org_id AS org_id, "
-                "u.school_id AS school_id, t.created_at AS created_at FROM tokens t "
+                "u.school_id AS school_id, u.alumni_status AS alumni_status, "
+                "t.created_at AS created_at FROM tokens t "
                 "JOIN users u ON u.id = t.user_id WHERE t.token_hash=?",
                 (th,),
             ).fetchone()
@@ -181,7 +184,8 @@ class AccountStore:
                 conn.commit()
                 return None
         return {"id": row["id"], "email": row["email"], "role": row["role"],
-                "org_id": row["org_id"], "school_id": row["school_id"]}
+                "org_id": row["org_id"], "school_id": row["school_id"],
+                "alumni_status": row["alumni_status"]}
 
     def logout(self, token: str | None) -> None:
         if not token:

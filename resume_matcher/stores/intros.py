@@ -12,16 +12,31 @@ revealed to the employer. A declined request is indistinguishable from "no path"
 
 Authorization note: this module holds lifecycle logic; the ROUTE layer enforces the broker-only
 accept/decline identity check and the application-ownership IDOR check (adversarial criticals).
+
+Phase-5 (docs/PHASE5.md §2.3):
+  * A2 — a mutual who never granted `warm_intro` is not a broker. `find_paths(broker_ok=...)`
+    prunes those paths BEFORE ranking, so the response is shape-identical to "no path": the
+    surface must not become an oracle for who did or didn't opt into brokering.
+  * SM-M2 — the BINDING broker-consent check runs inside `create`'s own transaction. The route's
+    check is advisory: between it and the INSERT the broker can revoke.
+  * C2 — `origin` records whether the chosen path leaned on a bridge (alumni/mentorship) edge, so
+    the equity reports can compare bridged vs organic intros. It is per-REQUEST metadata, never a
+    per-person attribute.
 """
 from __future__ import annotations
 
 import json
 import secrets
 import time
+from collections.abc import Callable
 from contextlib import closing
 
 from .db import connect, migrate, platform_db_path
 from .relationships import EDGE_STRENGTH, RelationshipStore
+
+# C2: a path is 'bridged' iff it leans on an edge that the institution manufactured (a coordinator
+# bridge or a mentorship match) rather than one the student's own activity produced.
+BRIDGE_EDGE_KINDS = ("alumni_bridge", "mentorship")
 
 MAX_DEPTH = 3
 TOP_K = 5
@@ -57,11 +72,22 @@ def path_sort_key(path: dict) -> tuple:
 
 
 # ---- pathfinder -----------------------------------------------------------------------------------
+def path_origin(path: dict) -> str:
+    """C2: 'bridged' iff any edge on the chosen path is an institution-manufactured bridge."""
+    return ("bridged" if any(k in BRIDGE_EDGE_KINDS for k, _ in path.get("edges", []))
+            else "organic")
+
+
 def find_paths(rel: RelationshipStore, requester_id: int, target_id: int, school_id: int, *,
-               max_depth: int = MAX_DEPTH, top_k: int = TOP_K, now: float | None = None
-               ) -> list[dict]:
+               max_depth: int = MAX_DEPTH, top_k: int = TOP_K, now: float | None = None,
+               broker_ok: Callable[[int], bool] | None = None) -> list[dict]:
     """Bounded BFS from requester to target over consented edges. Returns ranked paths with
-    hops>=2 (at least one broker). Each path: {nodes, edges, hops, score, broker}."""
+    hops>=2 (at least one broker). Each path: {nodes, edges, hops, score, broker}.
+
+    A2: `broker_ok(uid)` decides whether a candidate mutual may be ASKED — routes pass a
+    memoized `warm_intro` consent check. Rejected brokers are dropped at path-completion time,
+    before ranking, so a path through a non-consenting mutual is indistinguishable from no path
+    at all (a post-ranking filter would leak the difference through result counts/scores)."""
     now = now or time.time()
     # adjacency cache to bound DB hits
     cache: dict[int, list[dict]] = {}
@@ -84,6 +110,8 @@ def find_paths(rel: RelationshipStore, requester_id: int, target_id: int, school
                 new_edges = epath + [(e["kind"], e["last_seen_at"])]
                 new_nodes = npath + [other]
                 if other == target_id and len(new_nodes) >= 3:   # hops>=2 => has a broker
+                    if broker_ok is not None and not broker_ok(new_nodes[1]):
+                        continue                   # A2: not a broker -> the path never existed
                     paths.append({
                         "nodes": new_nodes, "edges": new_edges, "hops": len(new_edges),
                         "score": rank_path(new_edges, now), "broker": new_nodes[1]})
@@ -115,38 +143,59 @@ class IntroStore:
 
     def create(self, *, school_id: int, posting_id: str, application_id: str,
                requester_user_id: int, target_user_id: int, path: dict,
-               note_redacted: str | None) -> dict:
+               note_redacted: str | None, origin: str = "organic") -> dict:
         """Create a requested intro to the path's broker. Route has already verified application
-        ownership (IDOR) and broker availability."""
+        ownership (IDOR) and broker availability.
+
+        SM-M2: the broker's `warm_intro` consent is re-checked HERE, on this connection, inside a
+        BEGIN IMMEDIATE — the route's earlier check is advisory because a broker can revoke in the
+        window between pathfinding and INSERT. This check is the invariant: no row is ever written
+        naming a broker who is not, at commit time, opted in."""
         broker = path["broker"]
+        if origin not in ("organic", "bridged"):
+            raise IntroError("Unknown intro origin.")
         now = time.time()
         intro_id = secrets.token_urlsafe(10)
         with closing(self._conn()) as conn:
-            # broker spam caps + block
-            if conn.execute("SELECT 1 FROM broker_blocks WHERE broker_user_id=? AND blocked_user_id=?",
-                            (broker, requester_user_id)).fetchone():
-                raise IntroError("An intro through this connection isn't available.")
-            pend = conn.execute("SELECT COUNT(*) FROM intro_requests WHERE broker_user_id=? "
-                                "AND status='requested'", (broker,)).fetchone()[0]
-            if pend >= _BROKER_PENDING_CAP:
-                raise IntroError("An intro through this connection isn't available right now.")
-            live = conn.execute("SELECT COUNT(*) FROM intro_requests WHERE requester_user_id=? "
-                                "AND status='requested'", (requester_user_id,)).fetchone()[0]
-            if live >= _REQUESTER_LIVE_CAP:
-                raise IntroError("You have too many pending intro requests.")
+            conn.isolation_level = None            # explicit txn control (BEGIN IMMEDIATE below)
+            conn.execute("BEGIN IMMEDIATE")
             try:
-                conn.execute(
-                    "INSERT INTO intro_requests(id, school_id, posting_id, application_id, "
-                    "requester_user_id, target_user_id, broker_user_id, hops, path_score, "
-                    "path_json, note_redacted, created_at, expires_at) "
-                    "VALUES(?,?,?,?,?,?,?,?,?,?,?,?,?)",
-                    (intro_id, school_id, posting_id, application_id, requester_user_id,
-                     target_user_id, broker, path["hops"], path["score"], json.dumps(path),
-                     note_redacted, now, now + _INTRO_TTL_S))
-            except Exception as exc:  # UNIQUE(requester, posting)
-                raise IntroError("You already requested an intro for this posting.") from exc
-            self._log(conn, intro_id, requester_user_id, None, "requested")
-            conn.commit()
+                if conn.execute(
+                    "SELECT 1 FROM consents WHERE user_id=? AND purpose='warm_intro' "
+                    "AND revoked_at IS NULL", (broker,)).fetchone() is None:
+                    # same neutral message as every other broker-unavailable branch (no oracle)
+                    raise IntroError("An intro through this connection isn't available.")
+                # broker spam caps + block
+                if conn.execute("SELECT 1 FROM broker_blocks WHERE broker_user_id=? "
+                                "AND blocked_user_id=?",
+                                (broker, requester_user_id)).fetchone():
+                    raise IntroError("An intro through this connection isn't available.")
+                pend = conn.execute("SELECT COUNT(*) FROM intro_requests WHERE broker_user_id=? "
+                                    "AND status='requested'", (broker,)).fetchone()[0]
+                if pend >= _BROKER_PENDING_CAP:
+                    raise IntroError("An intro through this connection isn't available right now.")
+                live = conn.execute("SELECT COUNT(*) FROM intro_requests WHERE requester_user_id=? "
+                                    "AND status='requested'", (requester_user_id,)).fetchone()[0]
+                if live >= _REQUESTER_LIVE_CAP:
+                    raise IntroError("You have too many pending intro requests.")
+                try:
+                    conn.execute(
+                        "INSERT INTO intro_requests(id, school_id, posting_id, application_id, "
+                        "requester_user_id, target_user_id, broker_user_id, hops, path_score, "
+                        "path_json, note_redacted, origin, created_at, expires_at) "
+                        "VALUES(?,?,?,?,?,?,?,?,?,?,?,?,?,?)",
+                        (intro_id, school_id, posting_id, application_id, requester_user_id,
+                         target_user_id, broker, path["hops"], path["score"], json.dumps(path),
+                         note_redacted, origin, now, now + _INTRO_TTL_S))
+                except IntroError:
+                    raise
+                except Exception as exc:  # UNIQUE(requester, posting)
+                    raise IntroError("You already requested an intro for this posting.") from exc
+                self._log(conn, intro_id, requester_user_id, None, "requested")
+                conn.execute("COMMIT")
+            except BaseException:
+                conn.execute("ROLLBACK")
+                raise
         return {"intro_id": intro_id, "status": "requested"}
 
     def get(self, intro_id: str) -> dict | None:
@@ -221,6 +270,26 @@ class IntroStore:
                 "FROM intro_requests ir JOIN users u ON u.id=ir.broker_user_id "
                 "WHERE ir.application_id=? AND ir.status='accepted'", (application_id,)).fetchall()
         return [dict(r) for r in rows]
+
+    def outcome_rows(self, school_id: int) -> list[dict]:
+        """C2 report source: one row per intro request — its origin, the broker edge kind it was
+        founded on, its status, and (via the application) where the student ended up. Raw rows
+        only; MIN_CELL suppression and consent filtering happen above this (§3.2), because this is
+        also the shape the CSV export needs."""
+        with closing(self._conn()) as conn:
+            rows = conn.execute(
+                "SELECT ir.id, ir.origin, ir.status, ir.path_json, ir.requester_user_id, "
+                "a.status AS application_status FROM intro_requests ir "
+                "LEFT JOIN applications a ON a.id=ir.application_id "
+                "WHERE ir.school_id=?", (school_id,)).fetchall()
+        out = []
+        for r in rows:
+            row = dict(r)
+            edges = (json.loads(row.pop("path_json") or "{}") or {}).get("edges") or []
+            # edges[0] is the requester->broker hop: the relationship the intro actually leaned on
+            row["broker_edge_kind"] = edges[0][0] if edges else None
+            out.append(row)
+        return out
 
     def sweep_expired(self) -> int:
         now = time.time()

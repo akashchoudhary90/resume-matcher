@@ -57,6 +57,17 @@
   td, th { padding:7px 8px; border-bottom:1px solid var(--line); text-align:left; }
   a { color:var(--accent); }
   .hidden { display:none !important; }
+  tr.withdrawn { opacity:.45; }
+
+  /* notification bell (B4) */
+  #bellWrap { position:relative; }
+  #bellFeed { position:absolute; right:0; top:38px; width:min(340px, 88vw); max-height:60vh;
+              overflow:auto; background:var(--panel); border:1px solid var(--line);
+              border-radius:8px; z-index:30; box-shadow:0 10px 28px rgba(0,0,0,.5); }
+  .notif { padding:8px 10px; border-bottom:1px solid var(--line); font-size:12.5px; }
+  .notif.unread { background:var(--panel2); }
+  .notif .t { font-weight:600; }
+  .notif .b { color:var(--muted); }
 
   /* mobile (Slice U): stack panes, wrap rows, scrollable tables, touch targets */
   @media (max-width: 900px) {
@@ -77,6 +88,11 @@
   <h1>Campus <span>Recruiting</span> — post a job</h1>
   <span class="muted">upload a JD, review the pre-filled form, submit for approval</span>
   <div class="spacer"></div>
+  <span id="msgBadge" class="badge hidden"></span>
+  <div id="bellWrap" class="hidden">
+    <button id="bellBtn" class="ghost" title="Notifications">🔔 <span id="bellCount"></span></button>
+    <div id="bellFeed" class="hidden"></div>
+  </div>
   <span id="who" class="muted"></span>
   <button id="signoutBtn" class="ghost hidden">Sign out</button>
 </header>
@@ -133,6 +149,50 @@
     <table id="mineTable"><thead><tr><th>Title</th><th>Status</th><th>Updated</th><th></th></tr></thead><tbody></tbody></table>
   </section>
 
+  <!-- applicants (A10) -->
+  <section class="card hidden" id="applicantsCard">
+    <h2 id="apTitle">Applicants</h2>
+    <div class="muted">Everyone who applied, in order. An email appears only where the candidate
+      granted contact consent — where it says “not shared”, they are reachable through the
+      application thread, not around it.</div>
+    <table id="apTable"><thead><tr><th>Candidate</th><th>Status</th><th>Applied</th>
+      <th>Contact</th><th></th></tr></thead><tbody></tbody></table>
+    <button id="apBack" class="ghost" style="margin-top:10px">Back</button>
+  </section>
+
+  <!-- hiring contacts (C5) -->
+  <section class="card hidden" id="contactsCard">
+    <h2>Hiring contacts</h2>
+    <div class="muted">Your own organization's people, named so a warm intro can aim at the actual
+      hiring manager instead of whoever pasted the JD. Business role and title only — emails and
+      phone numbers are stripped when saved, so keep personal contact details out of these boxes.</div>
+    <div class="row" style="margin-top:10px">
+      <div><label>Name or label</label><input id="ctName" placeholder="Dana Okafor" /></div>
+      <div><label>Role title</label><input id="ctRole" placeholder="Engineering Manager" /></div>
+      <div><label>Their account id (optional — must be in your org)</label>
+        <input id="ctUser" type="number" min="1" /></div>
+      <div style="flex:0 0 auto; align-self:end"><button id="ctAdd">Add contact</button></div>
+    </div>
+    <div class="err" id="ctErr"></div>
+    <table id="ctTable"><thead><tr><th>Contact</th><th>Role</th><th>Linked account</th>
+      <th></th></tr></thead><tbody></tbody></table>
+
+    <div id="pcPanel" class="hidden" style="margin-top:14px; border-top:1px solid var(--line); padding-top:12px">
+      <h2 id="pcTitle">Hiring contact for this posting</h2>
+      <div class="row">
+        <div><label>Contact</label><select id="pcSelect"></select></div>
+        <div><label>Relation</label><select id="pcRelation">
+          <option value="hiring_manager">hiring_manager</option>
+          <option value="recruiter">recruiter</option>
+          <option value="referrer">referrer</option>
+          <option value="team_member">team_member</option></select></div>
+        <div style="flex:0 0 auto; align-self:end">
+          <button id="pcSet">Set</button> <button id="pcClear" class="ghost">Clear</button></div>
+      </div>
+      <div class="err" id="pcErr"></div>
+    </div>
+  </section>
+
   <!-- shortlist -->
   <section class="card hidden" id="shortlistCard">
     <h2 id="slTitle">Shortlist</h2>
@@ -164,20 +224,65 @@ let draft = null;          // the extraction draft (verbatim, sent back with the
 let skills = [];           // [{skill_id, bucket, name, status}]
 const confirmed = new Set();  // field names the human has confirmed/edited
 let pending = [];             // field names requiring confirmation
+let me = null;                // the signed-in user (role gates the contacts surfaces)
+let editingId = null;         // B8: posting being edited; null = the review pane is creating one
+let badgeTimer = null;
 
 // ---- auth ---------------------------------------------------------------------------------------
 async function refreshAuth() {
-  const me = (await api('/api/account/me').catch(()=>({user:null}))).user;
+  me = (await api('/api/account/me').catch(()=>({user:null}))).user;
   const ok = me && (me.role === 'employer' || me.role === 'coordinator' || me.role === 'admin');
+  const isEmployer = !!(me && me.role === 'employer');   // contacts routes are employer-only
   $('#authCard').classList.toggle('hidden', !!ok);
   $('#jdCard').classList.toggle('hidden', !ok);
   $('#mineCard').classList.toggle('hidden', !ok);
   $('#eventsCard').classList.toggle('hidden', !ok);
+  $('#contactsCard').classList.toggle('hidden', !isEmployer);
+  $('#bellWrap').classList.toggle('hidden', !ok);
   $('#signoutBtn').classList.toggle('hidden', !ok);
   $('#who').textContent = me ? `${me.email} (${me.role})` : '';
   if (me && !ok) $('#authErr').textContent = 'This page needs an employer account — you are signed in as ' + me.role + '.';
-  if (ok) { loadMine(); loadEvents(); }
+  if (ok) {
+    loadMine(); loadEvents();
+    if (isEmployer) loadContacts();
+    pollBadges();
+    if (!badgeTimer) badgeTimer = setInterval(pollBadges, 60000);
+  }
 }
+
+// ---- B4: notification bell + unread-message badge ------------------------------------------------
+async function pollBadges() {
+  const n = await api('/api/notifications?unread=1').catch(()=>null);
+  if (n) {
+    $('#bellCount').textContent = n.unread ? String(n.unread) : '';
+    $('#bellBtn').style.color = n.unread ? 'var(--accent)' : '';
+  }
+  const m = await api('/api/messages/unread-count').catch(()=>null);
+  const unread = m ? m.unread : 0;
+  $('#msgBadge').classList.toggle('hidden', !unread);
+  $('#msgBadge').textContent = unread ? `${unread} unread message${unread === 1 ? '' : 's'}` : '';
+}
+$('#bellBtn').onclick = async () => {
+  const feed = $('#bellFeed');
+  if (!feed.classList.contains('hidden')) { feed.classList.add('hidden'); return; }
+  const data = await api('/api/notifications').catch(()=>({items:[]}));
+  // Titles/bodies are server-composed, but they quote employer/posting free text — esc() every one.
+  feed.innerHTML = ((data.items || []).map(i => `<div class="notif ${i.read_at ? '' : 'unread'}">
+      <div class="t">${esc(i.title)}</div>
+      ${i.body ? `<div class="b">${esc(i.body)}</div>` : ''}
+      <div class="b">${new Date(i.created_at * 1000).toLocaleString()}</div>
+    </div>`).join('') || '<div class="notif b">Nothing yet.</div>')
+    + '<div style="padding:8px"><button id="bellRead" class="ghost">Mark all read</button></div>';
+  feed.classList.remove('hidden');
+  $('#bellRead').onclick = async () => {
+    await api('/api/notifications/read', {method:'POST', body: JSON.stringify({all:true})}).catch(()=>{});
+    feed.classList.add('hidden');
+    pollBadges();
+  };
+};
+document.addEventListener('click', e => {
+  if (!e.target.closest('#bellWrap')) $('#bellFeed').classList.add('hidden');
+});
 $('#loginBtn').onclick = async () => {
   $('#authErr').textContent = '';
   try { await api('/api/account/login', {method:'POST', body: JSON.stringify({email:$('#authEmail').value, password:$('#authPw').value})}); await refreshAuth(); }
@@ -208,6 +313,7 @@ $('#extractBtn').onclick = async () => {
     const job = await poll(resp.poll);
     if (job.status === 'error') throw new Error(job.error || 'Extraction failed.');
     draft = job.result.draft;
+    editingId = null;          // a fresh extraction always creates, never overwrites an edit target
     renderReview();
   } catch (e) { $('#extractErr').textContent = e.message; }
   $('#extractStatus').textContent = ''; $('#extractBtn').disabled = false;
@@ -241,6 +347,8 @@ function fieldValue(f) { return (draft[f] && draft[f].value !== undefined) ? dra
 
 function renderReview() {
   $('#reviewCard').classList.remove('hidden');
+  $('#submitBtn').textContent = editingId ? 'Save & re-submit for review' : 'Create & submit for review';
+  $('#draftBtn').textContent = editingId ? 'Save changes only' : 'Save as draft only';
   $('#src').textContent = draft.description || '';
   const flags = (draft.extraction_meta && draft.extraction_meta.flags) || [];
   $('#flagBanner').textContent = flags.length ? ('⚠ ' + flags.join(' · ')) : '';
@@ -290,6 +398,10 @@ function renderReview() {
   }
   renderSkills();
   updateGate();
+  // #form survives every re-render (only its innerHTML is replaced), so wire it once — B8 re-opens
+  // the pane per edit, and stacked listeners would replay each click once per render.
+  if (renderReview.wired) return;
+  renderReview.wired = true;
   $('#form').addEventListener('input', e => { const k = e.target.closest('.field'); if (k) confirmField(k.dataset.key); });
   $('#form').addEventListener('click', e => {
     const c = e.target.dataset.confirm; if (c) { confirmField(c); e.preventDefault(); }
@@ -389,28 +501,70 @@ function collect() {
       apply_deadline: get('application_deadline') || null, start_date: get('start_date') || null,
       min_education: get('min_education') || null, min_years: get('min_years') ? +get('min_years') : null,
       application_method: get('application_method') || null, application_url: get('application_url') || null,
+      // A18: this input has been on the page since the two-pane review shipped, but collect()
+      // never read it — an employer who typed an apply email watched it vanish on save.
+      application_email: get('application_email') || null,
     },
     skills: skills.filter(s => s.ok !== false).map(s => ({skill_id:s.skill_id, bucket:s.bucket, source:s.method || 'user'})),
     extraction: {draft},
   };
 }
-async function createPosting(submit) {
+// B8: the same review pane creates a new posting and edits a draft/rejected one — `editingId`
+// picks POST-then-submit vs PATCH-then-resubmit. Nothing else about the pane changes.
+async function savePosting(submit) {
   $('#submitErr').textContent = '';
   try {
-    const made = await api('/api/postings', {method:'POST', body: JSON.stringify(collect())});
+    let pid = editingId;
+    if (pid) await api(`/api/postings/${pid}`, {method:'PATCH', body: JSON.stringify(collect())});
+    else pid = (await api('/api/postings', {method:'POST', body: JSON.stringify(collect())})).posting_id;
     if (submit) {
-      try { await api(`/api/postings/${made.posting_id}/submit`, {method:'POST'}); alert('Submitted — career services will review it.'); }
+      try { await api(`/api/postings/${pid}/submit`, {method:'POST'}); alert('Submitted — career services will review it.'); }
       catch (e) {
         if (e.status === 409) alert('Saved as draft. ' + e.message);
         else throw e;
       }
-    } else { alert('Draft saved.'); }
+    } else { alert(editingId ? 'Changes saved.' : 'Draft saved.'); }
+    editingId = null;
     $('#reviewCard').classList.add('hidden');
     loadMine();
   } catch (e) { $('#submitErr').textContent = e.message; }
 }
-$('#submitBtn').onclick = () => createPosting(true);
-$('#draftBtn').onclick = () => createPosting(false);
+$('#submitBtn').onclick = () => savePosting(true);
+$('#draftBtn').onclick = () => savePosting(false);
+
+// B8: re-open a saved posting in the review pane. A posting that already went through review is
+// rebuilt from its COLUMNS (the stored extraction draft is the original machine read, not the
+// human's corrections); the apply email survives only in that draft, so it is read back from there.
+function draftFromPosting(p) {
+  const stored = (p.extraction && p.extraction.draft) || {};
+  const fld = (v, present) => ({value: v ?? null, method: 'saved',
+                                status: (present === undefined ? (v !== null && v !== undefined && v !== '')
+                                                               : present) ? 'confirmed' : 'missing'});
+  const pay = {min: p.pay_min, max: p.pay_max, currency: p.pay_currency, period: p.pay_period};
+  const app = {method: p.application_method, url: p.application_url,
+               email: (stored.application && stored.application.value || {}).email || ''};
+  return {
+    description: p.description || '',
+    extraction_meta: stored.extraction_meta || {},
+    title: fld(p.title), employer_name: fld(p.org_name), locations: fld(p.location),
+    work_mode: fld(p.work_mode), employment_type: fld(p.employment_type),
+    pay: fld(pay, Object.values(pay).some(v => v !== null && v !== undefined && v !== '')),
+    application_deadline: fld(p.apply_deadline), start_date: fld(p.start_date),
+    min_education: fld(p.min_education), min_years: fld(p.min_years),
+    application: fld(app, Object.values(app).some(v => v !== null && v !== undefined && v !== '')),
+    // Already-reviewed skills carry no conflict — re-confirming them would be theatre.
+    skills: (p.skills || []).map(s => ({skill_id: s.skill_id, bucket: s.bucket,
+                                        status: 'auto', method: s.source || 'user'})),
+  };
+}
+async function openEdit(pid) {
+  const p = await api(`/api/postings/${pid}`).catch(err => { alert(err.message); return null; });
+  if (!p) return;
+  draft = draftFromPosting(p);
+  editingId = pid;
+  renderReview();
+  $('#reviewCard').scrollIntoView({behavior:'smooth'});
+}
 
 // ---- my postings --------------------------------------------------------------------------------
 async function loadMine() {
@@ -419,23 +573,76 @@ async function loadMine() {
     <td>${esc(p.title)}</td><td><span class="status">${esc(p.status)}</span></td>
     <td class="muted">${new Date(p.updated_at * 1000).toLocaleString()}</td>
     <td>${p.status === 'draft' || p.status === 'rejected'
-        ? `<button class="ghost" data-submit="${esc(p.id)}">Submit for review</button>`
-        : (p.status === 'live'
-           ? `<button data-shortlist="${esc(p.id)}" data-title="${esc(p.title)}">Shortlist</button>
-              <button class="ghost" data-close="${esc(p.id)}">Close</button>` : '')}</td>
+        ? `<button class="ghost" data-edit="${esc(p.id)}">Edit</button>
+           <button class="ghost" data-submit="${esc(p.id)}">Submit for review</button>` : ''}
+       ${p.status === 'live' || p.status === 'closed'
+        ? `<button class="ghost" data-applicants="${esc(p.id)}" data-title="${esc(p.title)}">Applicants</button>` : ''}
+       ${p.status === 'live'
+        ? `<button data-shortlist="${esc(p.id)}" data-title="${esc(p.title)}">Shortlist</button>
+           <button class="ghost" data-close="${esc(p.id)}">Close</button>` : ''}
+       ${me && me.role === 'employer'
+        ? `<button class="ghost" data-contact="${esc(p.id)}" data-title="${esc(p.title)}">Hiring contact</button>` : ''}</td>
     </tr>`).join('')
     || '<tr><td colspan="4" class="muted">Nothing yet.</td></tr>';
 }
 $('#mineTable').addEventListener('click', async e => {
-  const submitId = e.target.dataset.submit, closeId = e.target.dataset.close,
-        slId = e.target.dataset.shortlist;
-  if (slId) { openShortlist(slId, e.target.dataset.title); return; }
-  if (!submitId && !closeId) return;
+  const d = e.target.dataset;
+  if (d.shortlist) { openShortlist(d.shortlist, d.title); return; }
+  if (d.applicants) { openApplicants(d.applicants, d.title); return; }
+  if (d.edit) { openEdit(d.edit); return; }
+  if (d.contact) { openPostingContact(d.contact, d.title); return; }
+  if (!d.submit && !d.close) return;
   try {
-    await api(`/api/postings/${submitId || closeId}/${submitId ? 'submit' : 'close'}`, {method:'POST'});
+    await api(`/api/postings/${d.submit || d.close}/${d.submit ? 'submit' : 'close'}`, {method:'POST'});
     loadMine();
   } catch (err) { alert(err.message); }
 });
+
+// ---- application stage actions (A9) --------------------------------------------------------------
+// Mirrors _APP_TRANSITIONS in stores/students.py. 'withdrawn' is deliberately absent from every
+// list: that move is the student's own speech about their candidacy, and the API 409s an employer
+// who tries it. Terminal states (rejected/hired/withdrawn) offer nothing.
+const APP_ACTIONS = {
+  applied:     [['shortlisted','Shortlist'], ['advanced','Advance'], ['rejected','Reject'], ['hired','Hire']],
+  shortlisted: [['advanced','Advance'], ['rejected','Reject'], ['hired','Hire']],
+  advanced:    [['rejected','Reject'], ['hired','Hire']],
+};
+function appActions(status, appId) {
+  return (APP_ACTIONS[status] || []).map(([to, label]) =>
+    `<button class="confirmbtn${to === 'rejected' ? ' ghost' : ''}" data-setstatus="${esc(appId)}:${to}">${label}</button>`).join('');
+}
+async function setAppStatus(appId, to) {
+  if ((to === 'rejected' || to === 'hired')
+      && !confirm(`Move this candidate to "${to}"? They are notified, and it can't be undone.`)) return false;
+  try {
+    await api(`/api/applications/${appId}`, {method:'PATCH', body: JSON.stringify({status: to})});
+    return true;
+  } catch (err) { alert(err.message); return false; }
+}
+
+// ---- applicants (A10) ----------------------------------------------------------------------------
+async function openApplicants(pid, title) {
+  const data = await api(`/api/postings/${pid}/applications`).catch(err => { alert(err.message); return null; });
+  if (!data) return;
+  $('#applicantsCard').classList.remove('hidden');
+  $('#apTitle').textContent = `Applicants — ${title}`;
+  $('#apTable tbody').innerHTML = data.applications.map(a => `<tr class="${a.status === 'withdrawn' ? 'withdrawn' : ''}">
+    <td>${esc(a.candidate_ref)}</td>
+    <td><span class="status">${esc(a.status)}</span>
+        ${a.human_review_requested ? '<span class="badge" style="color:var(--amber)">human review</span>' : ''}</td>
+    <td class="muted">${new Date(a.created_at * 1000).toLocaleDateString()}</td>
+    <td>${a.email ? esc(a.email) : '<span class="badge">not shared</span>'}</td>
+    <td>${appActions(a.status, a.id)}</td></tr>`).join('')
+    || '<tr><td colspan="5" class="muted">No applicants yet.</td></tr>';
+  $('#apTable').onclick = async e => {
+    const set = e.target.dataset.setstatus;
+    if (!set) return;
+    const [appId, to] = set.split(':');
+    if (await setAppStatus(appId, to)) openApplicants(pid, title);
+  };
+  $('#applicantsCard').scrollIntoView({behavior:'smooth'});
+}
+$('#apBack').onclick = () => $('#applicantsCard').classList.add('hidden');
 
 // ---- shortlist (ranked, evidence-quoted) ---------------------------------------------------------
 async function openShortlist(pid, title) {
@@ -456,8 +663,7 @@ async function openShortlist(pid, title) {
         <span style="font-weight:700; color:${fitCls(row.grade)}">${row.fit_score} ${esc(row.grade)}</span>
         ${row.application_id ? `<span class="badge">applied · ${esc(row.application_status)}</span>` : '<span class="badge">not applied</span>'}
         ${row.human_review_requested ? '<span class="badge" style="color:var(--amber)">human review requested</span>' : ''}
-        ${row.application_id && row.application_status === 'applied'
-          ? `<button class="confirmbtn" data-advance="${esc(row.application_id)}">Shortlist candidate</button>` : ''}
+        ${row.application_id ? appActions(row.application_status, row.application_id) : ''}
       </div>
       <details><summary style="cursor:pointer;color:var(--accent);font-size:12.5px">Why this score?</summary>
         <table style="margin-top:6px"><thead><tr><th>Skill</th><th>Match</th><th>Points</th><th>Evidence</th></tr></thead>
@@ -476,7 +682,9 @@ async function openShortlist(pid, title) {
         <div id="evid-${esc(row.application_id)}" class="muted" style="margin-top:6px"></div></details>` : ''}
     </div>`;
   }).join('') : '<div class="muted">No candidates scored yet — matching runs when the posting goes live.</div>';
-  // lazy-load threads/slots when a details block opens
+  // lazy-load threads/slots when a details block opens (wired once — #shortlist outlives every
+  // re-render, and A9 re-renders after each stage change)
+  if (!openShortlist.wired) { openShortlist.wired = true;
   $('#shortlist').addEventListener('toggle', async e => {
     const box = e.target.querySelector('[id^="msgs-"], [id^="slots-"], [id^="evid-"]');
     if (!e.target.open || !box) return;
@@ -505,12 +713,12 @@ async function openShortlist(pid, title) {
       box.textContent = slots.map(s =>
         `${new Date(s.starts_at*1000).toLocaleString()} — ${s.status}`).join(' · ') || 'No slots proposed yet.';
     }
-  }, true);
+  }, true); }
   $('#shortlist').onclick = async e => {
-    const appId = e.target.dataset.advance;
-    if (appId) {
-      try { await api(`/api/applications/${appId}`, {method:'PATCH', body: JSON.stringify({status:'shortlisted'})}); openShortlist(pid, title); }
-      catch (err) { alert(err.message); }
+    const set = e.target.dataset.setstatus;
+    if (set) {
+      const [appId, to] = set.split(':');
+      if (await setAppStatus(appId, to)) { openShortlist(pid, title); return; }
     }
     const msgApp = e.target.dataset.sendmsg;
     if (msgApp) {
@@ -537,6 +745,69 @@ async function openShortlist(pid, title) {
 }
 $('#slBack').onclick = () => $('#shortlistCard').classList.add('hidden');
 
+// ---- hiring contacts (C5) ------------------------------------------------------------------------
+// display_label/role_title are redacted AND HTML-escaped by the store at write; esc() runs anyway —
+// a render that trusts the write path to have escaped is one migration away from being wrong.
+let contacts = [];
+let pcPosting = null;      // the posting whose hiring contact the panel is editing
+
+async function loadContacts() {
+  contacts = (await api('/api/orgs/me/contacts').catch(()=>({contacts:[]}))).contacts;
+  $('#ctTable tbody').innerHTML = contacts.map(c => `<tr>
+    <td>${esc(c.display_label)}</td><td>${esc(c.role_title || '—')}</td>
+    <td class="muted">${c.contact_user_id ? 'account #' + esc(c.contact_user_id) : 'free text'}</td>
+    <td><button class="ghost" data-delcontact="${esc(c.contact_id)}">Delete</button></td></tr>`).join('')
+    || '<tr><td colspan="4" class="muted">No contacts yet.</td></tr>';
+  $('#pcSelect').innerHTML = contacts.map(c =>
+    `<option value="${esc(c.contact_id)}">${esc(c.display_label)}${c.role_title ? ' — ' + esc(c.role_title) : ''}</option>`).join('')
+    || '<option value="">Add a contact first</option>';
+}
+$('#ctAdd').onclick = async () => {
+  $('#ctErr').textContent = '';
+  const uid = $('#ctUser').value.trim();
+  try {
+    await api('/api/orgs/me/contacts', {method:'POST', body: JSON.stringify({
+      display_label: $('#ctName').value, role_title: $('#ctRole').value,
+      contact_user_id: uid ? +uid : null})});
+    $('#ctName').value = ''; $('#ctRole').value = ''; $('#ctUser').value = '';
+    loadContacts();
+  } catch (e) { $('#ctErr').textContent = e.message; }
+};
+$('#ctTable').onclick = async e => {
+  const id = e.target.dataset.delcontact;
+  if (!id) return;
+  if (!confirm('Delete this contact? Any posting pointing at them loses its hiring contact too.')) return;
+  $('#ctErr').textContent = '';
+  try { await api(`/api/orgs/me/contacts/${id}`, {method:'DELETE'}); loadContacts(); }
+  catch (err) { $('#ctErr').textContent = err.message; }
+};
+function openPostingContact(pid, title) {
+  pcPosting = pid;
+  $('#contactsCard').classList.remove('hidden');
+  $('#pcPanel').classList.remove('hidden');
+  $('#pcTitle').textContent = `Hiring contact — ${title}`;
+  $('#pcErr').textContent = '';
+  $('#contactsCard').scrollIntoView({behavior:'smooth'});
+}
+$('#pcSet').onclick = async () => {
+  $('#pcErr').textContent = '';
+  const cid = $('#pcSelect').value;
+  if (!pcPosting || !cid) { $('#pcErr').textContent = 'Add a contact first.'; return; }
+  try {
+    await api(`/api/postings/${pcPosting}/contact`, {method:'PUT', body: JSON.stringify({
+      employer_contact_id: cid, relation: $('#pcRelation').value})});
+    $('#pcErr').textContent = 'Saved — warm intros for this posting now aim at that person.';
+  } catch (e) { $('#pcErr').textContent = e.message; }
+};
+$('#pcClear').onclick = async () => {
+  if (!pcPosting) return;
+  $('#pcErr').textContent = '';
+  try {
+    await api(`/api/postings/${pcPosting}/contact`, {method:'DELETE'});
+    $('#pcErr').textContent = 'Cleared — intros fall back to whoever created the posting.';
+  } catch (e) { $('#pcErr').textContent = e.message; }
+};
+
 // ---- events (book a booth) -----------------------------------------------------------------------
 async function loadEvents() {
   const events = (await api('/api/events').catch(()=>({events:[]}))).events;
@@ -545,10 +816,23 @@ async function loadEvents() {
     <td>${esc(e.title)} <span class="muted">${esc(e.kind)}</span></td>
     <td>${esc(e.location || '—')}</td>
     <td>${e.registered
-        ? `<span class="status">booth booked</span> <button class="ghost" data-unrsvp="${esc(e.id)}">Cancel</button>`
+        ? `<span class="status">booth booked</span>
+           <button class="ghost" data-checkin="${esc(e.id)}">Check in</button>
+           <button class="ghost" data-unrsvp="${esc(e.id)}">Cancel</button>`
         : `<button data-rsvp="${esc(e.id)}">Book a booth</button>`}</td></tr>`).join('')
     || '<tr><td colspan="4" class="muted">No upcoming events.</td></tr>';
   $('#eventsTable').onclick = async e => {
+    // C3: the code is the presence factor on top of the booking — it is read out in the room, so
+    // it is typed here rather than fetched.
+    const ci = e.target.dataset.checkin;
+    if (ci) {
+      const code = prompt('Enter the check-in code shown at the event:');
+      if (!code || !code.trim()) return;
+      try { await api(`/api/events/${ci}/checkin`, {method:'POST', body: JSON.stringify({code: code.trim()})});
+            alert('Checked in ✓'); }
+      catch (err) { alert(err.message); }
+      return;
+    }
     const r = e.target.dataset.rsvp, u = e.target.dataset.unrsvp;
     if (r || u) {
       await api(`/api/events/${r || u}/${r ? 'register' : 'unregister'}`, {method:'POST'})

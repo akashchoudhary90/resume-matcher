@@ -21,7 +21,17 @@ PROTECTED_KEYS = {
     # deliberate proxies the audit watches and scoring must not encode:
     "name", "postal_code", "zip", "neighbourhood", "neighborhood", "first_language", "mother_tongue",
     "community",
+    # age proxy (Phase 5, privacy F2): no such column exists and none may ever be added — the
+    # schema grep in tests/test_platform_db.py trips on any future attempt.
+    "graduation_year",
 }
+
+# Columns that are LEGAL in the platform schema but barred from every scoring feature dict.
+# `alumni_status` (Phase 5 C4) is a legitimate users column; `grad_year` is the pre-existing
+# student_profiles display field (001_platform.sql) — an age proxy that predates this guard, so
+# it cannot join PROTECTED_KEYS without failing the schema grep. Neither may EVER enter a
+# feature dict; assert_no_protected enforces that below (privacy F2).
+NO_SCORING_ATTRIBUTE_KEYS = {"alumni_status", "grad_year"}
 
 # The only attributes the audit plane is allowed to store (voluntary self-ID).
 AUDITABLE_ATTRIBUTES = {
@@ -65,6 +75,13 @@ class ScoringStore:
                 f"Refusing to put relationship-graph feature(s) {sorted(net)} into a scoring "
                 f"feature dict. Graph degree is a network-privilege proxy — it may drive the "
                 f"positive-action mitigation program, never a ranking/score (boundary #2)."
+            )
+        barred = NO_SCORING_ATTRIBUTE_KEYS & keys
+        if barred:
+            raise ProtectedDataError(
+                f"Refusing to put attribute(s) {sorted(barred)} into a scoring feature dict. "
+                f"These are legitimate platform columns (alumni standing, profile display "
+                f"fields) but are age/status proxies — they must never become scoring features."
             )
 
     def add_candidate(self, c: CandidateProfile, extra_features: dict | None = None) -> None:

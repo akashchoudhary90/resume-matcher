@@ -428,9 +428,16 @@ The LinkedIn path is self-upload only, RAM-intersected, zero non-member residue.
 - [x] AJ2 Browser-verify the full flow; console clean; 375px pass.
 
 ## Slice AK — retention/erasure job + legal launch gates ✅
-- [x] AK1 graph_retention job (purge expired edges/intros; erasure cascade on account deletion; tombstones);
+- [x] AK1 graph_retention job (purge expired edges/intros; GRAPH erasure via delete_my_network; tombstones);
       record PIA + legal-opinion + data-residency + pepper-leak-runbook as documented launch gates.
-- [x] AK2 Tests: retention purges expired, erasure cascade leaves no PII, intro_events PII-free.
+- [x] AK2 Tests: retention purges expired, graph erasure leaves no PII, intro_events PII-free.
+- **Scope correction (Phase 5 A3).** This line read "erasure cascade on account deletion", which
+  overclaimed: AK shipped `NetworkStore.delete_my_network` — a GRAPH-only cascade (edges, vouches,
+  intros, discovery tokens, tombstone). It never touched the account (resumes, applications, match
+  results, profile, consents, tokens), and no route or operator tool deleted an account at all. The
+  real two-plane cascade is Phase 5's `stores/erasure.py::erase_account` (audit.db first, then ONE
+  platform.db transaction with the tombstone inside it), behind `DELETE /api/account` (password
+  step-up) and `scripts/dsr_erase.py` — contract in PHASE5.md §6, pinned by tests/test_phase5_erasure.py.
 
 ## Phase-4 completion statement (2026-07-12)
 
@@ -442,3 +449,14 @@ network-poverty positive-action program, all four boundaries held (graph never e
 NETWORK_FEATURE_KEYS guard + boundary-trio tests). Remaining before turning the graph on for real
 students: the Slice AK legal gates (PIA, legal opinion, data-residency, breach runbook) + a real
 KMS for the tokenizer pepper. These are process/ops, not code.
+
+**Read this statement with the 2026-07-12 audit + Phase 5 in hand.** "COMPLETE" described the
+feature surface, not the promises around it: the audit found 95 confirmed gaps, of which the ones
+this document had asserted as done — the erasure cascade (above), consent-revoke cascades, and the
+fairness pass/fail semantics under suppression — are Phase-5 scope, specified in
+[`PHASE5.md`](PHASE5.md) and built behind the same flag. Phase-5's own out-of-scope items are
+recorded as gates rather than silently dropped: OIDC SSO, a real KMS, the Postgres port, the FIPPA
+PIA / legal opinion / residency / breach-runbook process gates, Playwright, vision-PDF, the
+multi-role picker, and URL ingest. `RM_ENV=prod` (A16) additionally makes an unset/weak admin
+password or an explicitly insecure cookie a boot failure — the cohost compose does not forward
+`RM_ENV` yet, and adding that line is the deliberate act of calling this stack production.

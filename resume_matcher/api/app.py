@@ -205,9 +205,17 @@ def create_app():
         raise RuntimeError("FastAPI not installed. pip install -r requirements-extra.txt") from exc
 
     from ..audit.defense_file import assert_defense_signing_configured
-    from .auth import ADMIN_COOKIE, assert_admin_password_strong, check_login, require_auth
+    from .auth import (
+        ADMIN_COOKIE,
+        admin_session_max_age,
+        assert_admin_password_strong,
+        check_login,
+        destroy_admin_session,
+        require_auth,
+    )
 
-    # Refuse to start if the admin password is a known-weak default (e.g. shipped admin/admin).
+    # A16: RM_ENV=prod refuses to start on an unset/weak admin password or an explicitly insecure
+    # cookie; every other environment only warns (the synthetic-data demo stays admin/admin-usable).
     assert_admin_password_strong()
     # Warn (or, in prod, refuse) if Defense-File signing is using the shared public dev key.
     assert_defense_signing_configured()
@@ -225,9 +233,11 @@ def create_app():
     # only when explicitly enabled so pushes stay safe to auto-deploy while Phase 1 is built out.
     if env_flag("RM_PLATFORM_ENABLED", False):
         from ..workers.runner import start_worker_pool
+        from .phase5 import router as phase5_router
         from .platform import router as platform_router
 
         app.include_router(platform_router)
+        app.include_router(phase5_router)   # docs/PHASE5.md §3.2 (mounts its job handlers too)
         start_worker_pool()  # re-queues stale running jobs from a dead process, then polls
         _start_retention_scheduler()  # actually enforce the graph retention/erasure windows
 
@@ -242,6 +252,17 @@ def create_app():
         @app.get("/student", include_in_schema=False)
         def student_page():
             return FileResponse(str(_STATIC / "student.html"))
+
+        @app.get("/repudiate", include_in_schema=False)
+        def repudiate_page():
+            # B3: PUBLIC (auth._PLATFORM_PREFIXES exempts it) — a non-member data subject has no
+            # account, so the "someone uploaded my contact card, remove me" page cannot sit behind
+            # either sign-in. Served only when the platform is on, which is the only time the
+            # backing /api/graph/repudiate routes exist.
+            page = _STATIC / "repudiate.html"
+            if page.exists():
+                return FileResponse(str(page))
+            raise HTTPException(404, "Repudiation page not found.")
 
         @app.get("/manifest.webmanifest", include_in_schema=False)
         def manifest():
@@ -912,7 +933,7 @@ def create_app():
             raise HTTPException(401, "Sign in first.")
         return {"deleted": _acct().delete_project(user["id"], pid)}
 
-    # ---- Admin sign-in (form + session cookie; replaces the HTTP Basic Auth popup) --------------
+    # ---- Admin sign-in (form + SERVER-SIDE session; A15, api/auth.py) --------------------------
     @app.post("/api/login")
     async def admin_login(request: Request, response: Response) -> dict:
         if not auth_rate.allow("auth:" + _client_key(request), time.time()):
@@ -921,12 +942,16 @@ def create_app():
         token = check_login(data.get("username", ""), data.get("password", ""))
         if token is None:
             raise HTTPException(401, "Wrong username or password.")
-        response.set_cookie(ADMIN_COOKIE, token, max_age=cookie_max_age(),
+        # The cookie must not outlive the server-side row (auth._session_seconds is the authority).
+        response.set_cookie(ADMIN_COOKIE, token, max_age=admin_session_max_age(),
                             httponly=True, samesite="lax", secure=cookie_secure)
         return {"ok": True}
 
     @app.post("/api/logout")
-    def admin_logout(response: Response) -> dict:
+    def admin_logout(request: Request, response: Response) -> dict:
+        # A15: delete the SESSION, not just the browser's copy of the cookie — a captured token
+        # stayed valid forever under the old stateless-HMAC scheme.
+        destroy_admin_session(request.cookies.get(ADMIN_COOKIE, ""))
         response.delete_cookie(ADMIN_COOKIE)
         return {"ok": True}
 

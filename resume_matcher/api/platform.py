@@ -11,6 +11,18 @@ what the pipeline extracted and what the human submitted is appended to
 data/eval/jd_extraction_corrections.jsonl (RM_JD_CORRECTIONS_PATH) — the measure-then-improve
 loop the matching engine already runs, extended to extraction (docs/JD_AUTOFILL.md §4).
 
+Phase 5 (docs/PHASE5.md §3.1) enforces, in place, the promises these routes already made:
+  * A1 — /api/graph/repudiate no longer deletes anything. An anonymous assertion buys a CHALLENGE
+    (prove the address) or a coordinator REVIEW; both answer the same neutral 202.
+  * A2/SM-M2 — a mutual without `warm_intro` is pruned from pathfinding BEFORE ranking, so the
+    surface is not a consent oracle; the binding check lives inside IntroStore.create's txn.
+  * A5/A6 — revoking a consent DELETES what it authorized (resume blob + scores, audit self-ID).
+  * A7/FH-H3 — the `network_analytics` cohort filter applies to intro-equity AND network-coverage,
+    and deliberately NOT to the self-ID report (whose basis is `self_id_audit`).
+  * A8 — the two self-ID-backed reports are served from pinned snapshots, so a coordinator cannot
+    difference two reads across one student joining the cohort.
+  * B6/B7 — student posting search; student-initiated withdrawal (terminal, no reason collected).
+
 NOTE: no `from __future__ import annotations` — FastAPI introspects real annotation objects.
 """
 import base64
@@ -39,19 +51,35 @@ from ..matching.taxonomy import normalize_skills, search_skills
 from ..stores.db import connect as db_connect
 from ..stores.engage import EngageError, EventStore, InterviewStore, MessageStore
 from ..stores.graph import GraphError, NetworkStore
-from ..stores.intros import IntroError, IntroStore, find_paths
+from ..stores.intros import IntroError, IntroStore, find_paths, path_origin
 from ..stores.matches import MatchStore
+from ..stores.notifications import NotificationStore
 from ..stores.platform import OrgStore, PostingError, PostingStore
 from ..stores.relationships import RelationshipError, RelationshipStore
 from ..stores.students import CONSENT_PURPOSES, ApplicationStore, StudentError, StudentStore
 from ..workers.runner import get_job_store, register_handler
 from .auth import require_role
 
-# Phase-4 graph purposes (subset of CONSENT_PURPOSES) exposed via the granular consent API.
+# Phase-4 graph purposes (subset of CONSENT_PURPOSES) exposed via the granular consent API. The
+# A5/A6 storage/audit purposes deliberately do NOT route here (asserted by a test) — their revoke
+# cascade lives on the students consent route.
 _GRAPH_PURPOSES = ("contacts_upload", "graph_discoverable", "warm_intro", "network_analytics")
-# Broker role -> the vouch verification tier an accepted intro produces.
-_BROKER_VERIFY_LEVEL = {"employer": "employer_verified", "coordinator": "coordinator",
-                        "admin": "coordinator", "student": "self"}
+
+
+def _broker_verify_level(user: dict) -> str:
+    """The vouch tier an accepted intro produces, derived from WHO the broker is.
+
+    C4 turned this from a role->tier dict into a function: a coordinator-verified alum brokering an
+    intro is a stronger attestation than a random peer, but alumni-ness is an ATTRIBUTE on the user
+    (D4), never a role — so it cannot be expressed as a `user["role"]` lookup."""
+    role = user.get("role")
+    if role == "employer":
+        return "employer_verified"
+    if role in ("coordinator", "admin"):
+        return "coordinator"
+    if role == "student" and user.get("alumni_status") == "verified":
+        return "alumni_verified"
+    return "self"
 
 _log = logging.getLogger("resume_matcher.api.platform")
 
@@ -95,6 +123,47 @@ class _PerUserRate:
 
 
 _extract_rate = _PerUserRate()
+
+
+# ---- per-client rate limiting for the PUBLIC repudiation routes (A1) -----------------------------
+class _RateLimiter:
+    """Token bucket per client key — a local twin of app.py's. Both it and `_client_key` are
+    duplicated rather than imported from `.app` (feasibility L5): that module pulls the whole demo
+    graph in, and platform.py must not depend on the demo to gate a public route."""
+
+    def __init__(self, capacity: int, refill_per_sec: float) -> None:
+        self.capacity = float(max(1, capacity))
+        self.refill = max(0.001, refill_per_sec)
+        self._buckets: dict[str, tuple[float, float]] = {}
+        self._lock = threading.Lock()
+
+    def allow(self, key: str, now: float) -> bool:
+        with self._lock:
+            if len(self._buckets) > 10000:
+                self._buckets.clear()  # crude bound, same posture as the demo limiter
+            tokens, last = self._buckets.get(key, (self.capacity, now))
+            tokens = min(self.capacity, tokens + (now - last) * self.refill)
+            if tokens < 1.0:
+                self._buckets[key] = (tokens, now)
+                return False
+            self._buckets[key] = (tokens - 1.0, now)
+            return True
+
+
+def _client_key(request: Request) -> str:
+    """Best-effort client identity for the public limiter.
+
+    TRUST BOUNDARY (security H3): the first X-Forwarded-For hop is CALLER-SUPPLIED unless a trusted
+    front (our Caddy) rewrites it, so this limiter is a speed bump against casual flooding — never
+    the anti-bombing control. That job belongs to the IP-INDEPENDENT per-email and global 24h send
+    caps inside NetworkStore.create_repudiation."""
+    xff = request.headers.get("x-forwarded-for", "")
+    if xff:
+        return xff.split(",")[0].strip()
+    return request.client.host if request.client else "unknown"
+
+
+_repudiate_rate = _RateLimiter(3, 5 / 3600)
 
 
 # ---- job handler: the extraction pipeline runs on the DB-backed queue ---------------------------
@@ -225,7 +294,12 @@ def create_posting(body: dict, user: dict = Depends(require_role("employer", "co
 
 
 @router.get("/api/postings")
-def list_postings(status: str = "", user: dict = Depends(require_role())):
+def list_postings(status: str = "", q: str = "", employment_type: str = "", work_mode: str = "",
+                  pay_min: float | None = None, deadline_after: str = "", sort: str = "newest",
+                  page: int = 1, page_size: int = 20, user: dict = Depends(require_role())):
+    """B6: the student branch is a filtered/sorted/paged SEARCH over live postings in their own
+    school, so its response carries {postings, total, page, page_size}. Employer/coordinator
+    branches are unchanged review surfaces and keep the bare {postings} shape."""
     store = _posting_store()
     school = user.get("school_id") or 1
     if user["role"] in ("coordinator", "admin"):
@@ -235,7 +309,9 @@ def list_postings(status: str = "", user: dict = Depends(require_role())):
             return {"postings": []}
         return {"postings": store.list(status=status or None, org_id=user["org_id"],
                                        school_id=None)}  # an org can span schools
-    return {"postings": store.list(status="live", school_id=school)}  # students
+    return store.search(school_id=school, status="live", q=q, employment_type=employment_type,
+                        work_mode=work_mode, pay_min=pay_min, deadline_after=deadline_after,
+                        sort=sort, page=page, page_size=page_size)
 
 
 @router.get("/api/postings/{posting_id}")
@@ -324,7 +400,8 @@ def approve_posting(posting_id: str, body: dict | None = None,
     # event-driven matching: a posting going live is THE moment its shortlist gets computed
     get_job_store().enqueue("match_posting", {"posting_id": posting_id})
     _notify_creator(posting, "Your posting is live",
-                    f"“{posting['title']}” was approved by career services and is now live.")
+                    f"“{posting['title']}” was approved by career services and is now live.",
+                    kind="posting_approved")
     return posting
 
 
@@ -341,9 +418,13 @@ def reject_posting(posting_id: str, body: dict | None = None,
                                               note=note)
     except PostingError as exc:
         raise HTTPException(409, str(exc))
+    # the reviewer's note is coordinator free text and stays OUT of the composed body — the
+    # notifications table holds server-composed text only; the note itself rides the posting's
+    # event log, which is where the employer reads it anyway.
     _notify_creator(posting, "Your posting needs changes",
-                    f"“{posting['title']}” was returned by career services."
-                    + (f" Note: {note}" if note else ""))
+                    f"“{posting['title']}” was returned by career services"
+                    + (" with a reviewer's note — open the posting to read it." if note else "."),
+                    kind="posting_rejected")
     return posting
 
 
@@ -439,6 +520,23 @@ def update_profile(body: dict, user: dict = Depends(require_role("student"))):
         school_id=user.get("school_id") or 1)}
 
 
+def _revoke_cascade(user_id: int, purpose: str) -> None:
+    """A5/A6: a revoke must DELETE what the consent authorized, not merely stop new writes — a
+    toggle that leaves the data behind is a broken promise, not a consent.
+
+    `graph_discoverable` keeps its own cascade in set_graph_consent (edges + discovery tokens);
+    those purposes never reach this route (asserted by a test)."""
+    if purpose == "profile_matching":
+        MatchStore().delete_for_student(user_id)      # already-computed scores go too
+    elif purpose == "resume_storage":
+        _student_store().delete_resume(user_id)       # blob + redacted text, hard
+        MatchStore().delete_for_student(user_id)      # every score was derived from that resume
+    elif purpose == "self_id_audit":
+        from ..stores.audit_store import AuditDB      # deferred: the audit plane is a separate file
+
+        AuditDB().delete_self_id(_candidate_ref(user_id))
+
+
 @router.post("/api/students/me/consents")
 def set_consent(body: dict, user: dict = Depends(require_role("student"))):
     purpose, granted = str(body.get("purpose") or ""), bool(body.get("granted"))
@@ -447,8 +545,8 @@ def set_consent(body: dict, user: dict = Depends(require_role("student"))):
         store.set_consent(user["id"], purpose, granted)
     except StudentError as exc:
         raise HTTPException(400, str(exc))
-    if purpose == "profile_matching" and not granted:
-        MatchStore().delete_for_student(user["id"])  # revoke removes already-computed scores too
+    if not granted:
+        _revoke_cascade(user["id"], purpose)
     return {"consents": store.consents(user["id"])}
 
 
@@ -531,10 +629,40 @@ def update_application(application_id: str, body: dict,
         raise HTTPException(404, "No such application.")
     posting = _posting_store().get(app_row["posting_id"])
     _require_own_org_posting(posting, user)
+    to_status = str(body.get("status") or "")
+    if to_status == "withdrawn":
+        # B7: withdrawal is the student's speech about their own candidacy — an employer marking
+        # someone "withdrawn" would put words in their mouth (and dodge the funnel's reject count).
+        raise HTTPException(409, "Students withdraw their own applications.")
     try:
-        return apps.set_status(application_id, str(body.get("status") or ""))
+        updated = apps.set_status(application_id, to_status)
     except StudentError as exc:
         raise HTTPException(409, str(exc))
+    _notify_user(app_row["student_id"], posting.get("school_id") or 1, "application_status",
+                 "Your application status changed",
+                 f"Your application to “{posting.get('title') or 'a posting'}” is now {to_status}.",
+                 entity="application", entity_id=application_id)
+    return updated
+
+
+@router.post("/api/applications/{application_id}/withdraw")
+def withdraw_application(application_id: str, user: dict = Depends(require_role("student"))):
+    """B7. Student-owned, terminal, and NO reason is ever collected — a withdrawal is a fact, not a
+    confession, and a free-text 'why did you leave' box is exactly the kind of thing that ends up
+    read as a signal about the person."""
+    apps = ApplicationStore()
+    app_row = apps.get(application_id)
+    if app_row is None or app_row["student_id"] != user["id"]:
+        raise HTTPException(404, "No such application.")   # IDOR: same shape as a missing row
+    try:
+        apps.withdraw(application_id, user["id"])
+    except StudentError as exc:
+        raise HTTPException(409, str(exc))
+    posting = _posting_store().get(app_row["posting_id"]) or {}
+    _notify_creator(posting, "An applicant withdrew",
+                    f"An applicant withdrew from “{posting.get('title') or 'your posting'}”.",
+                    kind="application_status")
+    return {"status": "withdrawn"}
 
 
 @router.post("/api/applications/{application_id}/request-human-review")
@@ -729,11 +857,18 @@ def get_messages(application_id: str, user: dict = Depends(require_role())):
 
 @router.post("/api/applications/{application_id}/messages", status_code=201)
 def send_message(application_id: str, body: dict, user: dict = Depends(require_role())):
-    _application_access(application_id, user)
+    app_row, posting = _application_access(application_id, user)
     try:
-        return MessageStore().send(application_id, user["id"], str(body.get("body") or ""))
+        sent = MessageStore().send(application_id, user["id"], str(body.get("body") or ""))
     except EngageError as exc:
         raise HTTPException(400, str(exc))
+    # the thread's two sides: the applicant and the posting's creator. The message TEXT never
+    # enters the notification — only the fact that one arrived (B4-lite: no user free text).
+    for uid in {app_row["student_id"], posting.get("created_by")} - {user["id"]}:
+        _notify_user(uid, posting.get("school_id") or 1, "message", "New message",
+                     f"There's a new message on the thread for “{posting.get('title') or 'a posting'}”.",
+                     entity="application", entity_id=application_id)
+    return sent
 
 
 @router.get("/api/messages/unread-count")
@@ -754,12 +889,16 @@ def unread_count(user: dict = Depends(require_role())):
 @router.post("/api/applications/{application_id}/interview-slots", status_code=201)
 def propose_slots(application_id: str, body: dict,
                   user: dict = Depends(require_role("employer", "coordinator", "admin"))):
-    _application_access(application_id, user)
+    app_row, posting = _application_access(application_id, user)
     try:
-        return {"slots": InterviewStore().propose(application_id, user["id"],
-                                                  body.get("slots") or [])}
+        slots = InterviewStore().propose(application_id, user["id"], body.get("slots") or [])
     except EngageError as exc:
         raise HTTPException(400, str(exc))
+    _notify_user(app_row["student_id"], posting.get("school_id") or 1, "interview_proposed",
+                 "Interview times proposed",
+                 f"An employer proposed interview times for “{posting.get('title') or 'a posting'}”.",
+                 entity="application", entity_id=application_id)
+    return {"slots": slots}
 
 
 @router.get("/api/applications/{application_id}/interview-slots")
@@ -787,11 +926,18 @@ def cancel_slot(slot_id: str, user: dict = Depends(require_role())):
     slot = store.get(slot_id)
     if slot is None:
         raise HTTPException(404, "No such slot.")
-    _application_access(slot["application_id"], user)
+    app_row, posting = _application_access(slot["application_id"], user)
     try:
-        return store.cancel(slot_id)
+        out = store.cancel(slot_id)
     except EngageError as exc:
         raise HTTPException(409, str(exc))
+    if user["id"] != app_row["student_id"]:   # a student cancelling doesn't notify themselves
+        _notify_user(app_row["student_id"], posting.get("school_id") or 1, "interview_cancelled",
+                     "An interview slot was cancelled",
+                     f"A proposed interview time for “{posting.get('title') or 'a posting'}” "
+                     "was cancelled.",
+                     entity="application", entity_id=slot["application_id"])
+    return out
 
 
 @router.get("/api/students/me/interviews")
@@ -827,12 +973,19 @@ def delete_self_id(user: dict = Depends(require_role("student"))):
 
 
 def _funnel_rows(school_id: int) -> list[dict]:
-    """Per-posting selection funnel over REAL applications (+ exposure + match counts)."""
+    """Per-posting selection funnel over REAL applications (+ exposure + match counts).
+
+    B7: a withdrawn application left the funnel by the STUDENT's choice, so it is not an employer
+    selection decision — counting it in `applied` would depress every selection_rate below it and
+    read as employer behaviour. It gets its own column instead of vanishing."""
     with closing(db_connect()) as conn:
         rows = conn.execute(
             "SELECT p.id, p.title, o.name AS org_name, p.status, "
             "(SELECT COUNT(*) FROM match_results m WHERE m.posting_id = p.id) AS candidates_scored,"
-            "(SELECT COUNT(*) FROM applications a WHERE a.posting_id = p.id) AS applied, "
+            "(SELECT COUNT(*) FROM applications a WHERE a.posting_id = p.id "
+            " AND a.status != 'withdrawn') AS applied, "
+            "(SELECT COUNT(*) FROM applications a WHERE a.posting_id = p.id "
+            " AND a.status = 'withdrawn') AS withdrawn, "
             "(SELECT COUNT(*) FROM applications a WHERE a.posting_id = p.id "
             " AND a.status IN ('shortlisted','advanced','hired')) AS shortlisted_or_beyond, "
             "(SELECT COUNT(*) FROM applications a WHERE a.posting_id = p.id "
@@ -867,22 +1020,51 @@ def funnel_report(format: str = "json",
         buf = io.StringIO()
         writer = csv.writer(buf)
         writer.writerow(["posting_id", "title", "employer", "status", "candidates_scored",
-                         "applied", "shortlisted_or_beyond", "hired", "human_review_requests",
-                         "shortlist_viewers", "selection_rate"])
+                         "applied", "withdrawn", "shortlisted_or_beyond", "hired",
+                         "human_review_requests", "shortlist_viewers", "selection_rate"])
         for r in rows:
             writer.writerow([r["id"], r["title"], r["org_name"], r["status"],
-                             r["candidates_scored"], r["applied"], r["shortlisted_or_beyond"],
-                             r["hired"], r["human_review_requests"], r["shortlist_viewers"],
-                             r["selection_rate"]])
+                             r["candidates_scored"], r["applied"], r["withdrawn"],
+                             r["shortlisted_or_beyond"], r["hired"], r["human_review_requests"],
+                             r["shortlist_viewers"], r["selection_rate"]])
         return PlainTextResponse(buf.getvalue(), media_type="text/csv")
     return {"score_kind": "fit_readiness_not_hire_probability", "postings": rows}
+
+
+def _serve_snapshot(report_key: str, school_id: int, refs_count: int, compute) -> dict:
+    """A8 serving policy for the self-ID-backed reports.
+
+    Cell suppression stops a single read from naming anyone; it does nothing about DIFFERENCING —
+    read the report, wait for one student to join the cohort, read it again, and the delta is that
+    student. So a pinned snapshot is served until BOTH: it has aged past RM_AUDIT_SNAPSHOT_HOURS,
+    AND the cohort has moved by at least MIN_CELL. Either condition alone still leaves a usable
+    channel (time alone lets you wait out the pin; size alone lets you trigger a recompute).
+
+    The pin lives in the AUDIT plane next to the data it summarizes — never in platform.db."""
+    from ..stores.audit_store import MIN_CELL, AuditDB
+
+    audit = AuditDB()
+    snap = audit.get_snapshot(report_key, school_id)
+    if snap is not None:
+        aged = (time.time() - snap["computed_at"]) >= env_int("RM_AUDIT_SNAPSHOT_HOURS", 24) * 3600
+        moved = abs(refs_count - snap["refs_count"]) >= MIN_CELL
+        if not (aged and moved):
+            return snap["payload"]
+    payload = compute()
+    audit.save_snapshot(report_key, school_id, payload, refs_count)
+    return payload
 
 
 @router.get("/api/coordinator/reports/self-id")
 def self_id_report(user: dict = Depends(require_role("coordinator", "admin"))):
     """Aggregate self-ID distribution among this school's APPLICANTS, min-cell suppressed.
     The scoring plane supplies only an opaque ref list; the audit DB answers with counts —
-    the aligned-egress shape from stores/data_planes.py, made persistent."""
+    the aligned-egress shape from stores/data_planes.py, made persistent.
+
+    FH-H3: the `network_analytics` cohort filter (A7) is deliberately NOT applied here. This
+    report's consent basis is `self_id_audit` — the consent the respondents actually gave for
+    exactly this aggregate. Layering the analytics consent on top would empty the report for every
+    student who consented to the bias audit and nothing else, which is the opposite of the fix."""
     from ..stores.audit_store import AuditDB
     from ..stores.data_planes import AUDITABLE_ATTRIBUTES
 
@@ -891,22 +1073,65 @@ def self_id_report(user: dict = Depends(require_role("coordinator", "admin"))):
         refs = ["student-" + str(r["student_id"]) for r in conn.execute(
             "SELECT DISTINCT a.student_id FROM applications a "
             "JOIN postings p ON p.id = a.posting_id WHERE p.school_id=?", (school,))]
-    audit = AuditDB()
-    return {"applicants": len(refs),
-            "attributes": {attr: audit.aggregate(refs, attr)
-                           for attr in sorted(AUDITABLE_ATTRIBUTES)}}
+
+    def _compute() -> dict:
+        audit = AuditDB()
+        return {"applicants": len(refs),
+                "attributes": {attr: audit.aggregate(refs, attr)
+                               for attr in sorted(AUDITABLE_ATTRIBUTES)}}
+
+    return _serve_snapshot("self_id", school, len(refs), _compute)
 
 
-# ---- notifications (Slice M; best-effort by contract) ----------------------------------------------
-def _notify_creator(posting: dict, subject: str, body: str) -> None:
+# ---- notifications (Slice M + Phase-5 B4-lite; best-effort by contract) ----------------------------
+def _user_email(user_id: int) -> str | None:
+    with closing(db_connect()) as conn:
+        row = conn.execute("SELECT email FROM users WHERE id=?", (user_id,)).fetchone()
+    return row["email"] if row else None
+
+
+def _notify_user(user_id: int | None, school_id: int, kind: str, title: str, body: str = "",
+                 entity: str | None = None, entity_id: str | None = None,
+                 *, email: bool = False) -> None:
+    """B4-lite fan-out. Best-effort by contract, like every notification here: a failed row or a
+    dead mail server must never fail the action that triggered it.
+
+    Titles/bodies are SERVER-COMPOSED from org/posting content only — never a user's message text
+    and never an email address (NotificationStore rejects the latter at the chokepoint, so account
+    erasure can't leave the erased person's address inside someone else's feed). A falsy user_id
+    (None, or the created_by=0 erasure sentinel) is nobody: no-op."""
+    if not user_id:
+        return
     try:
-        with closing(db_connect()) as conn:
-            row = conn.execute("SELECT email FROM users WHERE id=?",
-                               (posting["created_by"],)).fetchone()
-        if row:
-            notify.send(row["email"], subject, body)
+        NotificationStore().notify(user_id, school_id, kind, title, body, entity=entity,
+                                   entity_id=entity_id,
+                                   email_to=_user_email(user_id) if email else None)
     except Exception:  # noqa: BLE001
         _log.warning("notification failed", exc_info=True)
+
+
+def _notify_creator(posting: dict, subject: str, body: str, kind: str | None = None) -> None:
+    """The posting creator's ping. With `kind` it is a notification row + email (B4-lite); without,
+    it stays email-only — the apply ping predates notifications and has no kind of its own."""
+    creator = posting.get("created_by")
+    if not creator:
+        return  # 0 = erased-user sentinel (§6 step 26): there is nobody to notify
+    try:
+        if kind:
+            _notify_user(creator, posting.get("school_id") or 1, kind, subject, body,
+                         entity="posting", entity_id=posting.get("id"), email=True)
+            return
+        to = _user_email(creator)
+        if to:
+            notify.send(to, subject, body)
+    except Exception:  # noqa: BLE001
+        _log.warning("notification failed", exc_info=True)
+
+
+def _school_coordinators(school_id: int) -> list[int]:
+    with closing(db_connect()) as conn:
+        return [r["id"] for r in conn.execute(
+            "SELECT id FROM users WHERE school_id=? AND role='coordinator'", (school_id,))]
 
 
 # ==================================================================================================
@@ -999,19 +1224,85 @@ def delete_my_network(user: dict = Depends(require_role())):
     return _network_store().delete_my_network(user["id"])
 
 
-@router.post("/api/graph/repudiate")
-def repudiate(body: dict):
-    """PUBLIC non-member data-subject request (a non-member has no account). Rate-limited; the
-    self-asserted identity is tokenized in RAM, tombstoned, and any resolved edge is deleted."""
-    school_id = int(body.get("school_id") or 1)
-    if not _extract_rate.allow(-abs(hash(str(body.get("last") or "")) % 100000)):
-        raise HTTPException(429, "Too many requests — try again shortly.")
+def _send_repudiation_challenge(email: str, request_id: str, token: str) -> None:
+    """Best-effort, like every send here. The token exists only in this call: its sha256 is all that
+    was persisted, and it is never returned to the HTTP caller — otherwise whoever guessed an
+    address would hold the challenge for it."""
     try:
-        return _network_store().repudiate(
-            school_id, first=str(body.get("first") or ""), last=str(body.get("last") or ""),
-            company=str(body.get("company") or ""), email=str(body.get("email") or ""))
+        notify.send(
+            email, "Confirm your removal request",
+            "Someone (probably you) asked us to remove records matching this email address.\n\n"
+            f"Request id: {request_id}\nConfirmation code: {token}\n\n"
+            "Enter both on the removal page to confirm. The code expires in 48 hours.\n"
+            "If this wasn't you, ignore this message — nothing has changed or will change.")
+    except Exception:  # noqa: BLE001
+        _log.warning("repudiation challenge send failed", exc_info=True)
+
+
+@router.post("/api/graph/repudiate", status_code=202)
+def repudiate(body: dict, request: Request):
+    """PUBLIC non-member data-subject request, A1 (a non-member has no account to sign into).
+
+    Nothing is deleted here any more. An anonymous assertion is not authorization, so this route
+    only ever ENQUEUES: an `email` starts a challenge (prove control of the address and the deletion
+    becomes self-action), anything else queues a coordinator review of the asserted name.
+
+    Both branches answer 202 with the same shape whether or not the details matched anything — and
+    the email branch answers identically when a send cap silently swallowed the mail (security H3).
+    A different status, body, or timing per branch would make this route a membership oracle, which
+    is the whole thing the queue exists to avoid."""
+    if not _repudiate_rate.allow(_client_key(request), time.time()):
+        raise HTTPException(429, "Too many requests — try again shortly.")
+    school_id = int(body.get("school_id") or 1)
+    email = str(body.get("email") or "").strip()
+    store = _network_store()
+    try:
+        if email:
+            made = store.create_repudiation(school_id, kind="email_challenge", email=email)
+            if made.get("email_token"):
+                _send_repudiation_challenge(email, made["request_id"], made["email_token"])
+            return {"status": "challenge_sent", "request_id": made["request_id"]}
+        made = store.create_repudiation(
+            school_id, kind="name_review", first=str(body.get("first") or ""),
+            last=str(body.get("last") or ""), company=str(body.get("company") or ""))
     except GraphError as exc:
         raise HTTPException(400, str(exc))
+    return {"status": "queued_for_review", "request_id": made["request_id"]}
+
+
+@router.post("/api/graph/repudiate/confirm")
+def repudiate_confirm(body: dict, request: Request):
+    """The email path's authorization step: request_id + address + emailed token. Only THIS route
+    reaches a deletion executor, and only the email one (security L2)."""
+    if not _repudiate_rate.allow(_client_key(request), time.time()):
+        raise HTTPException(429, "Too many requests — try again shortly.")
+    try:
+        _network_store().confirm_repudiation(str(body.get("request_id") or ""),
+                                             str(body.get("email") or ""),
+                                             str(body.get("token") or ""))
+    except GraphError as exc:
+        raise HTTPException(400, str(exc))
+    return {"ok": True}
+
+
+@router.get("/api/coordinator/repudiations")
+def list_repudiations(status: str = "pending",
+                      user: dict = Depends(require_role("coordinator", "admin"))):
+    """The name-review queue, school-scoped from the SESSION (D13) — never from a query param.
+    Rows carry a counts-only match preview so the decision isn't blind (security L2)."""
+    return {"requests": _network_store().list_repudiations(user.get("school_id") or 1, status)}
+
+
+@router.post("/api/coordinator/repudiations/{request_id}/decide")
+def decide_repudiation(request_id: str, body: dict,
+                       user: dict = Depends(require_role("coordinator", "admin"))):
+    """Approve/deny a name review. The store's WHERE carries school_id, so another tenant's request
+    is simply absent -> 404, never 403 (a 403 would confirm the id exists — security C1)."""
+    try:
+        return _network_store().decide_repudiation(
+            user.get("school_id") or 1, request_id, user["id"], bool(body.get("approve")))
+    except GraphError as exc:
+        raise HTTPException(404, str(exc))
 
 
 # ---- Slice AB: contacts import (202 + poll; consent-gated; no count egress) ------------------------
@@ -1037,10 +1328,36 @@ async def import_contacts(request: Request, user: dict = Depends(require_role("s
 
 # ---- Slice AD: pathfinder (bare boolean, gated behind an application) ------------------------------
 def _hiring_manager(posting: dict) -> int | None:
+    """The pathfinder's target. Preference order (C5): the posting's designated contact member,
+    then the member behind its employer_contacts business contact, then the creator as fallback.
+
+    created_by=0 is the ERASURE SENTINEL, not a person (§6 step 26): an erased employer's postings
+    survive as org records with created_by=0, and targeting uid 0 would resurrect the erased human
+    as a graph node. Map it — and NULL — to None; callers already 409 on a missing target (FM-M5)."""
     with closing(db_connect()) as conn:
-        row = conn.execute("SELECT contact_user_id FROM posting_contacts WHERE posting_id=? "
-                           "AND contact_user_id IS NOT NULL LIMIT 1", (posting["id"],)).fetchone()
-    return row["contact_user_id"] if row else posting.get("created_by")
+        row = conn.execute(
+            "SELECT COALESCE(pc.contact_user_id, ec.contact_user_id) AS uid FROM posting_contacts pc "
+            "LEFT JOIN employer_contacts ec ON ec.id = pc.employer_contact_id "
+            "WHERE pc.posting_id=? AND COALESCE(pc.contact_user_id, ec.contact_user_id) IS NOT NULL "
+            "LIMIT 1", (posting["id"],)).fetchone()
+    target = row["uid"] if row else posting.get("created_by")
+    return target or None
+
+
+def _broker_ok(store: StudentStore):
+    """A2: a mutual who never granted `warm_intro` is not a broker, and a path through them must be
+    pruned BEFORE ranking so the response is byte-identical to 'no path' — a shorter list or a
+    lower score would turn the pathfinder into an oracle for who opted into brokering.
+
+    Memoized per call: a bounded BFS revisits the same candidate many times."""
+    cache: dict[int, bool] = {}
+
+    def ok(uid: int) -> bool:
+        if uid not in cache:
+            cache[uid] = store.has_consent(uid, "warm_intro")
+        return cache[uid]
+
+    return ok
 
 
 def _has_application(user_id: int, posting_id: str) -> bool:
@@ -1061,7 +1378,8 @@ def intro_available(posting_id: str, user: dict = Depends(require_role("student"
     target = _hiring_manager(posting)
     if target is None or target == user["id"]:
         return {"warm_intro_available": False}
-    paths = find_paths(_rel_store(), user["id"], target, user.get("school_id") or 1)
+    paths = find_paths(_rel_store(), user["id"], target, user.get("school_id") or 1,
+                       broker_ok=_broker_ok(_student_store()))
     return {"warm_intro_available": bool(paths)}
 
 
@@ -1090,17 +1408,28 @@ def create_intro(body: dict, user: dict = Depends(require_role("student"))):
     target = _hiring_manager(posting)
     if target is None or target == user["id"]:
         raise HTTPException(409, "No warm intro is available for this posting.")
-    paths = find_paths(_rel_store(), user["id"], target, user.get("school_id") or 1)
+    paths = find_paths(_rel_store(), user["id"], target, user.get("school_id") or 1,
+                       broker_ok=_broker_ok(_student_store()))
     if not paths:
         raise HTTPException(409, "No warm intro is available for this posting.")
     note = redact_text(str(body.get("note") or "")[:500])
+    school = user.get("school_id") or 1
     try:
-        return _intro_store().create(
-            school_id=user.get("school_id") or 1, posting_id=posting["id"],
+        # C2: origin is metadata about the PATH ('did this lean on a bridge we manufactured?'),
+        # never an attribute of the student. SM-M2: the binding broker-consent check is inside
+        # create()'s transaction — the _broker_ok prune above is advisory (a broker can revoke in
+        # the window between pathfinding and INSERT).
+        created = _intro_store().create(
+            school_id=school, posting_id=posting["id"],
             application_id=application_id, requester_user_id=user["id"], target_user_id=target,
-            path=paths[0], note_redacted=note)
+            path=paths[0], note_redacted=note, origin=path_origin(paths[0]))
     except IntroError as exc:
         raise HTTPException(409, str(exc))
+    _notify_user(paths[0]["broker"], school, "intro_request", "Someone asked you for an intro",
+                 "A student you're connected to asked for a warm introduction. Open your intro "
+                 "inbox to accept or decline.",
+                 entity="intro", entity_id=created["intro_id"])
+    return created
 
 
 @router.get("/api/intros/inbox")
@@ -1123,11 +1452,18 @@ def accept_intro(intro_id: str, body: dict, user: dict = Depends(require_role())
         school_id=intro["school_id"], voucher_user_id=user["id"],
         subject_user_id=intro["requester_user_id"], relationship=str(body.get("relationship") or "other"),
         evidence=str(body.get("evidence") or ""), scope="posting", posting_id=intro["posting_id"],
-        verify_level=_BROKER_VERIFY_LEVEL.get(user["role"], "self"))
+        verify_level=_broker_verify_level(user))
     try:
-        return _intro_store().accept(intro_id, user["id"], vouch["vouch_id"])
+        out = _intro_store().accept(intro_id, user["id"], vouch["vouch_id"])
     except IntroError as exc:
         raise HTTPException(409, str(exc))
+    # accept is the ONLY side that notifies: a decline stays silent to the requester (D8), so a
+    # declined intro remains indistinguishable from 'no path was ever found'.
+    _notify_user(intro["requester_user_id"], intro["school_id"], "intro_accepted",
+                 "Your intro request was accepted",
+                 "A connection agreed to introduce you. Open your intro requests to see who.",
+                 entity="intro", entity_id=intro_id)
+    return out
 
 
 @router.post("/api/intros/requests/{intro_id}/decline")
@@ -1150,15 +1486,23 @@ def broker_block(body: dict, user: dict = Depends(require_role())):
 # ---- Slice AF: vouches ----------------------------------------------------------------------------
 @router.post("/api/vouches", status_code=201)
 def create_vouch(body: dict, user: dict = Depends(require_role())):
+    subject_id = int(body.get("subject_user_id") or 0)
+    school = user.get("school_id") or 1
     try:
-        return _rel_store().create_vouch(
-            school_id=user.get("school_id") or 1, voucher_user_id=user["id"],
-            subject_user_id=int(body.get("subject_user_id") or 0),
+        vouch = _rel_store().create_vouch(
+            school_id=school, voucher_user_id=user["id"],
+            subject_user_id=subject_id,
             relationship=body.get("relationship"), evidence=str(body.get("evidence") or ""),
             scope=str(body.get("scope") or "general"), posting_id=body.get("posting_id"),
+            org_id=int(body["org_id"]) if body.get("org_id") else None,   # B10: was dropped here
             verify_level="self")   # self-authored -> low weight until a coordinator verifies
     except RelationshipError as exc:
         raise HTTPException(400, str(exc))
+    _notify_user(subject_id, school, "vouch_received", "Someone vouched for you",
+                 "A new vouch about you was added. Open your reference ledger to review or "
+                 "contest it.",
+                 entity="vouch", entity_id=vouch.get("vouch_id"))
+    return vouch
 
 
 @router.get("/api/vouches/about-me")
@@ -1169,9 +1513,15 @@ def vouches_about_me(user: dict = Depends(require_role())):
 @router.post("/api/vouches/{vouch_id}/contest")
 def contest_vouch(vouch_id: str, body: dict, user: dict = Depends(require_role())):
     try:
-        return _rel_store().contest_vouch(vouch_id, user["id"], str(body.get("note") or ""))
+        out = _rel_store().contest_vouch(vouch_id, user["id"], str(body.get("note") or ""))
     except RelationshipError as exc:
         raise HTTPException(404, str(exc))
+    school = user.get("school_id") or 1
+    for uid in _school_coordinators(school):   # the queue they resolve (B10) — the note stays there
+        _notify_user(uid, school, "vouch_contested", "A vouch was contested",
+                     "A member disputed a vouch written about them. It's in the vouch review "
+                     "queue.", entity="vouch", entity_id=vouch_id)
+    return out
 
 
 @router.post("/api/vouches/{vouch_id}/verify")
@@ -1195,7 +1545,12 @@ def intro_equity(format: str = "json",
     """Does warm-intro ACCESS/CONVERSION concentrate among privileged self-ID groups? Computed from
     TWO INDEPENDENT AuditDB.aggregate() calls per attribute (denominator=all applicants,
     numerator=intro receivers / converters) — never an aligned per-person label list. The scoring
-    plane supplies only opaque refs; the audit DB answers with min-cell-suppressed counts."""
+    plane supplies only opaque refs; the audit DB answers with min-cell-suppressed counts.
+
+    A7: every cohort is filtered to students holding `network_analytics` — the consent whose whole
+    point is "you may count me in fairness/overlap aggregates". Shipping this report over the
+    non-consenting was the promise this route had been breaking.
+    A8: served through the snapshot policy, so two reads can't be differenced across a joiner."""
     from ..audit.metrics import access_disparity
     from ..stores.audit_store import AuditDB
     from ..stores.data_planes import AUDITABLE_ATTRIBUTES
@@ -1210,14 +1565,27 @@ def intro_equity(format: str = "json",
         converted = [r["requester_user_id"] for r in conn.execute(
             "SELECT DISTINCT requester_user_id FROM intro_requests WHERE school_id=? "
             "AND status='accepted'", (school,))]
-    audit = AuditDB()
-    report = {}
-    for attr in sorted(AUDITABLE_ATTRIBUTES):
-        denom = audit.aggregate(_refs(applicants), attr)["counts"]
-        report[attr] = {
-            "access": access_disparity(audit.aggregate(_refs(requested), attr)["counts"], denom),
-            "conversion": access_disparity(audit.aggregate(_refs(converted), attr)["counts"], denom),
-        }
+    students = _student_store()
+    applicants = students.filter_by_consent(applicants, "network_analytics")
+    requested = students.filter_by_consent(requested, "network_analytics")
+    converted = students.filter_by_consent(converted, "network_analytics")
+
+    def _compute() -> dict:
+        audit = AuditDB()
+        by_attr = {}
+        for attr in sorted(AUDITABLE_ATTRIBUTES):
+            denom = audit.aggregate(_refs(applicants), attr)["counts"]
+            by_attr[attr] = {
+                "access": access_disparity(audit.aggregate(_refs(requested), attr)["counts"],
+                                           denom),
+                "conversion": access_disparity(audit.aggregate(_refs(converted), attr)["counts"],
+                                               denom),
+            }
+        return {"applicants": len(applicants), "requested": len(requested),
+                "converted": len(converted), "by_attribute": by_attr}
+
+    payload = _serve_snapshot("intro_equity", school, len(applicants), _compute)
+    report = payload["by_attribute"]
     if format == "csv":
         import csv
         import io
@@ -1230,8 +1598,7 @@ def intro_equity(format: str = "json",
             for name, d in funnels.items():
                 w.writerow([attr, name, d["min_impact_ratio"], d["four_fifths_pass"]])
         return PlainTextResponse(buf.getvalue(), media_type="text/csv")
-    return {"applicants": len(applicants), "requested": len(requested),
-            "converted": len(converted), "by_attribute": report}
+    return payload
 
 
 # ---- Slice AI: mitigation coverage + coordinator-initiated bridge (governed positive action) ------
@@ -1239,7 +1606,11 @@ def intro_equity(format: str = "json",
 def network_coverage(user: dict = Depends(require_role("coordinator", "admin"))):
     """Structural under-networking (network_poverty = a discoverable student with ZERO shareable
     edges) and how many got a coordinator/alumni bridge. NEVER keyed on self-ID — the trigger is
-    structural. This is the shut-off dashboard for the positive-action program."""
+    structural. This is the shut-off dashboard for the positive-action program.
+
+    A7/FH-H3: this report was the one A7 forgot. Counting a student's network position is analytics
+    ABOUT that student, so the whole cohort — discoverable AND bridged — is filtered to holders of
+    `network_analytics`; `graph_discoverable` alone is consent to be FOUND, not to be measured."""
     school = user.get("school_id") or 1
     now = time.time()
     with closing(db_connect()) as conn:
@@ -1247,7 +1618,14 @@ def network_coverage(user: dict = Depends(require_role("coordinator", "admin")))
             "SELECT u.id AS user_id FROM users u WHERE u.school_id=? AND u.role='student' "
             "AND EXISTS(SELECT 1 FROM consents c WHERE c.user_id=u.id "
             "          AND c.purpose='graph_discoverable' AND c.revoked_at IS NULL)", (school,))]
-        under = 0
+        accepted = [r["requester_user_id"] for r in conn.execute(
+            "SELECT DISTINCT requester_user_id FROM intro_requests WHERE school_id=? "
+            "AND status='accepted'", (school,))]
+    students = _student_store()
+    discoverable = students.filter_by_consent(discoverable, "network_analytics")
+    bridged = len(students.filter_by_consent(accepted, "network_analytics"))
+    under = 0
+    with closing(db_connect()) as conn:
         for uid in discoverable:
             deg = conn.execute(
                 "SELECT COUNT(*) FROM graph_edges ge WHERE ge.school_id=? "
@@ -1256,12 +1634,10 @@ def network_coverage(user: dict = Depends(require_role("coordinator", "admin")))
                 (school, uid, uid, now)).fetchone()[0]
             if deg == 0:
                 under += 1
-        bridged = conn.execute(
-            "SELECT COUNT(DISTINCT requester_user_id) FROM intro_requests WHERE school_id=? "
-            "AND status='accepted'", (school,)).fetchone()[0]
     return {"discoverable_students": len(discoverable), "network_poverty": under,
             "students_with_accepted_intro": bridged,
-            "note": "network_poverty is structural (zero shareable edges), never self-ID-based"}
+            "note": "network_poverty is structural (zero shareable edges), never self-ID-based; "
+                    "cohort = graph_discoverable AND network_analytics consent"}
 
 
 @router.post("/api/coordinator/intros/bridge")
@@ -1293,6 +1669,9 @@ def intro_card(application_id: str,
         raise HTTPException(404, "No such application.")
     posting = _posting_store().get(app_row["posting_id"])
     _require_own_org_posting(posting, user)
+    # RELATIONSHIPS.md:395 — an evidence-card view is a human seeing relationship evidence about a
+    # candidate, i.e. the same AEDT-relevant moment the shortlist view logs. Dedupe is inside.
+    _record_exposure(user, app_row["posting_id"])
     intros = _intro_store().accepted_for_application(application_id)
     vouches = _rel_store().vouches_for_subject_on_posting(app_row["student_id"],
                                                           app_row["posting_id"])

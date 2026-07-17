@@ -28,6 +28,16 @@
 
 .NOTES
   Config via params or env: RMDEMO_SSH, RMDEMO_HEALTH_URL, RMDEMO_BRANCH, RMDEMO_REPO_DIR.
+
+  PROD APP POSTURE (Phase-5 A15/A16 - set in deploy/cohost/.env, see .env.example)
+  With RM_ENV=prod the app REFUSES TO START if RM_ADMIN_PASSWORD is unset or a known-weak default,
+  or if RM_COOKIE_SECURE is explicitly off. That is a container-start failure, so the HEALTHCHECK
+  never goes green and the health poll (or -Remote's auto-rollback) reports it as a failed deploy -
+  check `docker logs rmdemo-app` for the RuntimeError before re-running.
+  (RM_ENV is not forwarded by docker-compose.cohost.yml yet - that one-line `environment:` addition
+  is the recorded gate for treating this stack as prod; see deploy/cohost/.env.example.)
+  Admin sessions are server-side (admin_sessions table): rotating RM_ADMIN_PASSWORD and redeploying
+  invalidates every outstanding admin session immediately - the incident-response logout-all.
 #>
 [CmdletBinding()]
 param(

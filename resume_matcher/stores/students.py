@@ -29,10 +29,12 @@ CONSENT_PURPOSES = (
 )
 
 # Forward-only application transitions (employer/coordinator move them; students only apply).
+# 'withdrawn' (Phase 5 B7) is terminal and student-initiated ONLY — set_status refuses it so an
+# employer can never withdraw on a student's behalf; students go through withdraw().
 _APP_TRANSITIONS = {
-    "applied": {"shortlisted", "advanced", "rejected", "hired"},
-    "shortlisted": {"advanced", "rejected", "hired"},
-    "advanced": {"rejected", "hired"},
+    "applied": {"shortlisted", "advanced", "rejected", "hired", "withdrawn"},
+    "shortlisted": {"advanced", "rejected", "hired", "withdrawn"},
+    "advanced": {"rejected", "hired", "withdrawn"},
 }
 
 
@@ -103,6 +105,52 @@ class StudentStore:
 
     def consents(self, user_id: int) -> dict[str, bool]:
         return {p: self.has_consent(user_id, p) for p in CONSENT_PURPOSES}
+
+    def filter_by_consent(self, user_ids: list[int], purpose: str) -> list[int]:
+        """Keep only ids holding an active consent for `purpose` (A7 cohort filter); one IN(...)
+        query, input order preserved."""
+        if not user_ids:
+            return []
+        placeholders = ",".join("?" * len(user_ids))
+        with closing(self._conn()) as conn:
+            ok = {r[0] for r in conn.execute(
+                f"SELECT DISTINCT user_id FROM consents WHERE user_id IN ({placeholders}) "
+                "AND purpose=? AND revoked_at IS NULL",
+                (*user_ids, purpose),
+            )}
+        return [uid for uid in user_ids if uid in ok]
+
+    # ---- alumni (Phase 5 C4: users.alumni_status attribute, never a role) -------------------------
+    def set_alumni_status(self, user_id: int, school_id: int, status: str,
+                          attested_by: int | None = None) -> None:
+        """School-scoped (D13): a cross-tenant user_id looks absent (route answers 404)."""
+        if status not in ("none", "self_claimed", "verified"):
+            raise StudentError(f"Unknown alumni status {status!r}.")
+        with closing(self._conn()) as conn:
+            cur = conn.execute("UPDATE users SET alumni_status=? WHERE id=? AND school_id=?",
+                               (status, user_id, school_id))
+            if not cur.rowcount:
+                raise StudentError("No such user.")
+            if attested_by is not None and status == "verified":
+                # the coordinator's out-of-band SIS check; this append-only row IS the record
+                conn.execute(
+                    "INSERT INTO events(actor_user_id, action, entity, entity_id, at) "
+                    "VALUES(?,?,?,?,?)",
+                    (attested_by, "alumni_verified", "user", str(user_id), time.time()),
+                )
+            conn.commit()
+
+    def alumni_queue(self, school_id: int) -> list[dict]:
+        """Coordinator verification queue: self-claimed alumni in THIS school. Deliberately no
+        grad_year anywhere near this query (privacy F2 — coordinators verify by email vs SIS)."""
+        with closing(self._conn()) as conn:
+            rows = conn.execute(
+                "SELECT u.id AS user_id, u.email, p.program FROM users u "
+                "LEFT JOIN student_profiles p ON p.user_id = u.id "
+                "WHERE u.school_id=? AND u.alumni_status='self_claimed' ORDER BY u.id",
+                (school_id,),
+            ).fetchall()
+        return [dict(r) for r in rows]
 
     # ---- resume (one active per student; hard delete honored) -------------------------------------
     def save_resume(self, user_id: int, filename: str, content_type: str, data: bytes,
@@ -198,16 +246,19 @@ class ApplicationStore:
             ).fetchall()
         return [dict(r) for r in rows]
 
-    def for_posting(self, posting_id: str) -> list[dict]:
+    def for_posting(self, posting_id: str, include_withdrawn: bool = False) -> list[dict]:
         """Applicants for an employer/coordinator. Students are identified by an opaque ref;
-        their email is included ONLY under an active `contact` consent."""
+        their email is included ONLY under an active `contact` consent. Withdrawn applications
+        are excluded by default (B7)."""
         with closing(self._conn()) as conn:
             rows = conn.execute(
                 "SELECT a.id, a.student_id, a.status, a.human_review_requested, a.created_at, "
                 "u.email AS _email, EXISTS(SELECT 1 FROM consents c WHERE c.user_id=a.student_id "
                 "AND c.purpose='contact' AND c.revoked_at IS NULL) AS _contact_ok "
                 "FROM applications a JOIN users u ON u.id = a.student_id "
-                "WHERE a.posting_id=? ORDER BY a.created_at",
+                "WHERE a.posting_id=?"
+                + ("" if include_withdrawn else " AND a.status != 'withdrawn'")
+                + " ORDER BY a.created_at",
                 (posting_id,),
             ).fetchall()
         out = []
@@ -219,6 +270,8 @@ class ApplicationStore:
         return out
 
     def set_status(self, app_id: str, to_status: str) -> dict:
+        if to_status == "withdrawn":
+            raise StudentError("Students withdraw their own applications.")
         with closing(self._conn()) as conn:
             row = conn.execute("SELECT status FROM applications WHERE id=?", (app_id,)).fetchone()
             if row is None:
@@ -227,6 +280,20 @@ class ApplicationStore:
                 raise StudentError(f"Can't move a {row['status']} application to {to_status}.")
             conn.execute("UPDATE applications SET status=?, updated_at=? WHERE id=?",
                          (to_status, time.time(), app_id))
+            conn.commit()
+        return self.get(app_id)
+
+    def withdraw(self, app_id: str, student_id: int) -> dict:
+        """B7: student-initiated, ownership-checked, terminal (nothing leaves 'withdrawn')."""
+        with closing(self._conn()) as conn:
+            row = conn.execute("SELECT status FROM applications WHERE id=? AND student_id=?",
+                               (app_id, student_id)).fetchone()
+            if row is None:
+                raise StudentError("No such application.")
+            if "withdrawn" not in _APP_TRANSITIONS.get(row["status"], set()):
+                raise StudentError(f"Can't withdraw a {row['status']} application.")
+            conn.execute("UPDATE applications SET status='withdrawn', updated_at=? WHERE id=?",
+                         (time.time(), app_id))
             conn.commit()
         return self.get(app_id)
 

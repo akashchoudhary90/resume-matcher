@@ -1,0 +1,217 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="theme-color" content="#0f1419" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<meta name="robots" content="noindex" />
+<title>Remove me from the campus recruiting network</title>
+<!--
+  B3 / A1 — the PUBLIC non-member data-subject page (docs/PHASE5.md §4, §3.1).
+
+  Design constraints this page holds:
+    * No auth, no nav chrome, no links back into the signed-in app. The person this page exists for
+      has no account and must never meet a sign-in wall to exercise a removal right.
+    * NEUTRAL success copy on BOTH paths (§8): the page never reveals whether the details matched
+      anything. "Queued" and "sent" are said identically whether or not a record exists — the
+      route's 202 shapes are a non-oracle only if the UI stays one too.
+    * Nothing is deleted from here. The email path buys a CHALLENGE (prove the address, then the
+      deletion is self-action); the name path buys a coordinator REVIEW. The page says so plainly
+      so nobody leaves believing a submit was a deletion.
+    * Every rendered value goes through esc() — the only strings we echo are ones the visitor
+      typed, but this page's output is also the one an attacker would aim at themselves first.
+-->
+<style>
+  :root { --bg:#0f1419; --panel:#1a2029; --panel2:#222b36; --line:#2c3744; --text:#e6edf3;
+          --muted:#9aa7b4; --accent:#4f9dde; --red:#f85149; --green:#3fb950; }
+  * { box-sizing:border-box; }
+  body { margin:0; font:14px/1.6 -apple-system,Segoe UI,Roboto,Helvetica,Arial,sans-serif;
+         background:var(--bg); color:var(--text); }
+  header { padding:14px 22px; border-bottom:1px solid var(--line); }
+  header h1 { font-size:17px; margin:0; } header h1 span { color:var(--accent); }
+  main { max-width:720px; margin:0 auto; padding:18px 22px 60px; }
+  .card { background:var(--panel); border:1px solid var(--line); border-radius:10px; padding:18px; margin-bottom:18px; }
+  h2 { font-size:15px; margin:0 0 10px; }
+  p { margin:8px 0; }
+  label { display:block; font-size:11.5px; color:var(--muted); margin:10px 0 3px; text-transform:uppercase; letter-spacing:.03em; }
+  input { width:100%; background:var(--panel2); border:1px solid var(--line); color:var(--text);
+          border-radius:6px; padding:8px 10px; font:inherit; }
+  button { background:var(--accent); color:#06121f; border:0; padding:8px 13px; border-radius:6px;
+           font-weight:600; cursor:pointer; font-size:13px; }
+  button.ghost { background:var(--panel2); color:var(--text); border:1px solid var(--line); }
+  button:disabled { opacity:.5; cursor:not-allowed; }
+  .tabs { display:flex; gap:8px; margin-bottom:14px; }
+  .tabs button { flex:1; }
+  .tabs button[aria-selected="true"] { outline:2px solid var(--accent); }
+  .muted { color:var(--muted); font-size:12.5px; }
+  .err { color:var(--red); min-height:16px; font-size:12.5px; margin-top:8px; }
+  .ok { color:var(--green); font-size:13px; margin-top:8px; }
+  .row { display:flex; gap:10px; align-items:end; } .row > div { flex:1; }
+  .hidden { display:none !important; }
+  code { background:var(--panel2); padding:1px 5px; border-radius:4px; }
+  @media (max-width: 700px) {
+    main { padding: 12px 10px 40px; }
+    .row { flex-wrap: wrap; } .row > div { flex: 1 1 100%; }
+    button { padding: 11px 16px; }
+  }
+</style>
+</head>
+<body>
+<header>
+  <h1>Remove me from the <span>campus recruiting</span> network</h1>
+</header>
+<main>
+
+  <section class="card">
+    <h2>Why you might be here</h2>
+    <p>Members of this network can upload their own contact export so the system can find people they
+      already know. If someone you know did that and you were in their contacts, your name may have
+      been used to derive a private connection — <b>you don't have an account here, and nothing about
+      you is shown to anyone.</b></p>
+    <p>You can ask for those derived records to be removed. Two ways, below. Neither one requires an
+      account, and neither one tells us — or you — whether any record actually exists: we answer
+      every request the same way on purpose, so this page can't be used to check who is in the
+      network.</p>
+  </section>
+
+  <section class="card">
+    <div class="tabs" role="tablist">
+      <button id="tabEmailBtn" class="ghost" role="tab" aria-selected="true"
+              aria-controls="tabEmail">I know the email address</button>
+      <button id="tabNameBtn" class="ghost" role="tab" aria-selected="false"
+              aria-controls="tabName">I only know the name</button>
+    </div>
+
+    <div id="tabEmail" role="tabpanel">
+      <h2>Confirm the address, then it's your own removal</h2>
+      <p class="muted">We email that address a confirmation code. Entering it proves you control the
+        address, which makes the removal your own action rather than an anonymous claim about
+        someone else. The code expires in 48 hours.</p>
+      <div class="row">
+        <div><label>Email address</label><input id="reEmail" type="email" autocomplete="email"
+             placeholder="you@example.com" /></div>
+        <div style="flex:0 0 auto"><button id="reSendBtn">Send confirmation code</button></div>
+      </div>
+      <div class="err" id="reEmailErr"></div>
+      <div class="ok" id="reEmailMsg"></div>
+
+      <div id="confirmBox" class="hidden" style="margin-top:14px; border-top:1px solid var(--line); padding-top:12px">
+        <h2>Enter the code</h2>
+        <p class="muted">The email also carries the request id, so you can come back and finish this
+          on any device.</p>
+        <div class="row">
+          <div><label>Request id</label><input id="reReqId" /></div>
+          <div><label>Confirmation code</label><input id="reToken" autocomplete="one-time-code" /></div>
+          <div style="flex:0 0 auto"><button id="reConfirmBtn">Confirm removal</button></div>
+        </div>
+        <div class="err" id="reConfirmErr"></div>
+        <div class="ok" id="reConfirmMsg"></div>
+      </div>
+    </div>
+
+    <div id="tabName" role="tabpanel" class="hidden">
+      <h2>Ask a coordinator to review</h2>
+      <p class="muted">Without a proven email address we can't treat this as your own action, so a
+        school coordinator reviews it by hand. What you type here is held only while the review is
+        open, is scrubbed once it's decided, and is deleted after 30 days either way.</p>
+      <div class="row">
+        <div><label>First name</label><input id="reFirst" /></div>
+        <div><label>Last name</label><input id="reLast" /></div>
+        <div><label>Company / school</label><input id="reCompany" /></div>
+      </div>
+      <div class="row" style="margin-top:10px">
+        <div style="flex:0 0 auto"><button id="reNameBtn">Send for review</button></div>
+      </div>
+      <div class="err" id="reNameErr"></div>
+      <div class="ok" id="reNameMsg"></div>
+    </div>
+  </section>
+
+  <section class="card">
+    <h2>If you <em>do</em> have an account here</h2>
+    <p class="muted">This page is for people who don't. A member's own controls — delete my network,
+      revoke discovery, erase my account — live on your own dashboard and do considerably more than
+      this page can.</p>
+  </section>
+</main>
+
+<script>
+const $ = s => document.querySelector(s);
+const esc = s => String(s ?? '').replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+const api = async (url, opts={}) => {
+  const r = await fetch(url, {headers:{'Content-Type':'application/json'}, ...opts});
+  const body = await r.json().catch(()=> ({}));
+  if (!r.ok) throw Object.assign(new Error(body.detail || r.statusText), {status:r.status});
+  return body;
+};
+
+function showTab(which) {
+  const email = which === 'email';
+  $('#tabEmail').classList.toggle('hidden', !email);
+  $('#tabName').classList.toggle('hidden', email);
+  $('#tabEmailBtn').setAttribute('aria-selected', String(email));
+  $('#tabNameBtn').setAttribute('aria-selected', String(!email));
+}
+$('#tabEmailBtn').onclick = () => showTab('email');
+$('#tabNameBtn').onclick = () => showTab('name');
+
+// The one line both paths end on. It is deliberately identical in tone and detail whether or not
+// anything matched: the routes answer 202 the same way for a hit and a miss (§8), and copy that
+// said "found you" would hand back the membership oracle the whole design removes.
+const NEUTRAL_EMAIL = 'If that address is one we can act on, a confirmation code is on its way. ' +
+  'Nothing has been removed yet — the code is what authorizes it.';
+const NEUTRAL_NAME = 'Sent for review. A coordinator will look at it by hand. You will not hear ' +
+  'back through this page, and no record of what we do or do not hold is shown here.';
+
+$('#reSendBtn').onclick = async () => {
+  $('#reEmailErr').textContent = ''; $('#reEmailMsg').textContent = '';
+  const email = $('#reEmail').value.trim();
+  if (!email) { $('#reEmailErr').textContent = 'Enter the email address first.'; return; }
+  $('#reSendBtn').disabled = true;
+  try {
+    const r = await api('/api/graph/repudiate', {method:'POST', body: JSON.stringify({email})});
+    $('#reEmailMsg').textContent = NEUTRAL_EMAIL;
+    $('#confirmBox').classList.remove('hidden');
+    $('#reReqId').value = r.request_id || '';
+  } catch (e) {
+    $('#reEmailErr').textContent = e.status === 429
+      ? 'Too many requests from here — wait a few minutes and try again.' : e.message;
+  } finally { $('#reSendBtn').disabled = false; }
+};
+
+$('#reConfirmBtn').onclick = async () => {
+  $('#reConfirmErr').textContent = ''; $('#reConfirmMsg').textContent = '';
+  $('#reConfirmBtn').disabled = true;
+  try {
+    await api('/api/graph/repudiate/confirm', {method:'POST', body: JSON.stringify({
+      request_id: $('#reReqId').value.trim(), email: $('#reEmail').value.trim(),
+      token: $('#reToken').value.trim()})});
+    $('#reConfirmMsg').textContent = 'Confirmed. Any derived records matching that address are gone, '
+      + 'and the address is now blocked from being derived again from anyone else’s upload.';
+    $('#reToken').value = '';
+  } catch (e) {
+    $('#reConfirmErr').textContent = e.status === 429
+      ? 'Too many attempts from here — wait a few minutes and try again.' : e.message;
+  } finally { $('#reConfirmBtn').disabled = false; }
+};
+
+$('#reNameBtn').onclick = async () => {
+  $('#reNameErr').textContent = ''; $('#reNameMsg').textContent = '';
+  const first = $('#reFirst').value.trim(), last = $('#reLast').value.trim();
+  if (!first && !last) { $('#reNameErr').textContent = 'Enter at least a first or last name.'; return; }
+  $('#reNameBtn').disabled = true;
+  try {
+    const r = await api('/api/graph/repudiate', {method:'POST', body: JSON.stringify({
+      first, last, company: $('#reCompany').value.trim()})});
+    // request_id is the only thing we echo, and it is server-minted — esc() anyway: this is the
+    // page an attacker aims at themselves first, and the rule is cheaper than the exception.
+    $('#reNameMsg').innerHTML = esc(NEUTRAL_NAME) + ' <span class="muted">Reference: <code>'
+      + esc(r.request_id || '') + '</code></span>';
+  } catch (e) {
+    $('#reNameErr').textContent = e.status === 429
+      ? 'Too many requests from here — wait a few minutes and try again.' : e.message;
+  } finally { $('#reNameBtn').disabled = false; }
+};
+</script>
+</body>
+</html>

@@ -13,6 +13,8 @@ def _fake_audit():
                                "groups": [], "notes": []},
             "gender": {"four_fifths_pass": True, "min_impact_ratio": 0.91, "flagged": False,
                        "groups": [], "notes": []},
+            "disability": {"four_fifths_pass": None, "min_impact_ratio": None, "flagged": False,
+                           "groups": [], "notes": ["indeterminate under suppression"]},
         },
         "exposure": {"parity_ratio": 0.74},
         "proxy_leakage": {"computable": True, "auc": 0.55, "leakage": False},
@@ -33,6 +35,21 @@ def test_honest_positioning_present():
     assert "not an independent" in blob and "local law 144" in blob.lower() or "ll144" in blob
     assert pack["score_kind"] == "fit_readiness_not_hire_probability"
     assert pack["audit"]["attributes"]["race_ethnicity"]["min_impact_ratio"] == 0.64  # carries the real numbers
+
+
+def test_undecided_verdict_renders_as_indeterminate_not_a_falsy_none():
+    # A4: an undecided four-fifths verdict must never be readable as "not flagged". None is falsy in
+    # every consumer of a signed pack, so it renders as an explicit string instead.
+    audit = _fake_audit()
+    pack = build_compliance_pack(audit, generated_at=1000.0)
+    attrs = pack["audit"]["attributes"]
+    assert attrs["disability"]["four_fifths_pass"] == "indeterminate"
+    assert attrs["race_ethnicity"]["four_fifths_pass"] is False    # real booleans are untouched
+    assert attrs["gender"]["four_fifths_pass"] is True
+    assert audit["attributes"]["disability"]["four_fifths_pass"] is None   # caller's dict unmutated
+    # packs signed before bounded suppression are distinguishable from ones signed after
+    assert pack["pack_semantics"] == "v2-bounded-suppression"
+    assert verify_compliance_pack(pack)["content_intact"]          # the rendering is what's signed
 
 
 def test_tampering_with_a_number_is_detected():

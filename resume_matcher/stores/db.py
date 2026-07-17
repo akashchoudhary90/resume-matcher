@@ -6,8 +6,9 @@ This is the SCORING PLANE ONLY — protected attributes / proxies never get a co
 in the separate audit database (see `stores/data_planes.py`, boundary #2). A CI test greps every
 column of this schema against PROTECTED_KEYS.
 
-Migrations are numbered SQL files in `stores/migrations/NNN_*.sql`, tracked in `schema_version`,
-plus a python column-upgrade pass (`_COLUMN_UPGRADES`) so a users table created by the older
+Migrations are numbered SQL files in `stores/migrations/NNN_*.sql`, tracked in `schema_version`
+(each file + its version row applied as ONE transaction, so a crash can never leave a half-built
+schema or strand rows in a copy-rename scratch table), plus a python column-upgrade pass (`_COLUMN_UPGRADES`) so a users table created by the older
 AccountStore bootstrap gains the new columns in place. `migrate()` is idempotent and cheap when
 current, so callers run it at startup/first-use rather than shipping a separate migrate command.
 """
@@ -33,12 +34,25 @@ _MIGRATE_LOCK = threading.Lock()
 
 # Columns added to tables that may PRE-EXIST a migration (the AccountStore bootstrap creates a bare
 # users table). SQLite backfills existing rows with the DEFAULT, so legacy users become 'student'.
+# Phase-5 plain ADD COLUMNs also live here rather than in 004 (feasibility M1): a raw ALTER inside
+# a migration script would wedge migrate() forever on any partial re-run; _ensure_columns is
+# idempotent and runs on every migrate(), covering fresh, partially-migrated, and legacy DBs alike.
 _COLUMN_UPGRADES: dict[str, dict[str, str]] = {
     "users": {
         "role": "TEXT NOT NULL DEFAULT 'student' "
                 "CHECK(role IN ('student','employer','coordinator','admin'))",
         "org_id": "INTEGER",
         "school_id": "INTEGER NOT NULL DEFAULT 1",
+        # Phase 5 D4: alumni-ness is an ATTRIBUTE, never a role — no users rebuild, no grad_year.
+        "alumni_status": "TEXT NOT NULL DEFAULT 'none' "
+                         "CHECK(alumni_status IN ('none','self_claimed','verified'))",
+    },
+    "intro_requests": {
+        # Phase 5 D5 (C2): 'bridged' iff the chosen path contains an alumni_bridge/mentorship edge.
+        "origin": "TEXT NOT NULL DEFAULT 'organic' CHECK(origin IN ('organic','bridged'))",
+    },
+    "campus_events": {
+        "checkin_code": "TEXT",  # Phase 5 C3: low-entropy second factor on top of registration
     },
 }
 
@@ -81,19 +95,49 @@ def migrate(path: str | None = None) -> int:
             version = int(sql_file.name[:3])
             if version <= current:
                 continue
-            conn.executescript(sql_file.read_text(encoding="utf-8"))
-            # OR IGNORE: two threads may race the first migrate on a fresh DB; the DDL is all
-            # IF NOT EXISTS so a double apply is harmless — the version row must not throw.
-            conn.execute(
-                "INSERT OR IGNORE INTO schema_version(version, applied_at) VALUES(?,?)",
-                (version, time.time()),
-            )
+            # ONE transaction per file, version row included: either the whole migration and its
+            # schema_version row land, or neither does. Non-negotiable for 004's copy-rename
+            # rebuilds — under executescript()'s per-statement autocommit an OOM-kill between
+            # `DROP TABLE graph_edges` and the RENAME left the only copy of the rows in a scratch
+            # table with schema_version still at 3. SQLite DDL is transactional, so a killed
+            # process now rolls back to a clean pre-004 DB.
+            conn.execute("BEGIN IMMEDIATE")
+            try:
+                _apply_script(conn, sql_file.read_text(encoding="utf-8"))
+                # OR IGNORE: two threads may race the first migrate on a fresh DB; the DDL is all
+                # IF NOT EXISTS so a double apply is harmless — the version row must not throw.
+                conn.execute(
+                    "INSERT OR IGNORE INTO schema_version(version, applied_at) VALUES(?,?)",
+                    (version, time.time()),
+                )
+                conn.commit()
+            except BaseException:
+                conn.rollback()
+                raise
             applied += 1
             _log.info("applied migration %s", sql_file.name)
         _ensure_columns(conn)
         _fold_in_legacy_accounts(conn, p)
         conn.commit()
     return applied
+
+
+def _apply_script(conn: sqlite3.Connection, sql: str) -> None:
+    """Execute a migration file statement-by-statement on an OPEN transaction.
+
+    `executescript()` cannot be used here: it COMMITs before running and then autocommits each
+    statement, which is exactly what made a mid-rebuild crash unrecoverable. Statement boundaries
+    come from sqlite3.complete_statement (SQLite's own parser — quotes/comments aware), not from a
+    naive split(';'). Trailing comment-only text is not a statement and is ignored.
+    """
+    buf = ""
+    for line in sql.splitlines(keepends=True):
+        buf += line
+        if sqlite3.complete_statement(buf):
+            conn.execute(buf)
+            buf = ""
+    if any(ln.strip() and not ln.strip().startswith("--") for ln in buf.splitlines()):
+        raise sqlite3.ProgrammingError(f"migration ends with an unterminated statement: {buf[:80]!r}")
 
 
 def _ensure_columns(conn: sqlite3.Connection) -> None:
