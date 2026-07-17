@@ -81,6 +81,43 @@ def connect(path: str | None = None) -> sqlite3.Connection:
     return conn
 
 
+def _snapshot_before_migration(conn: sqlite3.Connection, db_path: str, current: int) -> None:
+    """Snapshot the DB next to itself before the FIRST pending migration touches it.
+
+    A migration is the one deploy step no rollback undoes: the cohost auto-deploy restores the
+    previous image on a failed healthcheck, but the DB it hands that image back is already migrated.
+    And because RM_ACCOUNTS_DB makes this file the live accounts store as well as the platform DB,
+    "just the platform tables" is never the blast radius.
+
+    Uses the online backup API, not a file copy: the app is serving and the DB is WAL, so `cp` can
+    catch a torn page or miss the WAL. Best-effort by design — a demo that cannot write a snapshot
+    (read-only mount, disk full) must still boot, so this logs and continues rather than blocking
+    startup. The durable guard is the backup step in deploy/cohost/auto-deploy.sh, which refuses the
+    deploy outright; this is the in-process net that also covers the very deploy that adds it.
+    Set RM_MIGRATION_BACKUP=0 to skip.
+    """
+    if os.environ.get("RM_MIGRATION_BACKUP", "1").strip().lower() in ("0", "false", "no"):
+        return
+    # "Has anything worth keeping?" is a table question, not a file-size one: connect() has already
+    # created the file and set WAL, so a brand-new DB is non-empty on disk. Ignore our own bookkeeping
+    # table — a DB holding only schema_version has nothing to lose. Legacy DBs sit at version 0 with a
+    # real bootstrapped `users` table, so version alone can't answer this either.
+    tables = conn.execute("SELECT COUNT(*) FROM sqlite_master WHERE type='table' "
+                          "AND name NOT LIKE 'sqlite_%' AND name != 'schema_version'").fetchone()[0]
+    if not tables:
+        return
+    dest = f"{db_path}.pre-v{current}.bak"
+    try:
+        with closing(sqlite3.connect(dest)) as backup:
+            conn.backup(backup)
+        _log.warning("pre-migration snapshot written: %s (restore by copying it back over %s "
+                     "after deleting the stale -wal/-shm)", dest, os.path.basename(db_path))
+    except Exception as exc:                                  # noqa: BLE001 — must never block boot
+        _log.error("pre-migration snapshot FAILED (%s): %s — continuing, but this migration is "
+                   "not undoable; snapshot %s by hand if it holds anything you need", dest, exc,
+                   db_path)
+
+
 def migrate(path: str | None = None) -> int:
     """Apply pending migrations; returns how many were applied (0 == already current)."""
     p = path or platform_db_path()
@@ -91,10 +128,12 @@ def migrate(path: str | None = None) -> int:
             "version INTEGER PRIMARY KEY, applied_at REAL NOT NULL)"
         )
         current = conn.execute("SELECT MAX(version) FROM schema_version").fetchone()[0] or 0
-        for sql_file in sorted(MIGRATIONS_DIR.glob("[0-9][0-9][0-9]_*.sql")):
+        pending = [f for f in sorted(MIGRATIONS_DIR.glob("[0-9][0-9][0-9]_*.sql"))
+                   if int(f.name[:3]) > current]
+        if pending:
+            _snapshot_before_migration(conn, p, current)
+        for sql_file in pending:
             version = int(sql_file.name[:3])
-            if version <= current:
-                continue
             # ONE transaction per file, version row included: either the whole migration and its
             # schema_version row land, or neither does. Non-negotiable for 004's copy-rename
             # rebuilds — under executescript()'s per-statement autocommit an OOM-kill between

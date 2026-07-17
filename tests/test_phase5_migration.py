@@ -3,6 +3,7 @@ the _COLUMN_UPGRADES additions (users.alumni_status, intro_requests.origin,
 campus_events.checkin_code), the NotificationStore (B4-lite), and the run_retention additions."""
 from __future__ import annotations
 
+import os
 import shutil
 import sqlite3
 import time
@@ -310,3 +311,48 @@ def test_run_retention_scrubs_and_purges_phase5_rows(tmp_path):
         r4 = conn.execute("SELECT * FROM repudiation_requests WHERE id='r4'").fetchone()
         assert r4["status"] == "pending" and r4["first"] == "F"
         assert {r[0] for r in conn.execute("SELECT token_hash FROM admin_sessions")} == {"live"}
+
+
+def test_pending_migration_snapshots_the_db_first(tmp_path, monkeypatch):
+    """A migration is the one deploy step no rollback undoes: the cohost auto-deploy hands the
+    previous image back a DB that is ALREADY migrated. And RM_ACCOUNTS_DB makes this file the live
+    accounts store too, so the rows at risk are real users. Before the first pending migration runs,
+    migrate() must leave a restorable snapshot of the pre-migration file."""
+    path = _v3_db(tmp_path, monkeypatch)
+    with closing(platform_db.connect(path)) as conn:
+        conn.execute("INSERT INTO users(id, email, pw_hash, salt, created_at, role) "
+                     "VALUES(7,'real@york.ca','h','s',?,'student')", (time.time(),))
+        conn.commit()
+
+    assert platform_db.migrate(path) == 1   # 004: rebuilds two tables — the risky upgrade
+
+    snap = f"{path}.pre-v3.bak"
+    assert os.path.exists(snap), "no pre-migration snapshot was written"
+    with closing(sqlite3.connect(f"file:{snap}?mode=ro", uri=True)) as backup:
+        assert backup.execute("PRAGMA integrity_check").fetchone()[0] == "ok"
+        assert backup.execute("SELECT email FROM users WHERE id=7").fetchone()[0] == "real@york.ca"
+        # it is a PRE-migration image: v4's tables must not be in it
+        assert backup.execute("SELECT MAX(version) FROM schema_version").fetchone()[0] == 3
+        assert backup.execute("SELECT COUNT(*) FROM sqlite_master WHERE type='table' "
+                              "AND name='notifications'").fetchone()[0] == 0
+
+
+def test_snapshot_never_blocks_boot_and_is_skippable(tmp_path, monkeypatch):
+    """Best-effort by contract: a demo that cannot write a snapshot must still start. And a
+    no-op migrate() must not spray .bak files on every request."""
+    path = str(tmp_path / "p.db")
+    monkeypatch.setenv("RM_MIGRATION_BACKUP", "0")
+    platform_db.migrate(path)
+    assert not list(tmp_path.glob("*.bak")), "RM_MIGRATION_BACKUP=0 must skip the snapshot"
+
+    monkeypatch.delenv("RM_MIGRATION_BACKUP", raising=False)
+    assert platform_db.migrate(path) == 0            # already current: nothing pending
+    assert not list(tmp_path.glob("*.bak")), "a no-op migrate must not snapshot"
+
+    # a failing snapshot (disk full, read-only mount) logs and continues rather than taking the
+    # app down — the deploy-side backup is the blocking guard, this is only the in-process net
+    def boom(*_a, **_kw):
+        raise OSError("disk full")
+    with closing(platform_db.connect(path)) as conn:           # open BEFORE patching connect
+        monkeypatch.setattr(platform_db.sqlite3, "connect", boom)
+        platform_db._snapshot_before_migration(conn, path, 3)   # must not raise
